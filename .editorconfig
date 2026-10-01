@@ -1,0 +1,53 @@
+# 精简版。安装 .NET SDK 后可执行 `dotnet new editorconfig` 生成包含完整
+# 分析器规则集的版本,再按本项目需要裁剪。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{cs,csx}]
+indent_size = 4
+
+# Avalonia 的 XAML、MSBuild 工程文件、JSON、YAML 约定为 2 空格
+[*.{axaml,xaml,xml,csproj,props,targets,sln,json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# using 指令排序:系统命名空间在前
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# 大括号与命名空间
+csharp_new_line_before_open_brace = all
+csharp_style_namespace_declarations = file_scoped:warning
+
+# 限定符:不使用 this. 和类型名限定
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# 类型推断与表达式体
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+
+# 其他常见偏好
+csharp_prefer_braces = true:suggestion
+dotnet_style_readonly_field = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_prefer_readonly_struct = true:suggestion
+
+# 需要 using 但未使用时应移除
+dotnet_diagnostic.IDE0005.severity = warning

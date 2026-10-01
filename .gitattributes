@@ -1,0 +1,32 @@
+# 默认:文本文件在仓库内统一使用 LF,检出时也保持 LF
+* text=auto eol=lf
+
+# Windows 工具链生成的文件保持 CRLF
+*.sln text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制文件不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.mp3 binary
+*.flac binary
+*.mp4 binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.exe binary
+
+# 跨平台协作时避免 diff 噪音
+*.lock linguist-generated=true
+*.Designer.cs linguist-generated=true
