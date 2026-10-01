@@ -8,26 +8,27 @@ LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间�
 
 ## 当前状态
 
-早期搭建阶段。仓库骨架已建立,应用工程尚未创建,等待 .NET SDK 就位后用
-模板生成。
+早期搭建阶段。工程骨架已建立并能通过编译,tests 中的用例可运行。
+界面尚未开始设计。
 
 ## 技术栈
 
 | 项目 | 选择 | 状态 |
 | --- | --- | --- |
-| 运行时 | .NET 10 | 待安装 SDK |
-| 界面 | Avalonia 11.x | 待锁定版本 |
+| 运行时 | .NET 10 | SDK 10.0.401 已安装 |
+| 界面 | Avalonia 12.1.3 | 已引入,含 Fluent 主题与 Inter 字体 |
+| MVVM | CommunityToolkit.Mvvm 8.4.2 | 已引入 |
 | 媒体播放 | LibVLCSharp | 待评估 |
 | 音频分析 | FFT + 自建 mel 滤波器组 | 待评估 |
-| 测试 | xUnit | 待建立 |
+| 测试 | xUnit 2.9.3 | 已建立 |
 
-## 规划目录
+## 目录结构
 
 ```
-LightFlow.sln
+LightFlow.slnx
 src/LightFlow.Core/       领域模型、撤销栈、特效运算、设备协议、音频分析
-src/LightFlow.App/        Avalonia 界面
-tests/LightFlow.Core.Tests/
+src/LightFlow.App/        Avalonia 界面(引用 Core,反过来不成立)
+tests/LightFlow.Core.Tests/  Core 的单元测试
 ```
 
 ## 里程碑
@@ -40,7 +41,13 @@ tests/LightFlow.Core.Tests/
 
 ## 构建
 
-待 .NET SDK 就位后补充。
+```bash
+dotnet build LightFlow.slnx     # 编译
+dotnet test  LightFlow.slnx     # 运行测试
+dotnet run --project src/LightFlow.App   # 启动应用
+```
+
+需要 .NET 10 SDK。CI 在 Windows、Linux、macOS 三个平台分别编译并测试。
 
 ## 许可
 
