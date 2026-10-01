@@ -1,14 +1,11 @@
-# 默认:文本文件在仓库内统一使用 LF,检出时也保持 LF
+# 默认:文本文件在仓库内统一使用 LF,检出时也保持 LF。
+# 这与 .editorconfig 的 end_of_line = lf 保持一致,避免编辑器写入的换行符
+# 与检出结果互相打架。
 * text=auto eol=lf
 
-# Windows 工具链生成的文件保持 CRLF
-*.sln text eol=crlf
-*.csproj text eol=crlf
-*.props text eol=crlf
-*.targets text eol=crlf
+# 批处理脚本保持 CRLF:部分 cmd 语法在 LF 下行为不一致
 *.bat text eol=crlf
 *.cmd text eol=crlf
-*.ps1 text eol=crlf
 
 # 二进制文件不做换行转换
 *.png binary
