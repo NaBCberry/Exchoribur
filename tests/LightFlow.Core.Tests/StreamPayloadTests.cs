@@ -5,6 +5,20 @@ namespace LightFlow.Core.Tests;
 
 public class StreamPayloadTests
 {
+    // 参考值来自现有实现的实际输出,用来保证与设备协议逐字节一致。
+    private static readonly byte[] ReferencePayloadAtFullBrightness =
+    [
+        0x0F, 0x00, 0x10, 0xF0, 0x30, 0x0F, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2F, 0xFF,
+    ];
+
+    // 同一帧在 50% 亮度下的输出,同样取自现有实现。
+    private static readonly byte[] ReferencePayloadAtHalfBrightness =
+    [
+        0x08, 0x00, 0x10, 0x80, 0x30, 0x08, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x88,
+    ];
+
     [Fact]
     public void Encode_returns_twenty_bytes()
     {
@@ -23,18 +37,97 @@ public class StreamPayloadTests
     }
 
     [Fact]
-    public void Encode_matches_the_reference_bytes()
+    public void Encode_at_full_brightness_matches_the_reference_bytes()
     {
-        // 参考值取自现有实现的实际输出,用来保证与设备协议逐字节一致。
+        var payload = StreamPayload.Encode(CreateReferenceFrame(), 100);
+
+        Assert.Equal(ReferencePayloadAtFullBrightness, payload);
+    }
+
+    [Fact]
+    public void Encode_defaults_to_full_brightness()
+    {
+        // 不传亮度参数时必须等同于 100%,否则旧调用会被悄悄改暗。
+        var frame = CreateReferenceFrame();
+
+        Assert.Equal(StreamPayload.Encode(frame, 100), StreamPayload.Encode(frame));
+    }
+
+    [Fact]
+    public void Brightness_limits_are_zero_to_one_hundred()
+    {
+        // 界面上的滑块会引用这两个值设定范围,所以它们是公开契约。
+        Assert.Equal(0, StreamPayload.MinBrightnessPercent);
+        Assert.Equal(100, StreamPayload.MaxBrightnessPercent);
+    }
+
+    [Fact]
+    public void Encode_at_half_brightness_matches_the_reference_bytes()
+    {
+        var payload = StreamPayload.Encode(CreateReferenceFrame(), 50);
+
+        Assert.Equal(ReferencePayloadAtHalfBrightness, payload);
+    }
+
+    [Fact]
+    public void Encode_at_zero_brightness_blacks_out_colors_but_keeps_modes()
+    {
+        // 手工推算的期望值:颜色分量全部归零,功能模式原样保留
+        // (通道 1 慢闪仍占 0x10,通道 2 爆闪仍占 0x30,通道 9 快闪仍占 0x20)。
         byte[] expected =
         [
-            0x0F, 0x00, 0x10, 0xF0, 0x30, 0x0F, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2F, 0xFF,
+            0x00, 0x00, 0x10, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00,
         ];
 
-        var payload = StreamPayload.Encode(CreateReferenceFrame());
+        var payload = StreamPayload.Encode(CreateReferenceFrame(), 0);
 
         Assert.Equal(expected, payload);
+    }
+
+    [Theory]
+    [InlineData((byte)15, 100, (byte)15)]
+    [InlineData((byte)15, 50, (byte)8)]   // 7.5 → 8:四舍五入,不是截断
+    [InlineData((byte)15, 30, (byte)5)]   // 4.5 → 5
+    [InlineData((byte)15, 10, (byte)2)]   // 1.5 → 2
+    [InlineData((byte)9, 50, (byte)5)]    // 4.5 → 5
+    [InlineData((byte)1, 50, (byte)1)]    // 0.5 → 1
+    [InlineData((byte)1, 40, (byte)0)]    // 0.4 → 0
+    [InlineData((byte)15, 0, (byte)0)]
+    public void Encode_rounds_components_half_up(
+        byte component,
+        int brightnessPercent,
+        byte expectedScaledValue)
+    {
+        // 待测分量放在通道 0 的红色位,功能模式为常亮,于是载荷第一个字节
+        // 的低四位就是缩放后的红色值。
+        var frame = Frame.Uniform(0, new LightColor(component, 0, 0), FlashMode.Solid);
+
+        var payload = StreamPayload.Encode(frame, brightnessPercent);
+
+        Assert.Equal(expectedScaledValue, payload[0]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100)]
+    public void Encode_accepts_boundary_brightness(int brightnessPercent)
+    {
+        var payload = StreamPayload.Encode(CreateBlankFrame(), brightnessPercent);
+
+        Assert.Equal(StreamPayload.Length, payload.Length);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(101)]
+    [InlineData(200)]
+    [InlineData(int.MaxValue)]
+    [InlineData(int.MinValue)]
+    public void Encode_rejects_brightness_out_of_range(int brightnessPercent)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => StreamPayload.Encode(CreateBlankFrame(), brightnessPercent));
     }
 
     [Theory]
