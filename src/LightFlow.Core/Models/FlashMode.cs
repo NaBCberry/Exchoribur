@@ -1,5 +1,6 @@
 namespace LightFlow.Core.Models;
 
+/// <summary>协议中 function 字段定义的灯光行为,取值 0-3。</summary>
 public enum FlashMode : byte
 {
     Solid = 0,
@@ -9,8 +10,7 @@ public enum FlashMode : byte
     //还有fade in 和 fade out
 }
 
-/// <summary> 协议定义的灯光行为 </summary>
-
+/// <summary> FlashMode 的取值集合与转换工具。 </summary>
 public static class FlashModes
 {
     public static readonly IReadOnlyList<FlashMode> All =
