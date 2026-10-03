@@ -101,7 +101,7 @@ public class StreamPayloadTests
     {
         // 待测分量放在通道 0 的红色位,功能模式为常亮,于是载荷第一个字节
         // 的低四位就是缩放后的红色值。
-        var frame = Frame.Uniform(0, new LightColor(component, 0, 0), FlashMode.Solid);
+        var frame = Frame.Uniform(TimeSpan.Zero, new LightColor(component, 0, 0), FlashMode.Solid);
 
         var payload = StreamPayload.Encode(frame, brightnessPercent);
 
@@ -138,7 +138,7 @@ public class StreamPayloadTests
     public void Encode_puts_mode_in_the_high_nibble(FlashMode mode, byte expectedFirstByte)
     {
         // 高四位放功能模式,低四位放红色分量。
-        var frame = Frame.Uniform(0, new LightColor(0, 0, 0), mode);
+        var frame = Frame.Uniform(TimeSpan.Zero, new LightColor(0, 0, 0), mode);
 
         var payload = StreamPayload.Encode(frame);
 
@@ -148,7 +148,7 @@ public class StreamPayloadTests
     [Fact]
     public void Encode_puts_green_and_blue_in_the_second_byte()
     {
-        var frame = Frame.Uniform(0, new LightColor(0, 7, 9), FlashMode.Solid);
+        var frame = Frame.Uniform(TimeSpan.Zero, new LightColor(0, 7, 9), FlashMode.Solid);
 
         var payload = StreamPayload.Encode(frame);
 
@@ -162,7 +162,7 @@ public class StreamPayloadTests
         // 只有最后一个通道有值,它的两个字节应该落在载荷末尾。
         var channels = new ChannelState[Frame.ChannelCount];
         channels[^1] = new ChannelState(new LightColor(15, 15, 15), FlashMode.Solid);
-        var frame = new Frame(0, channels);
+        var frame = new Frame(TimeSpan.Zero, channels);
 
         var payload = StreamPayload.Encode(frame);
 
@@ -172,7 +172,7 @@ public class StreamPayloadTests
     }
 
     private static Frame CreateBlankFrame()
-        => Frame.Uniform(0, new LightColor(0, 0, 0), FlashMode.Solid);
+        => Frame.Uniform(TimeSpan.Zero, new LightColor(0, 0, 0), FlashMode.Solid);
 
     private static Frame CreateReferenceFrame()
     {
@@ -182,6 +182,6 @@ public class StreamPayloadTests
         channels[2] = new ChannelState(new LightColor(0, 0, 15), FlashMode.Blink4Hz);
         channels[9] = new ChannelState(new LightColor(15, 15, 15), FlashMode.Blink2Hz);
 
-        return new Frame(0, channels);
+        return new Frame(TimeSpan.Zero, channels);
     }
 }
