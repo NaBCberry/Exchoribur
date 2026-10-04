@@ -5,7 +5,7 @@ namespace LightFlow.Core.Storage;
 /// <summary>CSV 文本解析结果:表头 + 数据行。</summary>
 public sealed class CsvTable
 {
-    public CsvTable(IReadOnlyList<string> headers, IReadOnlyList<string[]> rows)
+    private CsvTable(IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<string>> rows)
     {
         Headers = headers ?? throw new ArgumentNullException(nameof(headers));
         Rows = rows ?? throw new ArgumentNullException(nameof(rows));
@@ -15,7 +15,7 @@ public sealed class CsvTable
     /// Csv读取整理（好难写啊QAQ）
     /// </summary>
     /// <param name="text">csv进来的字符串</param>
-    /// <returns>(headers, rows)</returns>
+    /// <returns>CsvTable类型(headers, rows)</returns>
     public static CsvTable Parse(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -126,5 +126,5 @@ public sealed class CsvTable
     }
 
     public IReadOnlyList<string> Headers { get; }
-    public IReadOnlyList<string[]> Rows { get; }
+    public IReadOnlyList<IReadOnlyList<string>> Rows { get; }
 }
