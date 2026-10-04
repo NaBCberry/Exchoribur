@@ -1,13 +1,17 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LightFlow.App.ViewModels"
+        xmlns:controls="using:LightFlow.App.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="760"
         x:Class="LightFlow.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="LightFlow.App">
+        Width="1280" Height="760"
+        MinWidth="960" MinHeight="600"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Title="LightFlow">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -15,8 +19,60 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <DockPanel>
+        <!-- 顶部菜单占位:还没接功能,先定位置 -->
+        <Border DockPanel.Dock="Top"
+                Height="34"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="20"
+                        Margin="12,0"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="menu" Text="文件" />
+                <TextBlock Classes="menu" Text="编辑" />
+                <TextBlock Classes="menu" Text="视图" />
+                <TextBlock Classes="menu" Text="帮助" />
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="340,*">
+            <!-- 左栏:视频预览 + 播放控制 + 十通道状态 -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="8">
+                <Border Grid.Row="0" Classes="panel" Height="191">
+                    <TextBlock Classes="hint" Text="视频预览" />
+                </Border>
+
+                <StackPanel Grid.Row="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0,8">
+                    <Button Classes="transport" Content="⏮" />
+                    <Button Classes="transport" Content="▶" />
+                    <Button Classes="transport" Content="⏸" />
+                    <Button Classes="transport" Content="⏹" />
+                    <Button Classes="transport" Content="⏭" />
+                </StackPanel>
+
+                <Border Grid.Row="2" Classes="panel">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="通道状态" />
+                        <controls:LightStatusControl CurrentFrame="{Binding CurrentFrame}" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形 -->
+            <Grid Grid.Column="1" RowDefinitions="*,110" Margin="0,8,8,8">
+                <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
+                    <controls:TimelineControl Frames="{Binding Frames}"
+                                              PlayheadTime="{Binding PlayheadTime}" />
+                </Border>
+
+                <Border Grid.Row="1" Classes="panel">
+                    <TextBlock Classes="hint" Text="音频波形(待接入)" />
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
 
 </Window>
