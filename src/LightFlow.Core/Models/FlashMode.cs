@@ -1,6 +1,6 @@
 namespace LightFlow.Core.Models;
 
-/// <summary>协议中 function 字段定义的灯光行为,取值 0-3。</summary>
+/// <summary>协议中 function 字段定义的灯光行为。</summary>
 public enum FlashMode : byte
 {
     Solid = 0,
@@ -8,7 +8,10 @@ public enum FlashMode : byte
     Blink2Hz = 2,
     Blink4Hz = 3,
     //还有fade in 和 fade out
+
+    /// <summary>忘记啥了，确认之后记得改</summary>
     Wangle = 10,
+    /// <summary>忘记啥了，确认之后记得改</summary>
     Wangle2 = 11
 }
 
