@@ -28,17 +28,16 @@ public class FlashModeTests
     }
 
     [Fact]
-    public void All_covers_every_defined_mode()
+    public void Legacy_values_are_recognised_but_not_offered_in_the_ui()
     {
-        // "枚举 + 清单"这种结构最容易出的错:加了枚举成员,忘了同步清单。
-        // 数量对不上或漏掉成员时这里会失败。
-        var defined = Enum.GetValues<FlashMode>();
+        // 真实工程文件里出现过 10 和 11,语义还没确认。
+        // 程序必须能表达并原样保留它们,但界面不该提供选择,所以不放进 All。
+        Assert.True(FlashModes.TryFromRawValue(10, out var first));
+        Assert.True(FlashModes.TryFromRawValue(11, out var second));
 
-        Assert.Equal(defined.Length, FlashModes.All.Count);
-        foreach (var mode in defined)
-        {
-            Assert.Contains(mode, FlashModes.All);
-        }
+        Assert.DoesNotContain(first, FlashModes.All);
+        Assert.DoesNotContain(second, FlashModes.All);
+        Assert.Equal(4, FlashModes.All.Count);
     }
 
     [Theory]
@@ -46,7 +45,9 @@ public class FlashModeTests
     [InlineData((byte)1, FlashMode.Blink1Hz)]
     [InlineData((byte)2, FlashMode.Blink2Hz)]
     [InlineData((byte)3, FlashMode.Blink4Hz)]
-    public void TryFromRawValue_accepts_protocol_values(byte raw, FlashMode expected)
+    [InlineData((byte)10, FlashMode.Wangle)]
+    [InlineData((byte)11, FlashMode.Wangle2)]
+    public void TryFromRawValue_accepts_defined_values(byte raw, FlashMode expected)
     {
         Assert.True(FlashModes.TryFromRawValue(raw, out var mode));
         Assert.Equal(expected, mode);
