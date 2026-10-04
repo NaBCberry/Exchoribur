@@ -28,12 +28,18 @@ public class TimelineTests
     }
 
     [Fact]
-    public void Constructor_rejects_duplicate_frame_times()
+    public void Duplicate_frame_times_keep_their_input_order()
     {
-        // 取某一时刻的灯光状态依赖严格升序,两个相同时间谁先谁后没有确定答案。
-        var frames = new[] { CreateFrame(100), CreateFrame(100) };
+        // 真实工程文件里出现过同一时间的两帧(除了 frame_id 完全相同)。
+        // 不能因此拒绝文件,所以两帧都保留,靠稳定排序保住它们的先后顺序,
+        // "后出现的覆盖先出现的"完全依赖这一点。
+        var frames = new[] { CreateFrame(1000, 3), CreateFrame(1000, 9) };
 
-        Assert.Throws<ArgumentException>(() => new Timeline(frames, []));
+        var timeline = new Timeline(frames, []);
+
+        Assert.Equal(2, timeline.Frames.Count);
+        Assert.Equal((byte)3, timeline.Frames[0].Channels[0].Color.Red);
+        Assert.Equal((byte)9, timeline.Frames[1].Channels[0].Color.Red);
     }
 
     [Fact]
@@ -48,6 +54,68 @@ public class TimelineTests
 
         Assert.Equal(TimeSpan.FromMilliseconds(100), timeline.Frames[0].Time);
         Assert.Equal("A", timeline.Markers[0].Name);
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_null_before_the_first_frame()
+    {
+        var timeline = new Timeline([CreateFrame(1000)], []);
+
+        Assert.Null(timeline.GetFrameAt(TimeSpan.FromMilliseconds(999)));
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_the_frame_at_the_exact_time()
+    {
+        var timeline = new Timeline([CreateFrame(1000, 3)], []);
+
+        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(1000));
+
+        Assert.NotNull(frame);
+        Assert.Equal(TimeSpan.FromMilliseconds(1000), frame.Time);
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_the_previous_frame_between_frames()
+    {
+        // 灯光状态是阶跃的:两个灯光帧之间一直沿用前一帧的状态。
+        var timeline = new Timeline([CreateFrame(1000, 3), CreateFrame(2000, 9)], []);
+
+        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(1500));
+
+        Assert.NotNull(frame);
+        Assert.Equal((byte)3, frame.Channels[0].Color.Red);
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_the_last_frame_after_the_end()
+    {
+        var timeline = new Timeline([CreateFrame(1000, 3), CreateFrame(2000, 9)], []);
+
+        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(99999));
+
+        Assert.NotNull(frame);
+        Assert.Equal((byte)9, frame.Channels[0].Color.Red);
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_the_last_of_several_frames_at_the_same_time()
+    {
+        // 同一时间有多帧时,后出现的覆盖先出现的。
+        var timeline = new Timeline(
+            [CreateFrame(3000, 1), CreateFrame(1000, 2), CreateFrame(3000, 3)],
+            []);
+
+        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(3000));
+
+        Assert.NotNull(frame);
+        Assert.Equal((byte)3, frame.Channels[0].Color.Red);
+    }
+
+    [Fact]
+    public void GetFrameAt_returns_null_for_empty_timeline()
+    {
+        Assert.Null(Timeline.Empty.GetFrameAt(TimeSpan.Zero));
     }
 
     [Fact]
@@ -97,9 +165,9 @@ public class TimelineTests
         Assert.Equal(TimeSpan.FromMilliseconds(1234.5), timeline.Markers[0].Time);
     }
 
-    private static Frame CreateFrame(double milliseconds)
+    private static Frame CreateFrame(double milliseconds, byte red = 0)
         => Frame.Uniform(
             TimeSpan.FromMilliseconds(milliseconds),
-            new LightColor(0, 0, 0),
+            new LightColor(red, 0, 0),
             FlashMode.Solid);
 }
