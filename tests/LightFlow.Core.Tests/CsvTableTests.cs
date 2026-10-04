@@ -90,7 +90,7 @@ public class CsvTableTests
         // 空字段必须保留:少一个字段会让后面所有列错位。
         var table = CsvTable.Parse("h1,h2,h3\n" + line);
 
-        Assert.Equal(expectedFieldCount, table.Rows[0].Length);
+        Assert.Equal(expectedFieldCount, table.Rows[0].Count);
     }
 
     [Fact]
