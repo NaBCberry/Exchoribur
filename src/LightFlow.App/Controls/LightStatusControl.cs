@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using LightFlow.Core.Models;
 
@@ -41,6 +42,9 @@ public sealed class LightStatusControl : Control
         var lampWidth = Math.Max(0, width - lampLeft - 12);
         var frame = CurrentFrame;
 
+        // 自绘的文字也要跟着窗口上设置的字体走,不能写死默认字体。
+        var typeface = new Typeface(TextElement.GetFontFamily(this));
+
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
             var y = channel * rowHeight;
@@ -60,12 +64,12 @@ public sealed class LightStatusControl : Control
 
             var label = new FormattedText(
                 $"CH{channel}",
-                CultureInfo.InvariantCulture,
+                CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
-                Typeface.Default,
-                11,
+                typeface,
+                11.5,
                 DimText);
-            context.DrawText(label, new Point(10, y + (rowHeight / 2) - 7));
+            context.DrawText(label, new Point(10, y + (rowHeight / 2) - 7.5));
         }
     }
 }

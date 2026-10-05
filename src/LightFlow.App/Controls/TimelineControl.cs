@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
 using LightFlow.Core;
@@ -23,6 +24,14 @@ public sealed class TimelineControl : Control
     /// <summary>滚轮一格平移多少像素(按住 Shift 或用触控板横扫时)。</summary>
     private const double PanPixelsPerWheelStep = 60;
 
+    /// <summary>
+    /// 刻度上的时间码用等宽字体:数字宽度一致,缩放或平移时标签不会左右抖。
+    /// 列表按顺序取第一个装了的,各平台都有对应的常见等宽字体。
+    /// </summary>
+    private static readonly FontFamily TimecodeFontFamily =
+        new("Cascadia Mono, Consolas, JetBrains Mono, Menlo, DejaVu Sans Mono");
+
+    private static readonly IBrush GutterBackground = new SolidColorBrush(Color.Parse("#202020"));
     private static readonly IBrush TrackBackground = new SolidColorBrush(Color.Parse("#151515"));
     private static readonly IBrush RowBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
     private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
@@ -30,6 +39,7 @@ public sealed class TimelineControl : Control
     private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
     private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
     private static readonly IPen RowSeparatorPen = new Pen(new SolidColorBrush(Color.Parse("#2A2A2A")), 1);
+    private static readonly IPen GutterDividerPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")), 1);
 
     // 渲染热路径:同一个颜色只创建一次画刷,避免每帧每通道都分配新对象。
     private readonly Dictionary<uint, IBrush> _brushCache = [];
@@ -128,53 +138,19 @@ public sealed class TimelineControl : Control
         var trackWidth = TimelineLayout.GetTrackWidth(width);
         var trackHeight = Math.Max(0, height - TimelineLayout.RulerHeight);
         var rowHeight = trackHeight / Frame.ChannelCount;
+        var trackRect = new Rect(
+            TimelineLayout.TrackLeft,
+            TimelineLayout.RulerHeight,
+            trackWidth,
+            trackHeight);
 
-        context.FillRectangle(
-            TrackBackground,
-            new Rect(TimelineLayout.TrackLeft, TimelineLayout.RulerHeight, trackWidth, trackHeight));
+        var uiTypeface = new Typeface(TextElement.GetFontFamily(this));
+        var timecodeTypeface = new Typeface(TimecodeFontFamily);
 
-        var viewport = Viewport;
-        var frames = Frames;
-
-        if (frames is null || frames.Count == 0)
-        {
-            DrawText(
-                context,
-                "还没有数据",
-                DimText,
-                new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
-            return;
-        }
-
-        if (viewport is null || viewport.Scale <= 0)
-        {
-            return;
-        }
-
-        DrawTimeRuler(context, viewport);
-
-        // 只画可见范围内的帧:左边缘那一帧的颜色决定了左边缘是什么颜色,
-        // 所以从"第一个可见帧的前一帧"开始,少算很多屏幕外的帧。
-        var sliceStart = Math.Max(0, TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.Start) - 1);
-        var sliceEnd = TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.End);
-        var count = sliceEnd - sliceStart;
-
-        if (count <= 0)
-        {
-            return;
-        }
-
-        var positions = new double[count + 1];
-        for (var offset = 0; offset < count; offset++)
-        {
-            positions[offset] = TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceStart + offset].Time);
-        }
-
-        // 最后一段铺到"下一帧"的位置;没有下一帧就铺到右边缘,
-        // 这样"保持到最后一帧"的意思才看得出来。
-        positions[count] = sliceEnd < frames.Count
-            ? TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceEnd].Time)
-            : TimelineLayout.TrackLeft + trackWidth;
+        // 左侧通道名列先铺一层不透明的底:它永远是最下层,后面任何东西
+        // 都不该盖到通道名上面。
+        context.FillRectangle(GutterBackground, new Rect(0, 0, TimelineLayout.TrackLeft, height));
+        context.FillRectangle(TrackBackground, trackRect);
 
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
@@ -182,14 +158,89 @@ public sealed class TimelineControl : Control
             context.FillRectangle(
                 RowBackground,
                 new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
+        }
 
-            DrawChannelTrack(context, frames, positions, sliceStart, count, channel, y, rowHeight);
+        var hasFrames = Frames is { Count: > 0 };
 
-            DrawText(context, $"CH{channel}", DimText, new Point(10, y + (rowHeight / 2) - 7), 11);
+        if (Frames is { Count: > 0 } frames && Viewport is { Scale: > 0 } viewport)
+        {
+            DrawTimeRuler(context, timecodeTypeface, viewport);
+
+            // 只画可见范围内的帧:左边缘那一帧的颜色决定了左边缘是什么颜色,
+            // 所以从"第一个可见帧的前一帧"开始,少算很多屏幕外的帧。
+            var sliceStart = Math.Max(
+                0,
+                TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.Start) - 1);
+            var sliceEnd = TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.End);
+            var count = sliceEnd - sliceStart;
+
+            if (count > 0)
+            {
+                var positions = new double[count + 1];
+                for (var offset = 0; offset < count; offset++)
+                {
+                    positions[offset] = TimelineLayout.TrackLeft
+                        + viewport.MapTime(frames[sliceStart + offset].Time);
+                }
+
+                // 最后一段铺到"下一帧"的位置;没有下一帧就铺到右边缘,
+                // 这样"保持到最后一帧"的意思才看得出来。
+                positions[count] = sliceEnd < frames.Count
+                    ? TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceEnd].Time)
+                    : TimelineLayout.TrackLeft + trackWidth;
+
+                // 色块裁剪在轨道区里:左边缘那一帧的时间在视口之外,横坐标是负数,
+                // 不裁剪就会盖住左边的通道名。右边缘同理,不裁剪会盖住右侧留白。
+                using (context.PushClip(trackRect))
+                {
+                    for (var channel = 0; channel < Frame.ChannelCount; channel++)
+                    {
+                        DrawChannelTrack(
+                            context,
+                            frames,
+                            positions,
+                            sliceStart,
+                            count,
+                            channel,
+                            TimelineLayout.RulerHeight + (channel * rowHeight),
+                            rowHeight);
+                    }
+                }
+
+                DrawMarkers(context, uiTypeface, viewport);
+            }
+        }
+
+        // 通道名和分隔线最后画,保证永远在最上层。
+        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        {
+            var y = TimelineLayout.RulerHeight + (channel * rowHeight);
+
+            DrawText(
+                context,
+                uiTypeface,
+                $"CH{channel}",
+                DimText,
+                new Point(10, y + (rowHeight / 2) - 7.5),
+                11.5);
+
             context.DrawLine(RowSeparatorPen, new Point(0, y), new Point(width, y));
         }
 
-        DrawMarkers(context, viewport);
+        context.DrawLine(
+            GutterDividerPen,
+            new Point(TimelineLayout.TrackLeft, 0),
+            new Point(TimelineLayout.TrackLeft, height));
+
+        if (!hasFrames)
+        {
+            DrawText(
+                context,
+                uiTypeface,
+                "还没有数据",
+                DimText,
+                new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
+        }
     }
 
     /// <summary>
@@ -249,7 +300,10 @@ public sealed class TimelineControl : Control
     /// 标记:刻度上一个小旗子,往下拉一条淡色竖线,名字贴在轨道顶部。
     /// 名字互相挤在一起时只保留小旗子,免得糊成一团。
     /// </summary>
-    private void DrawMarkers(DrawingContext context, TimelineViewport viewport)
+    private void DrawMarkers(
+        DrawingContext context,
+        Typeface typeface,
+        TimelineViewport viewport)
     {
         var markers = Markers;
         if (markers is null || markers.Count == 0)
@@ -297,10 +351,10 @@ public sealed class TimelineControl : Control
 
             var name = new FormattedText(
                 marker.Name,
-                CultureInfo.InvariantCulture,
+                CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
-                Typeface.Default,
-                10,
+                typeface,
+                11,
                 MarkerBrush);
 
             var tag = new Rect(
@@ -316,7 +370,10 @@ public sealed class TimelineControl : Control
         }
     }
 
-    private void DrawTimeRuler(DrawingContext context, TimelineViewport viewport)
+    private void DrawTimeRuler(
+        DrawingContext context,
+        Typeface typeface,
+        TimelineViewport viewport)
     {
         var step = TimelineLayout.ChooseTickStep(1 / viewport.Scale).Ticks;
         if (step <= 0)
@@ -324,7 +381,7 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 从"第一个不小于左边缘的整数刻度"开始,用刻度数累加避免毫秒浮点误差。
+        // 从"第一个不小于左边缘的整数刻度"开始,用刻度数累加避免浮点误差。
         var tick = viewport.Start.Ticks / step * step;
         if (tick < viewport.Start.Ticks)
         {
@@ -342,7 +399,7 @@ public sealed class TimelineControl : Control
                 new Point(x, TimelineLayout.RulerHeight - 5),
                 new Point(x, TimelineLayout.RulerHeight));
 
-            DrawText(context, Timecode.Format(time), DimText, new Point(x + 3, 5), 10.5);
+            DrawText(context, typeface, Timecode.Format(time), DimText, new Point(x + 3, 5), 11);
 
             tick += step;
         }
@@ -451,6 +508,7 @@ public sealed class TimelineControl : Control
 
     private static void DrawText(
         DrawingContext context,
+        Typeface typeface,
         string text,
         IBrush brush,
         Point origin,
@@ -458,9 +516,9 @@ public sealed class TimelineControl : Control
     {
         var formatted = new FormattedText(
             text,
-            CultureInfo.InvariantCulture,
+            CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
-            Typeface.Default,
+            typeface,
             size,
             brush);
 

@@ -15,6 +15,16 @@
         <SolidColorBrush x:Key="DimTextBrush" Color="#8A8A8A" />
     </Styles.Resources>
 
+    <!--
+        界面字体:拉丁字母和数字用随程序打包的 Inter(设计类软件里最常见的选择),
+        中文交给系统里的黑体。这里写的是候选列表,装了的第一个生效;
+        缺字形时的逐字兜底在 Program.cs 的 FontManagerOptions 里配。
+        FontFamily 是可继承属性,写在窗口上,里面所有文字都会跟着走。
+    -->
+    <Style Selector="Window">
+        <Setter Property="FontFamily" Value="Inter, Microsoft YaHei UI, PingFang SC, Noto Sans CJK SC, Source Han Sans SC, Segoe UI" />
+    </Style>
+
     <Style Selector="TextBlock.menu">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="FontSize" Value="13" />
