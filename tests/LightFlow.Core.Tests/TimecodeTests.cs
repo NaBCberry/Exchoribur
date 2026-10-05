@@ -19,6 +19,21 @@ public class TimecodeTests
     }
 
     [Theory]
+    [InlineData(0.0, "00:00.000")]
+    [InlineData(3500.0, "00:03.500")]
+    [InlineData(3500.4, "00:03.500")]
+    [InlineData(3500.5, "00:03.501")]
+    [InlineData(163.6530089474806, "00:00.164")]
+    public void Format_accepts_a_time_span_and_rounds_to_milliseconds(
+        double milliseconds,
+        string expected)
+    {
+        // 真实帧时间像 163.6530089474806 这样,不是整数毫秒;
+        // 显示时按最接近的毫秒取整,0.5 一律向上取,免得同一段时长显示得不一样。
+        Assert.Equal(expected, Timecode.Format(TimeSpan.FromMilliseconds(milliseconds)));
+    }
+
+    [Theory]
     [InlineData("00:03.500", 3500L)]
     [InlineData("00:03,500", 3500L)]
     [InlineData("00:03.5", 3500L)]

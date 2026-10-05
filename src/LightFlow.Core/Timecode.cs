@@ -29,6 +29,14 @@ public static class Timecode
             : $"{sign}{totalMinutes:00}:{seconds:00}.{millisecondsPart:000}";
     }
 
+    /// <summary>
+    /// 把一段时长格式化为时间码文本。
+    /// 帧时间是 <see cref="TimeSpan"/>,它的刻度比毫秒细得多,显示时四舍五入到毫秒;
+    /// 界面不该自己到处写这个换算,所以放在这里统一。
+    /// </summary>
+    public static string Format(TimeSpan time)
+        => Format((long)Math.Round(time.TotalMilliseconds, MidpointRounding.AwayFromZero));
+
     /// <summary>解析时间码文本,失败时返回 false 并把结果置零。</summary>
     public static bool TryParse(string? text, out long milliseconds)
     {
