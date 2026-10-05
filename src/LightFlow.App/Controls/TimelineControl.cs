@@ -550,14 +550,23 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 按住 Shift(或触控板横向滑动)是平移,其余情况以指针位置为锚点缩放。
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) || e.Delta.X != 0)
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
-            var step = e.Delta.X != 0 ? e.Delta.X : e.Delta.Y;
+            // Shift + 滚轮:横向平移时间轴。滚轮往上 = 往时间轴前段看,
+            // 和浏览器里 Shift + 滚轮横向滚动的方向一致。
+            // 有些平台会把 Shift + 滚轮直接送成横向事件,那种情况按横向增量算。
+            var step = e.Delta.Y != 0 ? e.Delta.Y : -e.Delta.X;
+            viewport.PanByPixels(step * PanPixelsPerWheelStep);
+        }
+        else if (e.Delta.X != 0)
+        {
+            // 触摸板的横向滑动:不需要按 Shift,直接横着推时间轴。
+            var step = e.Delta.X;
             viewport.PanByPixels(-step * PanPixelsPerWheelStep);
         }
         else
         {
+            // 普通滚轮:以指针位置为锚点缩放。
             viewport.Zoom(
                 Math.Pow(ZoomPerWheelStep, e.Delta.Y),
                 e.GetPosition(this).X - TimelineLayout.TrackLeft);
