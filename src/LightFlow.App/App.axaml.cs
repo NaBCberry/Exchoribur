@@ -20,9 +20,20 @@ public partial class App : Application
         {
             // 先造窗口,再把窗口交给文件选择器——它要实现弹系统对话框那一半。
             var window = new MainWindow();
-            window.DataContext = new MainViewModel(new StorageProviderTimelineFilePicker(window));
+            var viewModel = new MainViewModel(new StorageProviderTimelineFilePicker(window));
+            window.DataContext = viewModel;
 
             desktop.MainWindow = window;
+
+            // 允许从命令行直接打开一个工程文件(LightFlow.exe 演出.csv),
+            // 以后做文件关联也是走这里。加载失败只在状态栏提示,不拦住启动。
+            var path = desktop.Args?.FirstOrDefault(
+                argument => argument.EndsWith(".csv", StringComparison.OrdinalIgnoreCase));
+
+            if (path is not null)
+            {
+                _ = viewModel.LoadAsync(path);
+            }
         }
 
         base.OnFrameworkInitializationCompleted();
