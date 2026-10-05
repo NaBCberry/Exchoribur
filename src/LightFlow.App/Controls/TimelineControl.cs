@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -10,11 +11,18 @@ namespace LightFlow.App.Controls;
 
 /// <summary>
 /// 十通道灯光时间轴。每一帧用它的颜色一直填到下一帧,画出来的就是灯光实际的
-/// 阶跃行为;顶部是时间刻度,标记画在刻度上并往下拉一条竖线。
-/// 播放头不在这里画,见 <see cref="PlayheadControl"/>。
+/// 阶跃行为;顶部是跟着缩放走的刻度,标记画在刻度上并往下拉一条竖线。
+/// 播放头不在这里画,见 <see cref="PlayheadControl"/>;看哪一段由
+/// <see cref="TimelineViewport"/> 决定。
 /// </summary>
 public sealed class TimelineControl : Control
 {
+    /// <summary>滚轮一格放大/缩小的比例。</summary>
+    private const double ZoomPerWheelStep = 1.25;
+
+    /// <summary>滚轮一格平移多少像素(按住 Shift 或用触控板横扫时)。</summary>
+    private const double PanPixelsPerWheelStep = 60;
+
     private static readonly IBrush TrackBackground = new SolidColorBrush(Color.Parse("#151515"));
     private static readonly IBrush RowBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
     private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
@@ -27,12 +35,18 @@ public sealed class TimelineControl : Control
     private readonly Dictionary<uint, IBrush> _brushCache = [];
 
     private bool _isScrubbing;
+    private bool _isPanning;
+    private double _lastPanX;
 
     public static readonly StyledProperty<IReadOnlyList<Frame>?> FramesProperty =
         AvaloniaProperty.Register<TimelineControl, IReadOnlyList<Frame>?>(nameof(Frames));
 
     public static readonly StyledProperty<IReadOnlyList<TimelineMarker>?> MarkersProperty =
         AvaloniaProperty.Register<TimelineControl, IReadOnlyList<TimelineMarker>?>(nameof(Markers));
+
+    /// <summary>看哪一段、放大到多少。和播放头那一层共用同一个实例。</summary>
+    public static readonly StyledProperty<TimelineViewport?> ViewportProperty =
+        AvaloniaProperty.Register<TimelineControl, TimelineViewport?>(nameof(Viewport));
 
     /// <summary>
     /// 这个属性不参与绘制,只用来说明"点在时间轴上要定位到哪里";
@@ -58,11 +72,49 @@ public sealed class TimelineControl : Control
         set => SetValue(MarkersProperty, value);
     }
 
+    public TimelineViewport? Viewport
+    {
+        get => GetValue(ViewportProperty);
+        set => SetValue(ViewportProperty, value);
+    }
+
     public TimeSpan PlayheadTime
     {
         get => GetValue(PlayheadTimeProperty);
         set => SetValue(PlayheadTimeProperty, value);
     }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == ViewportProperty)
+        {
+            // 视口自己不是可渲染属性,它变了要手动叫醒重画。
+            if (change.GetOldValue<TimelineViewport?>() is { } oldViewport)
+            {
+                oldViewport.PropertyChanged -= OnViewportChanged;
+            }
+
+            if (change.GetNewValue<TimelineViewport?>() is { } newViewport)
+            {
+                newViewport.PropertyChanged += OnViewportChanged;
+            }
+
+            UpdateTrackWidth();
+            InvalidateVisual();
+        }
+        else if (change.Property == BoundsProperty)
+        {
+            // 窗口大小变了,视口要知道新的宽度才能正确夹住两端。
+            UpdateTrackWidth();
+        }
+    }
+
+    private void OnViewportChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+
+    private void UpdateTrackWidth()
+        => Viewport?.SetTrackWidth(TimelineLayout.GetTrackWidth(Bounds.Width));
 
     public override void Render(DrawingContext context)
     {
@@ -81,7 +133,9 @@ public sealed class TimelineControl : Control
             TrackBackground,
             new Rect(TimelineLayout.TrackLeft, TimelineLayout.RulerHeight, trackWidth, trackHeight));
 
+        var viewport = Viewport;
         var frames = Frames;
+
         if (frames is null || frames.Count == 0)
         {
             DrawText(
@@ -92,17 +146,35 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        var end = TimelineLayout.GetEnd(frames);
-        DrawTimeRuler(context, end, trackWidth);
-
-        // 每帧的横坐标只算一次,十个通道共用;最后一个位置是色块区的右边缘。
-        var positions = new double[frames.Count + 1];
-        for (var index = 0; index < frames.Count; index++)
+        if (viewport is null || viewport.Scale <= 0)
         {
-            positions[index] = TimelineLayout.MapTime(frames[index].Time, end, trackWidth);
+            return;
         }
 
-        positions[frames.Count] = TimelineLayout.TrackLeft + trackWidth;
+        DrawTimeRuler(context, viewport);
+
+        // 只画可见范围内的帧:左边缘那一帧的颜色决定了左边缘是什么颜色,
+        // 所以从"第一个可见帧的前一帧"开始,少算很多屏幕外的帧。
+        var sliceStart = Math.Max(0, TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.Start) - 1);
+        var sliceEnd = TimelineLayout.FindFirstFrameAtOrAfter(frames, viewport.End);
+        var count = sliceEnd - sliceStart;
+
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var positions = new double[count + 1];
+        for (var offset = 0; offset < count; offset++)
+        {
+            positions[offset] = TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceStart + offset].Time);
+        }
+
+        // 最后一段铺到"下一帧"的位置;没有下一帧就铺到右边缘,
+        // 这样"保持到最后一帧"的意思才看得出来。
+        positions[count] = sliceEnd < frames.Count
+            ? TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceEnd].Time)
+            : TimelineLayout.TrackLeft + trackWidth;
 
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
@@ -111,13 +183,13 @@ public sealed class TimelineControl : Control
                 RowBackground,
                 new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
 
-            DrawChannelTrack(context, frames, positions, channel, y, rowHeight);
+            DrawChannelTrack(context, frames, positions, sliceStart, count, channel, y, rowHeight);
 
             DrawText(context, $"CH{channel}", DimText, new Point(10, y + (rowHeight / 2) - 7), 11);
             context.DrawLine(RowSeparatorPen, new Point(0, y), new Point(width, y));
         }
 
-        DrawMarkers(context, end, trackWidth);
+        DrawMarkers(context, viewport);
     }
 
     /// <summary>
@@ -128,6 +200,8 @@ public sealed class TimelineControl : Control
         DrawingContext context,
         IReadOnlyList<Frame> frames,
         double[] positions,
+        int sliceStart,
+        int count,
         int channel,
         double y,
         double rowHeight)
@@ -135,24 +209,23 @@ public sealed class TimelineControl : Control
         var top = y + 1;
         var blockHeight = Math.Max(0, rowHeight - 3);
 
-        var runStart = 0;
-        var runColor = ColorKey(frames[0].Channels[channel].Color);
+        var runOffset = 0;
+        var runColor = ColorKey(frames[sliceStart].Channels[channel].Color);
 
-        for (var index = 1; index < frames.Count; index++)
+        for (var offset = 1; offset < count; offset++)
         {
-            var color = ColorKey(frames[index].Channels[channel].Color);
+            var color = ColorKey(frames[sliceStart + offset].Channels[channel].Color);
             if (color == runColor)
             {
                 continue;
             }
 
-            DrawBlock(context, positions[runStart], positions[index], runColor, top, blockHeight);
-            runStart = index;
+            DrawBlock(context, positions[runOffset], positions[offset], runColor, top, blockHeight);
+            runOffset = offset;
             runColor = color;
         }
 
-        // 最后一段一直铺到色块区右边缘,这样"保持到最后一帧"的意思才看得出来。
-        DrawBlock(context, positions[runStart], positions[frames.Count], runColor, top, blockHeight);
+        DrawBlock(context, positions[runOffset], positions[count], runColor, top, blockHeight);
     }
 
     private void DrawBlock(
@@ -176,7 +249,7 @@ public sealed class TimelineControl : Control
     /// 标记:刻度上一个小旗子,往下拉一条淡色竖线,名字贴在轨道顶部。
     /// 名字互相挤在一起时只保留小旗子,免得糊成一团。
     /// </summary>
-    private void DrawMarkers(DrawingContext context, TimeSpan end, double trackWidth)
+    private void DrawMarkers(DrawingContext context, TimelineViewport viewport)
     {
         var markers = Markers;
         if (markers is null || markers.Count == 0)
@@ -188,7 +261,18 @@ public sealed class TimelineControl : Control
 
         foreach (var marker in markers)
         {
-            var x = TimelineLayout.MapTime(marker.Time, end, trackWidth);
+            // 标记已按时间排好序,出了右边就可以收工。
+            if (marker.Time > viewport.End)
+            {
+                break;
+            }
+
+            if (marker.Time < viewport.Start)
+            {
+                continue;
+            }
+
+            var x = TimelineLayout.TrackLeft + viewport.MapTime(marker.Time);
 
             context.DrawLine(
                 MarkerLinePen,
@@ -232,15 +316,26 @@ public sealed class TimelineControl : Control
         }
     }
 
-    private void DrawTimeRuler(DrawingContext context, TimeSpan end, double trackWidth)
+    private void DrawTimeRuler(DrawingContext context, TimelineViewport viewport)
     {
-        const int tickCount = 6;
-
-        for (var tick = 0; tick <= tickCount; tick++)
+        var step = TimelineLayout.ChooseTickStep(1 / viewport.Scale).Ticks;
+        if (step <= 0)
         {
-            var ratio = (double)tick / tickCount;
-            var time = TimeSpan.FromTicks((long)(end.Ticks * ratio));
-            var x = TimelineLayout.MapTime(time, end, trackWidth);
+            return;
+        }
+
+        // 从"第一个不小于左边缘的整数刻度"开始,用刻度数累加避免毫秒浮点误差。
+        var tick = viewport.Start.Ticks / step * step;
+        if (tick < viewport.Start.Ticks)
+        {
+            tick += step;
+        }
+
+        var endTicks = viewport.End.Ticks;
+        while (tick <= endTicks)
+        {
+            var time = TimeSpan.FromTicks(tick);
+            var x = TimelineLayout.TrackLeft + viewport.MapTime(time);
 
             context.DrawLine(
                 RowSeparatorPen,
@@ -248,6 +343,8 @@ public sealed class TimelineControl : Control
                 new Point(x, TimelineLayout.RulerHeight));
 
             DrawText(context, Timecode.Format(time), DimText, new Point(x + 3, 5), 10.5);
+
+            tick += step;
         }
     }
 
@@ -255,14 +352,26 @@ public sealed class TimelineControl : Control
     {
         base.OnPointerPressed(e);
 
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        var point = e.GetCurrentPoint(this);
+
+        // 中键拖动平移:和左键点一下就定位播放头区分开,不会误碰。
+        if (point.Properties.IsMiddleButtonPressed)
+        {
+            _isPanning = true;
+            _lastPanX = point.Position.X;
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed)
         {
             return;
         }
 
         _isScrubbing = true;
         e.Pointer.Capture(this);
-        SeekTo(e.GetPosition(this).X);
+        SeekTo(point.Position.X);
         e.Handled = true;
     }
 
@@ -270,40 +379,74 @@ public sealed class TimelineControl : Control
     {
         base.OnPointerMoved(e);
 
-        if (!_isScrubbing)
+        var x = e.GetPosition(this).X;
+
+        if (_isPanning)
         {
+            Viewport?.PanByPixels(_lastPanX - x);
+            _lastPanX = x;
+            e.Handled = true;
             return;
         }
 
-        SeekTo(e.GetPosition(this).X);
-        e.Handled = true;
+        if (_isScrubbing)
+        {
+            SeekTo(x);
+            e.Handled = true;
+        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
 
-        if (!_isScrubbing)
+        if (!_isPanning && !_isScrubbing)
         {
             return;
         }
 
+        _isPanning = false;
         _isScrubbing = false;
         e.Pointer.Capture(null);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        var viewport = Viewport;
+        if (viewport is null)
+        {
+            return;
+        }
+
+        // 按住 Shift(或触控板横向滑动)是平移,其余情况以指针位置为锚点缩放。
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) || e.Delta.X != 0)
+        {
+            var step = e.Delta.X != 0 ? e.Delta.X : e.Delta.Y;
+            viewport.PanByPixels(-step * PanPixelsPerWheelStep);
+        }
+        else
+        {
+            viewport.Zoom(
+                Math.Pow(ZoomPerWheelStep, e.Delta.Y),
+                e.GetPosition(this).X - TimelineLayout.TrackLeft);
+        }
+
         e.Handled = true;
     }
 
     /// <summary>把点击位置换成时间写回 PlayheadTime;按住拖动时会一直被调用。</summary>
     private void SeekTo(double x)
     {
-        var frames = Frames;
-        var trackWidth = TimelineLayout.GetTrackWidth(Bounds.Width);
-        if (frames is null || frames.Count == 0 || trackWidth <= 0)
+        var viewport = Viewport;
+        if (viewport is null || Frames is null)
         {
             return;
         }
 
-        PlayheadTime = TimelineLayout.MapX(x, TimelineLayout.GetEnd(frames), trackWidth);
+        PlayheadTime = viewport.MapX(x - TimelineLayout.TrackLeft);
     }
 
     private static void DrawText(

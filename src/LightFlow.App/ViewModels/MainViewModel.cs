@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LightFlow.App.Controls;
 using LightFlow.App.Services;
 using LightFlow.Core;
 using LightFlow.Core.Models;
@@ -62,6 +63,12 @@ public partial class MainViewModel : ViewModelBase
     public TimeSpan Duration
         => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[^1].Time;
 
+    /// <summary>
+    /// 时间轴的取景框:现在看哪一段、放大到多少。
+    /// 界面上的滚轮缩放、拖动平移和工具栏按钮都改它这一个对象。
+    /// </summary>
+    public TimelineViewport Viewport { get; } = new();
+
     partial void OnTimelineChanged(Timeline value)
     {
         // Frames / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。
@@ -73,6 +80,9 @@ public partial class MainViewModel : ViewModelBase
         // 因为播放头本来就是 0 的时候 setter 不会触发变更回调。
         PlayheadTime = TimeSpan.Zero;
         CurrentFrame = value.GetFrameAt(PlayheadTime);
+
+        // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
+        Viewport.SetContent(Duration);
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
@@ -100,10 +110,27 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void GoToStart() => PlayheadTime = TimeSpan.Zero;
+    private void GoToStart()
+    {
+        PlayheadTime = TimeSpan.Zero;
+        Viewport.EnsureVisible(PlayheadTime);
+    }
 
     [RelayCommand]
-    private void GoToEnd() => PlayheadTime = Duration;
+    private void GoToEnd()
+    {
+        PlayheadTime = Duration;
+        Viewport.EnsureVisible(PlayheadTime);
+    }
+
+    [RelayCommand]
+    private void ZoomIn() => Viewport.ZoomBy(1.4);
+
+    [RelayCommand]
+    private void ZoomOut() => Viewport.ZoomBy(1 / 1.4);
+
+    [RelayCommand]
+    private void FitAll() => Viewport.FitAll();
 
     /// <summary>
     /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;

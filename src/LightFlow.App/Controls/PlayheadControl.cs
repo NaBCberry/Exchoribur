@@ -1,7 +1,7 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using LightFlow.Core.Models;
 
 namespace LightFlow.App.Controls;
 
@@ -15,22 +15,22 @@ public sealed class PlayheadControl : Control
     private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
     private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
 
-    public static readonly StyledProperty<IReadOnlyList<Frame>?> FramesProperty =
-        AvaloniaProperty.Register<PlayheadControl, IReadOnlyList<Frame>?>(nameof(Frames));
+    /// <summary>和时间轴那一层共用同一个视口,位置才不会错开。</summary>
+    public static readonly StyledProperty<TimelineViewport?> ViewportProperty =
+        AvaloniaProperty.Register<PlayheadControl, TimelineViewport?>(nameof(Viewport));
 
     public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty =
         AvaloniaProperty.Register<PlayheadControl, TimeSpan>(nameof(PlayheadTime));
 
     static PlayheadControl()
     {
-        AffectsRender<PlayheadControl>(FramesProperty, PlayheadTimeProperty);
+        AffectsRender<PlayheadControl>(PlayheadTimeProperty);
     }
 
-    /// <summary>用来算时间轴的终点,决定播放头画在哪个横坐标。</summary>
-    public IReadOnlyList<Frame>? Frames
+    public TimelineViewport? Viewport
     {
-        get => GetValue(FramesProperty);
-        set => SetValue(FramesProperty, value);
+        get => GetValue(ViewportProperty);
+        set => SetValue(ViewportProperty, value);
     }
 
     public TimeSpan PlayheadTime
@@ -39,16 +39,45 @@ public sealed class PlayheadControl : Control
         set => SetValue(PlayheadTimeProperty, value);
     }
 
-    public override void Render(DrawingContext context)
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
-        var frames = Frames;
-        if (frames is null || frames.Count == 0 || Bounds.Width <= 0 || Bounds.Height <= 0)
+        base.OnPropertyChanged(change);
+
+        if (change.Property != ViewportProperty)
         {
             return;
         }
 
-        var trackWidth = TimelineLayout.GetTrackWidth(Bounds.Width);
-        var x = TimelineLayout.MapTime(PlayheadTime, TimelineLayout.GetEnd(frames), trackWidth);
+        if (change.GetOldValue<TimelineViewport?>() is { } oldViewport)
+        {
+            oldViewport.PropertyChanged -= OnViewportChanged;
+        }
+
+        if (change.GetNewValue<TimelineViewport?>() is { } newViewport)
+        {
+            newViewport.PropertyChanged += OnViewportChanged;
+        }
+
+        InvalidateVisual();
+    }
+
+    private void OnViewportChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+
+    public override void Render(DrawingContext context)
+    {
+        var viewport = Viewport;
+        if (viewport is null || viewport.Scale <= 0 || Bounds.Width <= 0 || Bounds.Height <= 0)
+        {
+            return;
+        }
+
+        // 播放头跑到可见范围之外就不画了——它本来就在屏幕外,画了也看不见。
+        if (PlayheadTime < viewport.Start || PlayheadTime > viewport.End)
+        {
+            return;
+        }
+
+        var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
         var height = Bounds.Height;
 
         context.DrawLine(PlayheadPen, new Point(x, TimelineLayout.RulerHeight - 8), new Point(x, height));

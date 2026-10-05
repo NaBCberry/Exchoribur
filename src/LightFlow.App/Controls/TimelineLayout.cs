@@ -3,8 +3,8 @@ using LightFlow.Core.Models;
 namespace LightFlow.App.Controls;
 
 /// <summary>
-/// 时间轴和播放头是两个叠在一起的控件,必须用同一套"时间 ↔ 横坐标"换算,
-/// 否则播放头的线会跟底下的色块错位。换算规则和留白尺寸集中放在这里。
+/// 时间轴各层共用的尺寸与"挑刻度间隔"这类纯计算。
+/// 时间 ↔ 横坐标的换算不在这里,在 <see cref="TimelineViewport"/>。
 /// </summary>
 internal static class TimelineLayout
 {
@@ -17,44 +17,64 @@ internal static class TimelineLayout
     /// <summary>右侧留白,避免最后一帧贴着边框。</summary>
     public const double TrackRightPadding = 10;
 
+    /// <summary>两个刻度标签之间至少要留出的像素,免得字挤在一起。</summary>
+    public const double MinTickLabelSpacing = 96;
+
+    /// <summary>刻度间隔的候选值(秒),放大缩小时从中挑一个够用又不挤的。</summary>
+    private static readonly double[] TickStepsInSeconds =
+    [
+        0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
+        1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600,
+    ];
+
     /// <summary>色块区的宽度;窗口还没测量出来时可能是负数,统一夹到 0。</summary>
     public static double GetTrackWidth(double controlWidth)
         => Math.Max(0, controlWidth - TrackLeft - TrackRightPadding);
 
     /// <summary>
-    /// 时间轴显示的终点:最后一帧的时间。没有数据时给 1 秒,免得除以 0。
+    /// 按当前缩放挑一个刻度间隔。用的是"整秒整分"这类人看得舒服的数值,
+    /// 而不是等分出来的怪数字——时间轴上标 00:03.417 没有意义。
     /// </summary>
-    public static TimeSpan GetEnd(IReadOnlyList<Frame>? frames)
+    /// <param name="secondsPerPixel">当前每像素代表多少秒。</param>
+    public static TimeSpan ChooseTickStep(double secondsPerPixel)
     {
-        if (frames is null || frames.Count == 0)
+        var needed = secondsPerPixel * MinTickLabelSpacing;
+
+        foreach (var step in TickStepsInSeconds)
         {
-            return TimeSpan.FromSeconds(1);
+            if (step >= needed)
+            {
+                return TimeSpan.FromSeconds(step);
+            }
         }
 
-        var end = frames[^1].Time;
-        return end > TimeSpan.Zero ? end : TimeSpan.FromSeconds(1);
+        return TimeSpan.FromSeconds(TickStepsInSeconds[^1]);
     }
 
-    /// <summary>时间 → 控件内的横坐标。</summary>
-    public static double MapTime(TimeSpan time, TimeSpan end, double trackWidth)
+    /// <summary>
+    /// 二分查找第一个时间不早于 time 的帧。放大以后只有一小段帧在屏幕上,
+    /// 从这段开始画就够了,不必每帧都算一遍(两万帧时省得明显)。
+    /// 全都早于 time 时返回帧数,表示"一帧都不在可见范围里"。
+    /// </summary>
+    public static int FindFirstFrameAtOrAfter(IReadOnlyList<Frame> frames, TimeSpan time)
     {
-        if (end <= TimeSpan.Zero || trackWidth <= 0)
+        var low = 0;
+        var high = frames.Count;
+
+        while (low < high)
         {
-            return TrackLeft;
+            var middle = low + ((high - low) / 2);
+
+            if (frames[middle].Time < time)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
         }
 
-        return TrackLeft + (time.TotalMilliseconds / end.TotalMilliseconds * trackWidth);
-    }
-
-    /// <summary>横坐标 → 时间;超出两端时夹在两端,拖出去也不会越界。</summary>
-    public static TimeSpan MapX(double x, TimeSpan end, double trackWidth)
-    {
-        if (trackWidth <= 0)
-        {
-            return TimeSpan.Zero;
-        }
-
-        var ratio = Math.Clamp((x - TrackLeft) / trackWidth, 0, 1);
-        return TimeSpan.FromMilliseconds(ratio * end.TotalMilliseconds);
+        return low;
     }
 }
