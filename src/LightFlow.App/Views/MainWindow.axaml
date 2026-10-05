@@ -138,8 +138,8 @@
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形 -->
             <Grid Grid.Column="1" RowDefinitions="*,110" Margin="0,8,8,8">
                 <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
-                    <!-- 两层叠在一起:下面画色块和标记,上面只画播放头,
-                         拖播放头时只重画上面那层。 -->
+                    <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
+                         免得滚动时各层落在不同的合成帧上对不齐。 -->
                     <Grid ClipToBounds="True">
                         <controls:TimelineControl
                             Frames="{Binding Frames}"
@@ -147,10 +147,6 @@
                             Viewport="{Binding Viewport}"
                             PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
                             Cursor="Hand" />
-                        <controls:PlayheadControl
-                            Viewport="{Binding Viewport}"
-                            PlayheadTime="{Binding PlayheadTime}"
-                            IsHitTestVisible="False" />
                     </Grid>
                 </Border>
 

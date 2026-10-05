@@ -127,9 +127,15 @@ public sealed class TimelineViewport : INotifyPropertyChanged
             return;
         }
 
+        var previousStart = _start;
         _start -= TimeSpan.FromSeconds(deltaX / _scale);
         ClampStart();
-        RaiseChanged();
+
+        // 已经顶到两端时位置没变,就不用再叫醒界面重画一遍。
+        if (_start != previousStart)
+        {
+            RaiseChanged();
+        }
     }
 
     /// <summary>

@@ -11,10 +11,10 @@ using LightFlow.Core.Models;
 namespace LightFlow.App.Controls;
 
 /// <summary>
-/// 十通道灯光时间轴。每一帧用它的颜色一直填到下一帧,画出来的就是灯光实际的
-/// 阶跃行为;顶部是跟着缩放走的刻度,标记画在刻度上并往下拉一条竖线。
-/// 播放头不在这里画,见 <see cref="PlayheadControl"/>;看哪一段由
-/// <see cref="TimelineViewport"/> 决定。
+/// 时间轴的全部绘制都在这一个控件里:左侧通道名列、顶部刻度与标记、十条色带轨道、
+/// 播放头。合成到一个控件是有意的——分成多个控件时,一次滚动里各层的重画可能
+/// 落在不同的合成帧上,看起来就是刻度先动、十条轨道晚一拍,对不齐。
+/// 看哪一段由 <see cref="TimelineViewport"/> 决定。
 /// </summary>
 public sealed class TimelineControl : Control
 {
@@ -23,6 +23,9 @@ public sealed class TimelineControl : Control
 
     /// <summary>滚轮一格平移多少像素(按住 Shift 或用触控板横扫时)。</summary>
     private const double PanPixelsPerWheelStep = 60;
+
+    /// <summary>文字缓存的上限,超过就整体清掉,免得长时间平移把它撑大。</summary>
+    private const int TextCacheLimit = 512;
 
     /// <summary>
     /// 刻度上的时间码用等宽字体:数字宽度一致,缩放或平移时标签不会左右抖。
@@ -37,12 +40,24 @@ public sealed class TimelineControl : Control
     private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
     private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.Parse("#E0B457"));
     private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
+    private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
+    private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
     private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
     private static readonly IPen RowSeparatorPen = new Pen(new SolidColorBrush(Color.Parse("#2A2A2A")), 1);
     private static readonly IPen GutterDividerPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")), 1);
 
-    // 渲染热路径:同一个颜色只创建一次画刷,避免每帧每通道都分配新对象。
+    // 以下三块都是"每次重画都要用、但值不会变"的东西,缓存起来少做重复功:
+    // 颜色画刷、每帧每通道的颜色键、已经排好版的文字。
     private readonly Dictionary<uint, IBrush> _brushCache = [];
+    private readonly Dictionary<(string Text, double Size), FormattedText> _dimTextCache = [];
+    private readonly Dictionary<string, FormattedText> _markerTextCache = [];
+
+    private IReadOnlyList<Frame>? _colorKeySource;
+    private uint[] _colorKeys = [];
+
+    private FontFamily? _cachedFontFamily;
+    private Typeface _uiTypeface = Typeface.Default;
+    private readonly Typeface _timecodeTypeface = new(TimecodeFontFamily);
 
     private bool _isScrubbing;
     private bool _isPanning;
@@ -54,20 +69,20 @@ public sealed class TimelineControl : Control
     public static readonly StyledProperty<IReadOnlyList<TimelineMarker>?> MarkersProperty =
         AvaloniaProperty.Register<TimelineControl, IReadOnlyList<TimelineMarker>?>(nameof(Markers));
 
-    /// <summary>看哪一段、放大到多少。和播放头那一层共用同一个实例。</summary>
+    /// <summary>看哪一段、放大到多少。</summary>
     public static readonly StyledProperty<TimelineViewport?> ViewportProperty =
         AvaloniaProperty.Register<TimelineControl, TimelineViewport?>(nameof(Viewport));
 
     /// <summary>
-    /// 这个属性不参与绘制,只用来说明"点在时间轴上要定位到哪里";
-    /// 拖动时会回写(所以绑定要用 TwoWay),播放头由上面那一层控件画出来。
+    /// 播放头位置。拖动时间轴时会回写(所以绑定要用 TwoWay),
+    /// 播放头本身也由这个控件画出来。
     /// </summary>
     public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty =
         AvaloniaProperty.Register<TimelineControl, TimeSpan>(nameof(PlayheadTime));
 
     static TimelineControl()
     {
-        AffectsRender<TimelineControl>(FramesProperty, MarkersProperty);
+        AffectsRender<TimelineControl>(FramesProperty, MarkersProperty, PlayheadTimeProperty);
     }
 
     public IReadOnlyList<Frame>? Frames
@@ -144,8 +159,7 @@ public sealed class TimelineControl : Control
             trackWidth,
             trackHeight);
 
-        var uiTypeface = new Typeface(TextElement.GetFontFamily(this));
-        var timecodeTypeface = new Typeface(TimecodeFontFamily);
+        UpdateTypeface();
 
         // 左侧通道名列先铺一层不透明的底:它永远是最下层,后面任何东西
         // 都不该盖到通道名上面。
@@ -164,7 +178,7 @@ public sealed class TimelineControl : Control
 
         if (Frames is { Count: > 0 } frames && Viewport is { Scale: > 0 } viewport)
         {
-            DrawTimeRuler(context, timecodeTypeface, viewport);
+            DrawTimeRuler(context, viewport);
 
             // 只画可见范围内的帧:左边缘那一帧的颜色决定了左边缘是什么颜色,
             // 所以从"第一个可见帧的前一帧"开始,少算很多屏幕外的帧。
@@ -189,6 +203,8 @@ public sealed class TimelineControl : Control
                     ? TimelineLayout.TrackLeft + viewport.MapTime(frames[sliceEnd].Time)
                     : TimelineLayout.TrackLeft + trackWidth;
 
+                var colorKeys = GetColorKeys(frames);
+
                 // 色块裁剪在轨道区里:左边缘那一帧的时间在视口之外,横坐标是负数,
                 // 不裁剪就会盖住左边的通道名。右边缘同理,不裁剪会盖住右侧留白。
                 using (context.PushClip(trackRect))
@@ -197,18 +213,23 @@ public sealed class TimelineControl : Control
                     {
                         DrawChannelTrack(
                             context,
-                            frames,
+                            colorKeys,
+                            frames.Count,
                             positions,
                             sliceStart,
                             count,
                             channel,
+                            TimelineLayout.TrackLeft,
+                            TimelineLayout.TrackLeft + trackWidth,
                             TimelineLayout.RulerHeight + (channel * rowHeight),
                             rowHeight);
                     }
                 }
 
-                DrawMarkers(context, uiTypeface, viewport);
+                DrawMarkers(context, viewport);
             }
+
+            DrawPlayhead(context, viewport);
         }
 
         // 通道名和分隔线最后画,保证永远在最上层。
@@ -216,13 +237,9 @@ public sealed class TimelineControl : Control
         {
             var y = TimelineLayout.RulerHeight + (channel * rowHeight);
 
-            DrawText(
-                context,
-                uiTypeface,
-                $"CH{channel}",
-                DimText,
-                new Point(10, y + (rowHeight / 2) - 7.5),
-                11.5);
+            context.DrawText(
+                GetDimText($"CH{channel}", 11.5),
+                new Point(10, y + (rowHeight / 2) - 7.5));
 
             context.DrawLine(RowSeparatorPen, new Point(0, y), new Point(width, y));
         }
@@ -234,49 +251,78 @@ public sealed class TimelineControl : Control
 
         if (!hasFrames)
         {
-            DrawText(
-                context,
-                uiTypeface,
-                "还没有数据",
-                DimText,
+            context.DrawText(
+                GetDimText("还没有数据", 12),
                 new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
         }
     }
 
     /// <summary>
-    /// 一个通道的色块:每帧的颜色一直铺到下一帧。颜色跟上一段相同的帧并成一条,
-    /// 少画很多矩形——真实工程动辄两万帧,不合并会明显卡。
+    /// 画一个通道的色带:每帧的颜色一直保持到下一帧。
+    /// 关键是<b>按像素列取色</b>而不是逐帧画矩形:缩到整条铺满时一帧还占不到
+    /// 一个像素,逐帧画就会画出上万个看不见的矩形,一帧要十几毫秒,滚动时
+    /// 界面各层就会落在不同的合成帧上、看起来对不齐。按像素列取色后,
+    /// 绘制量只跟窗口宽度有关(几百个矩形),结果看上去和逐帧画是一样的。
     /// </summary>
     private void DrawChannelTrack(
         DrawingContext context,
-        IReadOnlyList<Frame> frames,
+        uint[] colorKeys,
+        int frameCount,
         double[] positions,
         int sliceStart,
         int count,
         int channel,
+        double trackLeft,
+        double trackRight,
         double y,
         double rowHeight)
     {
         var top = y + 1;
         var blockHeight = Math.Max(0, rowHeight - 3);
-
-        var runOffset = 0;
-        var runColor = ColorKey(frames[sliceStart].Channels[channel].Color);
-
-        for (var offset = 1; offset < count; offset++)
+        if (blockHeight <= 0)
         {
-            var color = ColorKey(frames[sliceStart + offset].Channels[channel].Color);
+            return;
+        }
+
+        // 只画轨道区内、且这一帧切片覆盖到的横向范围。
+        var startX = Math.Max(trackLeft, positions[0]);
+        var endX = Math.Min(trackRight, positions[count]);
+        if (endX <= startX)
+        {
+            return;
+        }
+
+        var channelOffset = channel * frameCount;
+        var firstPixel = (int)Math.Floor(startX);
+        var lastPixel = (int)Math.Ceiling(endX);
+
+        // positions 是升序的,所以取"覆盖某个像素列的那一帧"只要一路往前推,
+        // 不用每个像素都从头找。
+        var frame = 0;
+        var runStartX = startX;
+        var runColor = colorKeys[channelOffset + sliceStart];
+
+        for (var pixel = firstPixel; pixel < lastPixel; pixel++)
+        {
+            var sampleX = pixel + 0.5;
+            while (frame + 1 < count && positions[frame + 1] <= sampleX)
+            {
+                frame++;
+            }
+
+            var color = colorKeys[channelOffset + sliceStart + frame];
             if (color == runColor)
             {
                 continue;
             }
 
-            DrawBlock(context, positions[runOffset], positions[offset], runColor, top, blockHeight);
-            runOffset = offset;
+            DrawBlock(context, runStartX, pixel, runColor, top, blockHeight);
+            runStartX = pixel;
             runColor = color;
         }
 
-        DrawBlock(context, positions[runOffset], positions[count], runColor, top, blockHeight);
+        // 最后一段一直铺到色带该结束的位置。
+        DrawBlock(context, runStartX, endX, runColor, top, blockHeight);
     }
 
     private void DrawBlock(
@@ -297,13 +343,10 @@ public sealed class TimelineControl : Control
     }
 
     /// <summary>
-    /// 标记:刻度上一个小旗子,往下拉一条淡色竖线,名字贴在轨道顶部。
+    /// 标记:时间码下面那条带里挂一个小旗子和名字,再往下拉一条淡色竖线。
     /// 名字互相挤在一起时只保留小旗子,免得糊成一团。
     /// </summary>
-    private void DrawMarkers(
-        DrawingContext context,
-        Typeface typeface,
-        TimelineViewport viewport)
+    private void DrawMarkers(DrawingContext context, TimelineViewport viewport)
     {
         var markers = Markers;
         if (markers is null || markers.Count == 0)
@@ -311,6 +354,7 @@ public sealed class TimelineControl : Control
             return;
         }
 
+        var flagTop = TimelineLayout.TimecodeBandHeight + 1;
         var lastLabelRight = double.NegativeInfinity;
 
         foreach (var marker in markers)
@@ -335,7 +379,6 @@ public sealed class TimelineControl : Control
                 new Point(x, Bounds.Height));
 
             // 旗标挂在时间码下面那条带里,不会挡住时间。
-            var flagTop = TimelineLayout.TimecodeBandHeight + 1;
             var flag = new StreamGeometry();
             using (var figure = flag.Open())
             {
@@ -352,17 +395,10 @@ public sealed class TimelineControl : Control
                 continue;
             }
 
-            var name = new FormattedText(
-                marker.Name,
-                CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                typeface,
-                11,
-                MarkerBrush);
-
+            var name = GetMarkerText(marker.Name);
             var tag = new Rect(
                 x + 9,
-                TimelineLayout.TimecodeBandHeight + 1,
+                flagTop,
                 name.Width + 6,
                 name.Height + 2);
 
@@ -373,10 +409,43 @@ public sealed class TimelineControl : Control
         }
     }
 
-    private void DrawTimeRuler(
-        DrawingContext context,
-        Typeface typeface,
-        TimelineViewport viewport)
+    /// <summary>播放头:一条竖线加一个倒立房子形状的标签,标签落在旗标那条带里。</summary>
+    private void DrawPlayhead(DrawingContext context, TimelineViewport viewport)
+    {
+        // 跑到可见范围之外就不画了——它本来就在屏幕外,画了也看不见。
+        if (PlayheadTime < viewport.Start || PlayheadTime > viewport.End)
+        {
+            return;
+        }
+
+        var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
+
+        context.DrawLine(
+            PlayheadPen,
+            new Point(x, TimelineLayout.TimecodeBandHeight),
+            new Point(x, Bounds.Height));
+
+        // 倒立房子:上面是矩形,下面收成一个朝下的尖角。
+        const double halfWidth = 7;
+        const double bodyHeight = 10;
+        const double tipHeight = 6;
+        var top = TimelineLayout.RulerHeight - bodyHeight - tipHeight - 2;
+
+        var geometry = new StreamGeometry();
+        using (var figure = geometry.Open())
+        {
+            figure.BeginFigure(new Point(x - halfWidth, top), true);
+            figure.LineTo(new Point(x + halfWidth, top));
+            figure.LineTo(new Point(x + halfWidth, top + bodyHeight));
+            figure.LineTo(new Point(x, top + bodyHeight + tipHeight));
+            figure.LineTo(new Point(x - halfWidth, top + bodyHeight));
+            figure.EndFigure(true);
+        }
+
+        context.DrawGeometry(PlayheadBrush, null, geometry);
+    }
+
+    private void DrawTimeRuler(DrawingContext context, TimelineViewport viewport)
     {
         var step = TimelineLayout.ChooseTickStep(1 / viewport.Scale).Ticks;
         if (step <= 0)
@@ -402,7 +471,7 @@ public sealed class TimelineControl : Control
                 new Point(x, TimelineLayout.TimecodeBandHeight - 4),
                 new Point(x, TimelineLayout.TimecodeBandHeight));
 
-            DrawText(context, typeface, Timecode.Format(time), DimText, new Point(x + 3, 2), 11);
+            context.DrawText(GetTickText(Timecode.Format(time)), new Point(x + 3, 2));
 
             tick += step;
         }
@@ -509,23 +578,87 @@ public sealed class TimelineControl : Control
         PlayheadTime = viewport.MapX(x - TimelineLayout.TrackLeft);
     }
 
-    private static void DrawText(
-        DrawingContext context,
-        Typeface typeface,
-        string text,
-        IBrush brush,
-        Point origin,
-        double size = 12)
+    /// <summary>
+    /// 每帧每通道的颜色键(压成一个整数),按通道连续存放。
+    /// 只在换文件时算一次:不然每次重画都要对着两万多个帧对象取值,
+    /// 滚动时白白多花几毫秒。
+    /// </summary>
+    private uint[] GetColorKeys(IReadOnlyList<Frame> frames)
     {
-        var formatted = new FormattedText(
-            text,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            typeface,
-            size,
-            brush);
+        if (ReferenceEquals(_colorKeySource, frames))
+        {
+            return _colorKeys;
+        }
 
-        context.DrawText(formatted, origin);
+        var keys = new uint[frames.Count * Frame.ChannelCount];
+
+        for (var index = 0; index < frames.Count; index++)
+        {
+            var channels = frames[index].Channels;
+            for (var channel = 0; channel < Frame.ChannelCount; channel++)
+            {
+                keys[(channel * frames.Count) + index] = ColorKey(channels[channel].Color);
+            }
+        }
+
+        _colorKeySource = frames;
+        _colorKeys = keys;
+        return keys;
+    }
+
+    private FormattedText GetTickText(string text) => GetDimText(text, 11);
+
+    private FormattedText GetDimText(string text, double size)
+    {
+        var key = (text, size);
+        if (_dimTextCache.TryGetValue(key, out var formatted))
+        {
+            return formatted;
+        }
+
+        if (_dimTextCache.Count >= TextCacheLimit)
+        {
+            _dimTextCache.Clear();
+        }
+
+        formatted = CreateText(text, size, DimText, _uiTypeface);
+        _dimTextCache[key] = formatted;
+        return formatted;
+    }
+
+    private FormattedText GetMarkerText(string text)
+    {
+        if (_markerTextCache.TryGetValue(text, out var formatted))
+        {
+            return formatted;
+        }
+
+        if (_markerTextCache.Count >= TextCacheLimit)
+        {
+            _markerTextCache.Clear();
+        }
+
+        formatted = CreateText(text, 11, MarkerBrush, _uiTypeface);
+        _markerTextCache[text] = formatted;
+        return formatted;
+    }
+
+    private static FormattedText CreateText(string text, double size, IBrush brush, Typeface typeface)
+        => new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, size, brush);
+
+    /// <summary>窗口上的字体可能变(换主题、换平台),变了就把排好版的文字丢掉重来。</summary>
+    private void UpdateTypeface()
+    {
+        var family = TextElement.GetFontFamily(this);
+        if (ReferenceEquals(family, _cachedFontFamily))
+        {
+            return;
+        }
+
+        _cachedFontFamily = family;
+        _uiTypeface = new Typeface(family);
+        _dimTextCache.Clear();
+        _markerTextCache.Clear();
     }
 
     /// <summary>四位分量压成一个整数,比较颜色是否相同、当查表的键都方便。</summary>
