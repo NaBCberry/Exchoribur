@@ -46,16 +46,38 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Margin="0,8">
-                    <Button Classes="transport" Content="⏮" />
-                    <Button Classes="transport" Content="▶" />
-                    <Button Classes="transport" Content="⏸" />
-                    <Button Classes="transport" Content="⏹" />
-                    <Button Classes="transport" Content="⏭" />
+                    <Button Classes="transport" ToolTip.Tip="回到开头">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="上一帧">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.PreviousFrame}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="播放">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.Play}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="暂停">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.Pause}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="停止">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.Stop}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="下一帧">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
+                    </Button>
+                    <Button Classes="transport" ToolTip.Tip="跳到结尾">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
+                    </Button>
                 </StackPanel>
 
                 <Border Grid.Row="2" Classes="panel">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="通道状态" />
+                        <StackPanel DockPanel.Dock="Top"
+                                    Orientation="Horizontal"
+                                    Spacing="6"
+                                    Margin="10,8,0,4">
+                            <Path Classes="icon small" Data="{x:Static controls:Icons.LightStatus}" />
+                            <TextBlock Classes="panelTitle" Text="通道状态" />
+                        </StackPanel>
                         <controls:LightStatusControl CurrentFrame="{Binding CurrentFrame}" />
                     </DockPanel>
                 </Border>
@@ -69,7 +91,13 @@
                 </Border>
 
                 <Border Grid.Row="1" Classes="panel">
-                    <TextBlock Classes="hint" Text="音频波形(待接入)" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="7">
+                        <Path Classes="icon small" Data="{x:Static controls:Icons.AudioWaveform}" />
+                        <TextBlock Classes="hint" Text="音频波形(待接入)" />
+                    </StackPanel>
                 </Border>
             </Grid>
         </Grid>

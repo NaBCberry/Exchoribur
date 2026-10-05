@@ -31,7 +31,27 @@
     <Style Selector="TextBlock.panelTitle">
         <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="Margin" Value="10,8,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        图标统一用描边绘制:Lucide 的图形本来就是笔画而不是填充区域,
+        所以必须设 Stroke;宽高同时决定缩放比例。
+    -->
+    <Style Selector="Path.icon">
+        <Setter Property="Fill" Value="{x:Null}" />
+        <Setter Property="Stroke" Value="{DynamicResource TextBrush}" />
+        <Setter Property="StrokeThickness" Value="2" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+    </Style>
+
+    <Style Selector="Path.icon.small">
+        <Setter Property="Width" Value="15" />
+        <Setter Property="Height" Value="15" />
     </Style>
 
     <Style Selector="Border.panel">
@@ -42,9 +62,9 @@
     </Style>
 
     <Style Selector="Button.transport">
-        <Setter Property="Width" Value="42" />
+        <Setter Property="Width" Value="36" />
         <Setter Property="Height" Value="30" />
-        <Setter Property="Margin" Value="3,0" />
+        <Setter Property="Margin" Value="2,0" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Background" Value="{DynamicResource PanelAltBackgroundBrush}" />
