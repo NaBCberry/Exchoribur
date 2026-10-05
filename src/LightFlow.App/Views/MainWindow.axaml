@@ -32,7 +32,7 @@
                           Command="{Binding OpenCommand}"
                           InputGesture="Ctrl+O">
                     <MenuItem.Icon>
-                        <Path Classes="icon small" Data="{x:Static controls:Icons.OpenProject}" />
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
@@ -43,7 +43,7 @@
             <MenuItem Header="帮助">
                 <MenuItem Header="关于 LightFlow" IsEnabled="False">
                     <MenuItem.Icon>
-                        <Path Classes="icon small" Data="{x:Static controls:Icons.About}" />
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.About}" />
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
@@ -61,75 +61,56 @@
         </Border>
 
         <Grid ColumnDefinitions="340,*">
-            <!-- 左栏:视频预览 + 播放控制 + 十通道状态 -->
-            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*" Margin="8">
+            <!-- 左栏:视频预览(播放控制压在它底部)+ 十通道状态(缩放压在它底部) -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="8">
                 <Border Grid.Row="0" Classes="panel" Height="191">
-                    <TextBlock Classes="hint" Text="视频预览" />
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Bottom"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    Spacing="2"
+                                    Margin="0,0,0,6">
+                            <Button Classes="transport"
+                                    ToolTip.Tip="回到开头"
+                                    Command="{Binding GoToStartCommand}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
+                            </Button>
+                            <Button Classes="transport" ToolTip.Tip="上一帧">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.PreviousFrame}" />
+                            </Button>
+                            <Button Classes="transport" ToolTip.Tip="播放">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.Play}" />
+                            </Button>
+                            <Button Classes="transport" ToolTip.Tip="暂停">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.Pause}" />
+                            </Button>
+                            <Button Classes="transport" ToolTip.Tip="停止">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.Stop}" />
+                            </Button>
+                            <Button Classes="transport" ToolTip.Tip="下一帧">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
+                            </Button>
+                            <Button Classes="transport"
+                                    ToolTip.Tip="跳到结尾"
+                                    Command="{Binding GoToEndCommand}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
+                            </Button>
+                        </StackPanel>
+
+                        <TextBlock Classes="hint" Text="视频预览" />
+                    </DockPanel>
                 </Border>
 
-                <StackPanel Grid.Row="1"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            Margin="0,8">
-                    <Button Classes="transport"
-                            ToolTip.Tip="回到开头"
-                            Command="{Binding GoToStartCommand}">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
-                    </Button>
-                    <Button Classes="transport" ToolTip.Tip="上一帧">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.PreviousFrame}" />
-                    </Button>
-                    <Button Classes="transport" ToolTip.Tip="播放">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.Play}" />
-                    </Button>
-                    <Button Classes="transport" ToolTip.Tip="暂停">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.Pause}" />
-                    </Button>
-                    <Button Classes="transport" ToolTip.Tip="停止">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.Stop}" />
-                    </Button>
-                    <Button Classes="transport" ToolTip.Tip="下一帧">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
-                    </Button>
-                    <Button Classes="transport"
-                            ToolTip.Tip="跳到结尾"
-                            Command="{Binding GoToEndCommand}">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
-                    </Button>
-                </StackPanel>
-
-                <!-- 缩放:滚轮也能缩放和平移,这几个按钮是给不方便用滚轮的时候 -->
-                <StackPanel Grid.Row="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            Spacing="4"
-                            Margin="0,0,0,8">
-                    <Button Classes="transport"
-                            ToolTip.Tip="放大(滚轮向上)"
-                            Command="{Binding ZoomInCommand}">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
-                    </Button>
-                    <Button Classes="transport"
-                            ToolTip.Tip="缩小(滚轮向下)"
-                            Command="{Binding ZoomOutCommand}">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
-                    </Button>
-                    <Button Classes="transport"
-                            ToolTip.Tip="适配全部"
-                            Command="{Binding FitAllCommand}">
-                        <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
-                    </Button>
-                </StackPanel>
-
-                <Border Grid.Row="3" Classes="panel">
+                <Border Grid.Row="1" Classes="panel" Margin="0,8,0,0">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top"
                                     Orientation="Horizontal"
                                     Spacing="6"
                                     Margin="10,8,0,4">
-                            <Path Classes="icon small" Data="{x:Static controls:Icons.LightStatus}" />
+                            <Path Classes="icon title" Data="{x:Static controls:Icons.LightStatus}" />
                             <TextBlock Classes="panelTitle" Text="通道状态" />
                         </StackPanel>
+
                         <controls:LightStatusControl CurrentFrame="{Binding CurrentFrame}" />
                     </DockPanel>
                 </Border>
@@ -147,6 +128,29 @@
                             Viewport="{Binding Viewport}"
                             PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
                             Cursor="Hand" />
+
+                        <!-- 缩放按钮浮在编辑面板右下角 -->
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Bottom"
+                                    Spacing="2"
+                                    Margin="0,0,8,6">
+                            <Button Classes="transport"
+                                    ToolTip.Tip="放大(滚轮向上)"
+                                    Command="{Binding ZoomInCommand}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
+                            </Button>
+                            <Button Classes="transport"
+                                    ToolTip.Tip="缩小(滚轮向下)"
+                                    Command="{Binding ZoomOutCommand}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
+                            </Button>
+                            <Button Classes="transport"
+                                    ToolTip.Tip="适配全部"
+                                    Command="{Binding FitAllCommand}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -155,7 +159,7 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Spacing="7">
-                        <Path Classes="icon small" Data="{x:Static controls:Icons.AudioWaveform}" />
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
                         <TextBlock Classes="hint" Text="音频波形(待接入)" />
                     </StackPanel>
                 </Border>

@@ -61,15 +61,17 @@
     <Style Selector="Path.icon">
         <Setter Property="Fill" Value="{x:Null}" />
         <Setter Property="Stroke" Value="{DynamicResource TextBrush}" />
-        <Setter Property="StrokeThickness" Value="2" />
+        <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="StrokeLineCap" Value="Round" />
         <Setter Property="StrokeJoin" Value="Round" />
         <Setter Property="Stretch" Value="Uniform" />
-        <Setter Property="Width" Value="20" />
-        <Setter Property="Height" Value="20" />
+        <Setter Property="Width" Value="10" />
+        <Setter Property="Height" Value="10" />
     </Style>
 
-    <Style Selector="Path.icon.small">
+    <!-- 面板标题和菜单里的图标比按钮图标大一点,线条也相应粗一点 -->
+    <Style Selector="Path.icon.title">
+        <Setter Property="StrokeThickness" Value="1.4" />
         <Setter Property="Width" Value="15" />
         <Setter Property="Height" Value="15" />
     </Style>
@@ -81,19 +83,29 @@
         <Setter Property="CornerRadius" Value="3" />
     </Style>
 
+    <!--
+        播放、缩放这类图标按钮不带自己的框:它们直接压在视频预览框和通道面板上,
+        所以底色透明、边框去掉,只在鼠标悬停和按下时给一层淡淡的亮色反馈。
+    -->
     <Style Selector="Button.transport">
-        <Setter Property="Width" Value="36" />
-        <Setter Property="Height" Value="30" />
-        <Setter Property="Margin" Value="2,0" />
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Margin" Value="0" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="Background" Value="{DynamicResource PanelAltBackgroundBrush}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="3" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Button.transport:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
+
+    <Style Selector="Button.transport:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#40FFFFFF" />
     </Style>
 
 </Styles>
