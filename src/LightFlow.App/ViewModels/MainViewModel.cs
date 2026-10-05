@@ -1,20 +1,42 @@
+using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LightFlow.App.Services;
+using LightFlow.Core;
 using LightFlow.Core.Models;
+using LightFlow.Core.Storage;
 
 namespace LightFlow.App.ViewModels;
 
+/// <summary>
+/// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
+/// 界面只管把这些属性画出来,不直接读文件。
+/// </summary>
 public partial class MainViewModel : ViewModelBase
 {
+    private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
+
+    private readonly ITimelineFilePicker? _filePicker;
+
+    /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
     public MainViewModel()
+        : this(filePicker: null)
     {
-        // 先用生成的样例数据把界面搭起来,接入真实工程文件是下一步。
-        Timeline = new Timeline(CreateSampleFrames(), []);
-        PlayheadTime = TimeSpan.FromMilliseconds(1320);
     }
 
-    public Timeline Timeline { get; }
+    public MainViewModel(ITimelineFilePicker? filePicker)
+    {
+        _filePicker = filePicker;
 
-    public IReadOnlyList<Frame> Frames => Timeline.Frames;
+        // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
+        Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
+        StatusText = EmptyStatusText;
+        WindowTitle = "LightFlow";
+    }
+
+    /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
+    [ObservableProperty]
+    public partial Timeline Timeline { get; set; }
 
     [ObservableProperty]
     public partial TimeSpan PlayheadTime { get; set; }
@@ -22,13 +44,98 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial Frame? CurrentFrame { get; set; }
 
+    [ObservableProperty]
+    public partial string StatusText { get; set; }
+
+    /// <summary>状态栏这句是提示还是报错,决定它的颜色。</summary>
+    [ObservableProperty]
+    public partial bool HasError { get; set; }
+
+    [ObservableProperty]
+    public partial string WindowTitle { get; set; }
+
+    public IReadOnlyList<Frame> Frames => Timeline.Frames;
+
+    public IReadOnlyList<TimelineMarker> Markers => Timeline.Markers;
+
+    /// <summary>时间轴总长:最后一帧的时间。没有数据时是 0。</summary>
+    public TimeSpan Duration
+        => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[^1].Time;
+
+    partial void OnTimelineChanged(Timeline value)
+    {
+        // Frames / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。
+        OnPropertyChanged(nameof(Frames));
+        OnPropertyChanged(nameof(Markers));
+        OnPropertyChanged(nameof(Duration));
+
+        // 换了文件就把播放头拨回开头;这里必须显式重算一次当前帧,
+        // 因为播放头本来就是 0 的时候 setter 不会触发变更回调。
+        PlayheadTime = TimeSpan.Zero;
+        CurrentFrame = value.GetFrameAt(PlayheadTime);
+    }
+
     partial void OnPlayheadTimeChanged(TimeSpan value)
     {
         // 用领域里的阶跃语义取帧:播放头落在两帧之间时,沿用前一帧的状态。
         CurrentFrame = Timeline.GetFrameAt(value);
     }
 
-    private static IReadOnlyList<Frame> CreateSampleFrames()
+    /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
+    [RelayCommand]
+    private async Task OpenAsync()
+    {
+        if (_filePicker is null)
+        {
+            return;
+        }
+
+        var path = await _filePicker.PickAsync();
+        if (path is null)
+        {
+            return; // 用户点了取消
+        }
+
+        await LoadAsync(path);
+    }
+
+    [RelayCommand]
+    private void GoToStart() => PlayheadTime = TimeSpan.Zero;
+
+    [RelayCommand]
+    private void GoToEnd() => PlayheadTime = Duration;
+
+    /// <summary>
+    /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;
+    /// 出错只改状态栏,已经打开的内容保持不动。
+    /// </summary>
+    public async Task LoadAsync(string path)
+    {
+        var fileName = Path.GetFileName(path);
+
+        try
+        {
+            var timeline = await TimelineCsvFile.LoadAsync(path);
+
+            Timeline = timeline;
+            WindowTitle = $"{fileName} — LightFlow";
+            HasError = false;
+            StatusText = timeline.Frames.Count == 0
+                ? $"已载入 {fileName},但里面一帧都没有。"
+                : $"已载入 {fileName}:{timeline.Frames.Count:N0} 帧,"
+                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Frames[^1].Time)}。";
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or FormatException)
+        {
+            HasError = true;
+            StatusText = $"打开 {fileName} 失败:{exception.Message}";
+        }
+    }
+
+    /// <summary>只在设计器里用的假数据,保证预览界面不是一片空白。</summary>
+    private static Timeline CreateSampleTimeline()
     {
         var frames = new List<Frame>();
 
@@ -38,14 +145,21 @@ public partial class MainViewModel : ViewModelBase
             for (var channel = 0; channel < Frame.ChannelCount; channel++)
             {
                 var red = (byte)((index + channel) % 16);
-                var green = (byte)((index * 2 + channel * 3) % 16);
-                var blue = (byte)((index * 3 + channel * 5) % 16);
+                var green = (byte)(((index * 2) + (channel * 3)) % 16);
+                var blue = (byte)(((index * 3) + (channel * 5)) % 16);
                 channels[channel] = new ChannelState(new LightColor(red, green, blue), FlashMode.Solid);
             }
 
             frames.Add(new Frame(TimeSpan.FromMilliseconds(index * 180), channels));
         }
 
-        return frames;
+        TimelineMarker[] markers =
+        [
+            new(TimeSpan.FromMilliseconds(900), "前奏"),
+            new(TimeSpan.FromMilliseconds(3600), "副歌"),
+            new(TimeSpan.FromMilliseconds(7200), "结尾"),
+        ];
+
+        return new Timeline(frames, markers);
     }
 }

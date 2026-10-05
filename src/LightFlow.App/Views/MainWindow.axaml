@@ -11,7 +11,8 @@
         Width="1280" Height="760"
         MinWidth="960" MinHeight="600"
         Background="{DynamicResource WindowBackgroundBrush}"
-        Title="LightFlow">
+        Title="{Binding WindowTitle}"
+        DragDrop.AllowDrop="True">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -19,20 +20,44 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
+    </Window.KeyBindings>
+
     <DockPanel>
-        <!-- 顶部菜单占位:还没接功能,先定位置 -->
-        <Border DockPanel.Dock="Top"
-                Height="34"
+        <!-- 顶部菜单 -->
+        <Menu DockPanel.Dock="Top" Background="{DynamicResource ChromeBackgroundBrush}">
+            <MenuItem Header="文件">
+                <MenuItem Header="打开…"
+                          Command="{Binding OpenCommand}"
+                          InputGesture="Ctrl+O">
+                    <MenuItem.Icon>
+                        <Path Classes="icon small" Data="{x:Static controls:Icons.OpenProject}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="退出" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="编辑" IsEnabled="False" />
+            <MenuItem Header="视图" IsEnabled="False" />
+            <MenuItem Header="帮助">
+                <MenuItem Header="关于 LightFlow" IsEnabled="False">
+                    <MenuItem.Icon>
+                        <Path Classes="icon small" Data="{x:Static controls:Icons.About}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+        </Menu>
+
+        <!-- 底部状态栏:打开文件的结果、报错都显示在这里 -->
+        <Border DockPanel.Dock="Bottom"
+                Height="26"
                 Background="{DynamicResource ChromeBackgroundBrush}">
-            <StackPanel Orientation="Horizontal"
-                        Spacing="20"
-                        Margin="12,0"
-                        VerticalAlignment="Center">
-                <TextBlock Classes="menu" Text="文件" />
-                <TextBlock Classes="menu" Text="编辑" />
-                <TextBlock Classes="menu" Text="视图" />
-                <TextBlock Classes="menu" Text="帮助" />
-            </StackPanel>
+            <TextBlock Classes="status"
+                       Classes.error="{Binding HasError}"
+                       Text="{Binding StatusText}"
+                       Margin="12,0"
+                       VerticalAlignment="Center" />
         </Border>
 
         <Grid ColumnDefinitions="340,*">
@@ -46,7 +71,9 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Margin="0,8">
-                    <Button Classes="transport" ToolTip.Tip="回到开头">
+                    <Button Classes="transport"
+                            ToolTip.Tip="回到开头"
+                            Command="{Binding GoToStartCommand}">
                         <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
                     </Button>
                     <Button Classes="transport" ToolTip.Tip="上一帧">
@@ -64,7 +91,9 @@
                     <Button Classes="transport" ToolTip.Tip="下一帧">
                         <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
                     </Button>
-                    <Button Classes="transport" ToolTip.Tip="跳到结尾">
+                    <Button Classes="transport"
+                            ToolTip.Tip="跳到结尾"
+                            Command="{Binding GoToEndCommand}">
                         <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
                     </Button>
                 </StackPanel>
@@ -86,8 +115,19 @@
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形 -->
             <Grid Grid.Column="1" RowDefinitions="*,110" Margin="0,8,8,8">
                 <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
-                    <controls:TimelineControl Frames="{Binding Frames}"
-                                              PlayheadTime="{Binding PlayheadTime}" />
+                    <!-- 两层叠在一起:下面画色块和标记,上面只画播放头,
+                         拖播放头时只重画上面那层。 -->
+                    <Grid ClipToBounds="True">
+                        <controls:TimelineControl
+                            Frames="{Binding Frames}"
+                            Markers="{Binding Markers}"
+                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                            Cursor="Hand" />
+                        <controls:PlayheadControl
+                            Frames="{Binding Frames}"
+                            PlayheadTime="{Binding PlayheadTime}"
+                            IsHitTestVisible="False" />
+                    </Grid>
                 </Border>
 
                 <Border Grid.Row="1" Classes="panel">

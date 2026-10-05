@@ -34,6 +34,16 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!-- 底部状态栏:平时是灰色提示,报错时换成暖红,和播放头同一个色系 -->
+    <Style Selector="TextBlock.status">
+        <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock.status.error">
+        <Setter Property="Foreground" Value="#E0705C" />
+    </Style>
+
     <!--
         图标统一用描边绘制:Lucide 的图形本来就是笔画而不是填充区域,
         所以必须设 Stroke;宽高同时决定缩放比例。
