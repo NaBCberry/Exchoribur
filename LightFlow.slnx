@@ -4,6 +4,7 @@
     <Project Path="src/LightFlow.Core/LightFlow.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/LightFlow.App.Tests/LightFlow.App.Tests.csproj" />
     <Project Path="tests/LightFlow.Core.Tests/LightFlow.Core.Tests.csproj" />
   </Folder>
 </Solution>

@@ -27,4 +27,10 @@
   <ItemGroup>
     <ProjectReference Include="..\LightFlow.Core\LightFlow.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- 界面层的内部工具(时间轴刻度换算之类)允许测试工程直接调用 -->
+    <InternalsVisibleTo Include="LightFlow.App.Tests" />
+  </ItemGroup>
+
 </Project>
