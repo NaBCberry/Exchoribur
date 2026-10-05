@@ -561,8 +561,9 @@ public sealed class TimelineControl : Control
         else if (e.Delta.X != 0)
         {
             // 触摸板的横向滑动:不需要按 Shift,直接横着推时间轴。
-            var step = e.Delta.X;
-            viewport.PanByPixels(-step * PanPixelsPerWheelStep);
+            // 方向要跟手指一致——手指往左推,轨道内容就往左走(也就是看更晚的时间),
+            // 所以这里直接用增量本身,不能再取反。
+            viewport.PanByPixels(e.Delta.X * PanPixelsPerWheelStep);
         }
         else
         {
