@@ -8,8 +8,17 @@ namespace LightFlow.App.Controls;
 /// </summary>
 internal static class TimelineLayout
 {
-    /// <summary>顶部刻度尺的高度,色块区域从它下面开始。</summary>
-    public const double RulerHeight = 26;
+    /// <summary>顶部放时间码文字的那条带的高度。</summary>
+    public const double TimecodeBandHeight = 18;
+
+    /// <summary>
+    /// 时间码下面这条带留给标记旗标和播放头标签。
+    /// 分成上下两条是必须的:挤在一起时旗标会盖住时间码文字。
+    /// </summary>
+    public const double MarkerBandHeight = 20;
+
+    /// <summary>顶部刻度尺的总高度,色块区域从它下面开始。</summary>
+    public const double RulerHeight = TimecodeBandHeight + MarkerBandHeight;
 
     /// <summary>左侧留给 CH0-CH9 通道名的宽度。</summary>
     public const double TrackLeft = 48;

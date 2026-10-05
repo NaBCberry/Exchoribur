@@ -328,17 +328,20 @@ public sealed class TimelineControl : Control
 
             var x = TimelineLayout.TrackLeft + viewport.MapTime(marker.Time);
 
+            // 竖线从旗标带一直拉到面板底部,和上面的时间码文字不重叠。
             context.DrawLine(
                 MarkerLinePen,
-                new Point(x, TimelineLayout.RulerHeight - 8),
+                new Point(x, TimelineLayout.TimecodeBandHeight),
                 new Point(x, Bounds.Height));
 
+            // 旗标挂在时间码下面那条带里,不会挡住时间。
+            var flagTop = TimelineLayout.TimecodeBandHeight + 1;
             var flag = new StreamGeometry();
             using (var figure = flag.Open())
             {
-                figure.BeginFigure(new Point(x - 1, TimelineLayout.RulerHeight - 16), true);
-                figure.LineTo(new Point(x + 7, TimelineLayout.RulerHeight - 12));
-                figure.LineTo(new Point(x - 1, TimelineLayout.RulerHeight - 7));
+                figure.BeginFigure(new Point(x - 1, flagTop), true);
+                figure.LineTo(new Point(x + 7, flagTop + 4));
+                figure.LineTo(new Point(x - 1, flagTop + 8));
                 figure.EndFigure(true);
             }
 
@@ -359,7 +362,7 @@ public sealed class TimelineControl : Control
 
             var tag = new Rect(
                 x + 9,
-                TimelineLayout.RulerHeight + 1,
+                TimelineLayout.TimecodeBandHeight + 1,
                 name.Width + 6,
                 name.Height + 2);
 
@@ -396,10 +399,10 @@ public sealed class TimelineControl : Control
 
             context.DrawLine(
                 RowSeparatorPen,
-                new Point(x, TimelineLayout.RulerHeight - 5),
-                new Point(x, TimelineLayout.RulerHeight));
+                new Point(x, TimelineLayout.TimecodeBandHeight - 4),
+                new Point(x, TimelineLayout.TimecodeBandHeight));
 
-            DrawText(context, typeface, Timecode.Format(time), DimText, new Point(x + 3, 5), 11);
+            DrawText(context, typeface, Timecode.Format(time), DimText, new Point(x + 3, 2), 11);
 
             tick += step;
         }
