@@ -119,39 +119,48 @@
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形 -->
             <Grid Grid.Column="1" RowDefinitions="*,110" Margin="0,8,8,8">
                 <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
-                    <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
-                         免得滚动时各层落在不同的合成帧上对不齐。 -->
-                    <Grid ClipToBounds="True">
-                        <controls:TimelineControl
-                            Frames="{Binding Frames}"
-                            Markers="{Binding Markers}"
-                            Viewport="{Binding Viewport}"
-                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
-                            Cursor="Hand" />
+                    <DockPanel>
+                        <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
+                        <Border DockPanel.Dock="Bottom"
+                                Height="26"
+                                Background="{DynamicResource ChromeBackgroundBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,3,3">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Spacing="2"
+                                        Margin="0,0,6,0">
+                                <Button Classes="transport"
+                                        ToolTip.Tip="放大(滚轮向上)"
+                                        Command="{Binding ZoomInCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
+                                </Button>
+                                <Button Classes="transport"
+                                        ToolTip.Tip="缩小(滚轮向下)"
+                                        Command="{Binding ZoomOutCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
+                                </Button>
+                                <Button Classes="transport"
+                                        ToolTip.Tip="适配全部"
+                                        Command="{Binding FitAllCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
 
-                        <!-- 缩放按钮浮在编辑面板右下角 -->
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Bottom"
-                                    Spacing="2"
-                                    Margin="0,0,8,6">
-                            <Button Classes="transport"
-                                    ToolTip.Tip="放大(滚轮向上)"
-                                    Command="{Binding ZoomInCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="缩小(滚轮向下)"
-                                    Command="{Binding ZoomOutCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="适配全部"
-                                    Command="{Binding FitAllCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
-                            </Button>
-                        </StackPanel>
-                    </Grid>
+                        <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
+                             免得滚动时各层落在不同的合成帧上对不齐。 -->
+                        <Grid ClipToBounds="True">
+                            <controls:TimelineControl
+                                Frames="{Binding Frames}"
+                                Markers="{Binding Markers}"
+                                Viewport="{Binding Viewport}"
+                                PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                                Cursor="Hand" />
+                        </Grid>
+                    </DockPanel>
                 </Border>
 
                 <Border Grid.Row="1" Classes="panel">
