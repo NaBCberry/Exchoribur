@@ -69,6 +69,9 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public TimelineViewport Viewport { get; } = new();
 
+    /// <summary>用户偏好设置(滚轮方向之类),设置窗口改的就是这一份。</summary>
+    public SettingsViewModel Settings { get; } = new();
+
     partial void OnTimelineChanged(Timeline value)
     {
         // Frames / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。

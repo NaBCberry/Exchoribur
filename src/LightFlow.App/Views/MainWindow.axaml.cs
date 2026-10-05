@@ -8,6 +8,8 @@ namespace LightFlow.App.Views;
 
 public partial class MainWindow : Window
 {
+    private SettingsWindow? _settingsWindow;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -18,6 +20,30 @@ public partial class MainWindow : Window
     }
 
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// 打开设置页。用非模态窗口:开着设置也能直接滚时间轴试方向,不用来回关。
+    /// </summary>
+    private void OnSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        if (_settingsWindow is { IsVisible: true })
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+
+        _settingsWindow = new SettingsWindow
+        {
+            DataContext = viewModel.Settings,
+        };
+
+        _settingsWindow.Show(this);
+    }
 
     private void OnDragOver(object? sender, DragEventArgs e)
         => e.DragEffects = FindCsvPath(e) is null ? DragDropEffects.None : DragDropEffects.Copy;

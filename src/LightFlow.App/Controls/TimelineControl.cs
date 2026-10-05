@@ -80,6 +80,14 @@ public sealed class TimelineControl : Control
     public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty =
         AvaloniaProperty.Register<TimelineControl, TimeSpan>(nameof(PlayheadTime));
 
+    /// <summary>反转鼠标滚轮方向,在设置页里改。</summary>
+    public static readonly StyledProperty<bool> InvertMouseWheelProperty =
+        AvaloniaProperty.Register<TimelineControl, bool>(nameof(InvertMouseWheel));
+
+    /// <summary>反转触摸板横向滑动方向,在设置页里改。</summary>
+    public static readonly StyledProperty<bool> InvertTouchpadScrollProperty =
+        AvaloniaProperty.Register<TimelineControl, bool>(nameof(InvertTouchpadScroll));
+
     static TimelineControl()
     {
         AffectsRender<TimelineControl>(FramesProperty, MarkersProperty, PlayheadTimeProperty);
@@ -107,6 +115,18 @@ public sealed class TimelineControl : Control
     {
         get => GetValue(PlayheadTimeProperty);
         set => SetValue(PlayheadTimeProperty, value);
+    }
+
+    public bool InvertMouseWheel
+    {
+        get => GetValue(InvertMouseWheelProperty);
+        set => SetValue(InvertMouseWheelProperty, value);
+    }
+
+    public bool InvertTouchpadScroll
+    {
+        get => GetValue(InvertTouchpadScrollProperty);
+        set => SetValue(InvertTouchpadScrollProperty, value);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -550,26 +570,31 @@ public sealed class TimelineControl : Control
             return;
         }
 
+        // 设置页里的两个开关。鼠标滚轮那一项同时管缩放和 Shift+平移,
+        // 因为它们都是滚轮这一个来源。
+        var wheelSign = InvertMouseWheel ? -1 : 1;
+        var touchpadSign = InvertTouchpadScroll ? -1 : 1;
+
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             // Shift + 滚轮:横向平移时间轴。滚轮往上 = 往时间轴前段看,
             // 和浏览器里 Shift + 滚轮横向滚动的方向一致。
             // 有些平台会把 Shift + 滚轮直接送成横向事件,那种情况按横向增量算。
             var step = e.Delta.Y != 0 ? e.Delta.Y : -e.Delta.X;
-            viewport.PanByPixels(step * PanPixelsPerWheelStep);
+            viewport.PanByPixels(wheelSign * step * PanPixelsPerWheelStep);
         }
         else if (e.Delta.X != 0)
         {
             // 触摸板的横向滑动:不需要按 Shift,直接横着推时间轴。
             // 方向要跟手指一致——手指往左推,轨道内容就往左走(也就是看更晚的时间),
             // 所以这里直接用增量本身,不能再取反。
-            viewport.PanByPixels(e.Delta.X * PanPixelsPerWheelStep);
+            viewport.PanByPixels(touchpadSign * e.Delta.X * PanPixelsPerWheelStep);
         }
         else
         {
             // 普通滚轮:以指针位置为锚点缩放。
             viewport.Zoom(
-                Math.Pow(ZoomPerWheelStep, e.Delta.Y),
+                Math.Pow(ZoomPerWheelStep, wheelSign * e.Delta.Y),
                 e.GetPosition(this).X - TimelineLayout.TrackLeft);
         }
 

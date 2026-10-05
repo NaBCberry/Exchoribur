@@ -38,7 +38,13 @@
                 <Separator />
                 <MenuItem Header="退出" Click="OnExitClick" />
             </MenuItem>
-            <MenuItem Header="编辑" IsEnabled="False" />
+            <MenuItem Header="编辑">
+                <MenuItem Header="设置…" Click="OnSettingsClick">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Settings}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
             <MenuItem Header="视图" IsEnabled="False" />
             <MenuItem Header="帮助">
                 <MenuItem Header="关于 LightFlow" IsEnabled="False">
@@ -156,9 +162,11 @@
                             <controls:TimelineControl
                                 Frames="{Binding Frames}"
                                 Markers="{Binding Markers}"
-                                Viewport="{Binding Viewport}"
-                                PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
-                                Cursor="Hand" />
+                            Viewport="{Binding Viewport}"
+                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                            InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
+                            InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
+                            Cursor="Hand" />
                         </Grid>
                     </DockPanel>
                 </Border>

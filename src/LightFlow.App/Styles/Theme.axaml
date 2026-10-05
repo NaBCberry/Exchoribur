@@ -54,6 +54,13 @@
         <Setter Property="Foreground" Value="#E0705C" />
     </Style>
 
+    <!-- 设置页里挂在开关下面的说明文字 -->
+    <Style Selector="TextBlock.note">
+        <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
     <!--
         图标统一用描边绘制:Lucide 的图形本来就是笔画而不是填充区域,
         所以必须设 Stroke;宽高同时决定缩放比例。
