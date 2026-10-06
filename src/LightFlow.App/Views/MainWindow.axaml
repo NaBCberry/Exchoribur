@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LightFlow.App.ViewModels"
         xmlns:controls="using:LightFlow.App.Controls"
+        xmlns:vlc="using:LibVLCSharp.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="760"
@@ -33,6 +34,11 @@
                           InputGesture="Ctrl+O">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="导入参考媒体…" Command="{Binding ImportVideoCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.ImportMedia}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
@@ -103,7 +109,15 @@
                             </Button>
                         </StackPanel>
 
-                        <TextBlock Classes="hint" Text="视频预览" />
+                        <Grid>
+                            <TextBlock Classes="hint"
+                                       Text="视频预览"
+                                       IsVisible="{Binding ShowVideoPlaceholder}" />
+                            <!-- 画面是 libvlc 的原生子窗口,只在真载入视频后才显示,
+                                 免得平时留一块盖住提示文字的黑板 -->
+                            <vlc:VideoView MediaPlayer="{Binding Video.Player}"
+                                           IsVisible="{Binding HasVideo}" />
+                        </Grid>
                     </DockPanel>
                 </Border>
 

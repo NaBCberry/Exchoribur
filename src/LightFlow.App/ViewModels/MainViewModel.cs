@@ -17,7 +17,7 @@ public partial class MainViewModel : ViewModelBase
 {
     private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
 
-    private readonly ITimelineFilePicker? _filePicker;
+    private readonly IFilePicker? _filePicker;
 
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
     public MainViewModel()
@@ -25,7 +25,7 @@ public partial class MainViewModel : ViewModelBase
     {
     }
 
-    public MainViewModel(ITimelineFilePicker? filePicker)
+    public MainViewModel(IFilePicker? filePicker)
     {
         _filePicker = filePicker;
 
@@ -72,6 +72,42 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>用户偏好设置(滚轮方向之类),设置窗口改的就是这一份。</summary>
     public SettingsViewModel Settings { get; } = new();
 
+    /// <summary>视频预览用的播放器;系统里没有 libvlc 时它自己会带着失败原因待着。</summary>
+    public VideoService Video { get; } = new();
+
+    /// <summary>是否已经载入了参考视频,用来决定预览框是显示画面还是提示文字。</summary>
+    [ObservableProperty]
+    public partial bool HasVideo { get; set; }
+
+    public bool ShowVideoPlaceholder => !HasVideo;
+
+    partial void OnHasVideoChanged(bool value) => OnPropertyChanged(nameof(ShowVideoPlaceholder));
+
+    /// <summary>打开参考视频。解码器不可用或文件打不开时只改状态栏,不动已经打开的内容。</summary>
+    public bool OpenVideo(string path)
+    {
+        var fileName = Path.GetFileName(path);
+
+        if (!Video.IsAvailable)
+        {
+            HasError = true;
+            StatusText = $"视频预览不可用:{Video.ErrorMessage}";
+            return false;
+        }
+
+        if (!Video.Open(path))
+        {
+            HasError = true;
+            StatusText = $"打开视频 {fileName} 失败。";
+            return false;
+        }
+
+        HasVideo = true;
+        HasError = false;
+        StatusText = $"已载入参考视频 {fileName}。";
+        return true;
+    }
+
     partial void OnTimelineChanged(Timeline value)
     {
         // Frames / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。
@@ -103,13 +139,31 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var path = await _filePicker.PickAsync();
+        var path = await _filePicker.PickTimelineAsync();
         if (path is null)
         {
             return; // 用户点了取消
         }
 
         await LoadAsync(path);
+    }
+
+    /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
+    [RelayCommand]
+    private async Task ImportVideoAsync()
+    {
+        if (_filePicker is null)
+        {
+            return;
+        }
+
+        var path = await _filePicker.PickVideoAsync();
+        if (path is null)
+        {
+            return; // 用户点了取消
+        }
+
+        OpenVideo(path);
     }
 
     [RelayCommand]

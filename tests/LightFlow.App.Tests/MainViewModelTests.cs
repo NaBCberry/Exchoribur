@@ -110,8 +110,10 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     /// <summary>假的文件选择器:直接返回给定路径,不需要真的弹对话框。</summary>
-    private sealed class StubFilePicker(string? path) : ITimelineFilePicker
+    private sealed class StubFilePicker(string? path) : IFilePicker
     {
-        public Task<string?> PickAsync() => Task.FromResult(path);
+        public Task<string?> PickTimelineAsync() => Task.FromResult(path);
+
+        public Task<string?> PickVideoAsync() => Task.FromResult<string?>(null);
     }
 }

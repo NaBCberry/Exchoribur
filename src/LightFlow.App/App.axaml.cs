@@ -20,7 +20,7 @@ public partial class App : Application
         {
             // 先造窗口,再把窗口交给文件选择器——它要实现弹系统对话框那一半。
             var window = new MainWindow();
-            var viewModel = new MainViewModel(new StorageProviderTimelineFilePicker(window));
+            var viewModel = new MainViewModel(new StorageProviderFilePicker(window));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;
