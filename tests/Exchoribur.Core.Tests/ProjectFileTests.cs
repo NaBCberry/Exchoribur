@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using Exchoribur.Core;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Storage;
@@ -67,6 +68,31 @@ public sealed class ProjectFileTests : IDisposable
 
         Assert.NotNull(entry);
         Assert.Equal(entry!.Length, entry.CompressedLength);
+    }
+
+    [Fact]
+    public void Chinese_names_are_kept_readable_in_the_manifest()
+    {
+        var media = Path.Combine(_directory, "现场视频.mp4");
+        File.WriteAllBytes(media, [1, 2, 3, 4]);
+
+        var project = Path.Combine(_directory, "中文名字.exb");
+        ProjectFile.Save(project, new TimelineDocument("乐鸣东方 2026", CreateTimeline(), media));
+
+        using var archive = ZipFile.OpenRead(project);
+        var manifest = archive.GetEntry("manifest.json")!;
+
+        using var reader = new StreamReader(manifest.Open(), Encoding.UTF8);
+        var text = reader.ReadToEnd();
+
+        // 转成 \uXXXX 就没法直接翻该文件了。
+        Assert.Contains("乐鸣东方 2026", text);
+        Assert.Contains("现场视频.mp4", text);
+
+        // 条目名原样保留,打开时才能按清单里的名字找到视频。
+        var loaded = ProjectFile.Load(project);
+        Assert.Equal("乐鸣东方 2026", loaded.Name);
+        Assert.Equal(File.ReadAllBytes(media), File.ReadAllBytes(loaded.MediaPath!));
     }
 
     [Fact]

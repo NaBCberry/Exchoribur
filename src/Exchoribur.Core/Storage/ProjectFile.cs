@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Exchoribur.Core.Models;
 
@@ -12,7 +13,15 @@ namespace Exchoribur.Core.Storage;
 /// </summary>
 public static class ProjectFile
 {
-    private static readonly JsonSerializerOptions ManifestOptions = new() { WriteIndented = true };
+    /// <summary>
+    /// 清单的写法。编码器指定成"不转义":工程名是中文时,文件里要能直接看到原文,
+    /// 而不是一串 \uXXXX。
+    /// </summary>
+    private static readonly JsonSerializerOptions ManifestOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     /// <summary>打包时每次搬运多少字节。1 MiB 对机械盘和 SSD 都不算大。</summary>
     private const int CopyBufferSize = 1 << 20;

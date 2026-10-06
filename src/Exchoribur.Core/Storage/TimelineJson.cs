@@ -1,5 +1,7 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Exchoribur.Core.Models;
 
 namespace Exchoribur.Core.Storage;
@@ -7,43 +9,65 @@ namespace Exchoribur.Core.Storage;
 /// <summary>
 /// 时间轴的 JSON 表示。按列存放(先所有时间,再每个通道的分量),
 /// 比"每帧一个对象"小得多,两万帧也不会写出一个几十兆的文件。
+/// 数字按行分块,文件打开是一行行能看的,不是挤成一整行。
 /// </summary>
 public static class TimelineJson
 {
-    private static readonly JsonSerializerOptions Options = new()
+    /// <summary>数组里每行放几个数字。两万帧的列若每个数字占一行,文件就成了几十万行。</summary>
+    private const int NumbersPerLine = 16;
+
+    private static readonly JsonSerializerOptions ReadOptions = new()
     {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        PropertyNameCaseInsensitive = true,
+    };
+
+    /// <summary>写字符串用:中文保持原样,不转成 \uXXXX,工程文件是给人看的。</summary>
+    private static readonly JsonSerializerOptions TextOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public static string Write(Timeline timeline)
     {
-        var frames = timeline.Frames;
-        var dto = new TimelineDto
-        {
-            Version = ProjectFileFormat.FormatVersion,
-            Times = [.. frames.Select(frame => frame.Time.TotalMilliseconds)],
-        };
+        ArgumentNullException.ThrowIfNull(timeline);
 
+        var frames = timeline.Frames;
+        var builder = new StringBuilder();
+
+        builder.Append("{\n");
+        builder.Append("  \"Version\": ").Append(ProjectFileFormat.FormatVersion).Append(",\n");
+
+        builder.Append("  \"Times\": ");
+        AppendNumbers(builder, frames.Count, "  ",
+            index => FormatNumber(frames[index].Time.TotalMilliseconds));
+        builder.Append(",\n");
+
+        builder.Append("  \"Channels\": [\n");
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
-            var columns = new ChannelColumnsDto();
-            foreach (var frame in frames)
-            {
-                var state = frame.Channels[channel];
-                columns.Functions.Add((byte)state.Mode);
-                columns.Red.Add(state.Color.Red);
-                columns.Green.Add(state.Color.Green);
-                columns.Blue.Add(state.Color.Blue);
-            }
+            builder.Append("    {\n");
 
-            dto.Channels.Add(columns);
+            builder.Append("      \"Functions\": ");
+            AppendNumbers(builder, frames.Count, "      ",
+                index => ((byte)frames[index].Channels[channel].Mode).ToString(CultureInfo.InvariantCulture));
+            builder.Append(",\n");
+
+            AppendColorColumn(builder, "Red", frames, channel, state => state.Color.Red);
+            AppendColorColumn(builder, "Green", frames, channel, state => state.Color.Green);
+            AppendColorColumn(builder, "Blue", frames, channel, state => state.Color.Blue);
+
+            builder.Append("    }");
+            builder.Append(channel < Frame.ChannelCount - 1 ? "," : string.Empty);
+            builder.Append('\n');
         }
 
-        dto.Markers.AddRange(timeline.Markers.Select(
-            marker => new MarkerDto { Time = marker.Time.TotalMilliseconds, Name = marker.Name }));
+        builder.Append("  ],\n");
+        AppendMarkers(builder, timeline.Markers);
+        builder.Append("}\n");
 
-        return JsonSerializer.Serialize(dto, Options);
+        return builder.ToString();
     }
 
     public static Timeline Read(string json)
@@ -53,7 +77,7 @@ public static class TimelineJson
         TimelineDto? dto;
         try
         {
-            dto = JsonSerializer.Deserialize<TimelineDto>(json, Options);
+            dto = JsonSerializer.Deserialize<TimelineDto>(json, ReadOptions);
         }
         catch (JsonException exception)
         {
@@ -105,6 +129,98 @@ public static class TimelineJson
             .ToList();
 
         return new Timeline(frames, markers);
+    }
+
+    /// <summary>写一个颜色分量列(0-15 的整数)。</summary>
+    private static void AppendColorColumn(
+        StringBuilder builder,
+        string name,
+        IReadOnlyList<Frame> frames,
+        int channel,
+        Func<ChannelState, byte> component)
+    {
+        builder.Append("      \"").Append(name).Append("\": ");
+        AppendNumbers(builder, frames.Count, "      ",
+            index => component(frames[index].Channels[channel]).ToString(CultureInfo.InvariantCulture));
+        builder.Append(",\n");
+    }
+
+    /// <summary>写标记列表。一个标记一行,方便直接在文件里翻。</summary>
+    private static void AppendMarkers(StringBuilder builder, IReadOnlyList<TimelineMarker> markers)
+    {
+        builder.Append("  \"Markers\": ");
+
+        if (markers.Count == 0)
+        {
+            builder.Append("[]\n");
+            return;
+        }
+
+        builder.Append("[\n");
+        for (var index = 0; index < markers.Count; index++)
+        {
+            var marker = markers[index];
+
+            builder.Append("    { \"Time\": ")
+                .Append(FormatNumber(marker.Time.TotalMilliseconds))
+                .Append(", \"Name\": ")
+                .Append(JsonSerializer.Serialize(marker.Name, TextOptions))
+                .Append('}');
+            builder.Append(index < markers.Count - 1 ? "," : string.Empty);
+            builder.Append('\n');
+        }
+
+        builder.Append("  ]\n");
+    }
+
+    /// <summary>
+    /// 写一个数字数组:每行 NumbersPerLine 个,行首缩进到 indent 再加两个空格。
+    /// value 给出第 index 个数字该写成什么文本,免得先造一批中间集合。
+    /// </summary>
+    private static void AppendNumbers(StringBuilder builder, int count, string indent, Func<int, string> value)
+    {
+        if (count == 0)
+        {
+            builder.Append("[]");
+            return;
+        }
+
+        builder.Append('[');
+
+        for (var index = 0; index < count; index++)
+        {
+            if (index % NumbersPerLine == 0)
+            {
+                builder.Append('\n').Append(indent).Append("  ");
+            }
+            else
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(value(index));
+
+            if (index < count - 1)
+            {
+                builder.Append(',');
+            }
+        }
+
+        builder.Append('\n').Append(indent).Append(']');
+    }
+
+    /// <summary>
+    /// 浮点数写最短的往返写法。真实数据里有 163.653008948 这种毫秒时间,
+    /// 少写一位就会让帧时间对不上,所以不能自己截断。
+    /// </summary>
+    private static string FormatNumber(double value)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new InvalidOperationException($"时间值 {value} 不是有限数,写不进 JSON。");
+        }
+
+        return value.ToString("R", CultureInfo.InvariantCulture);
     }
 
     private static LightColor ReadColor(ChannelColumnsDto columns, int index, int channel)
