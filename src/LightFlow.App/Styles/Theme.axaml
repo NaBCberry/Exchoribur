@@ -127,6 +127,11 @@
         <Setter Property="Background" Value="#33FF5A36" />
     </Style>
 
+    <!-- ToggleButton 自带一套默认底色,不覆盖的话循环按钮平时会露出灰底 -->
+    <Style Selector="ToggleButton.transport /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
     <!--
         播放/停止/循环这三个主控件不要灰底方块:悬停、按下、选中一律透明,
         只让图标自己变色。这几条必须放在上面那套通用规则之后,否则会被覆盖。
