@@ -76,12 +76,25 @@
             <!-- 左栏:视频预览(播放控制压在它底部)+ 十通道状态(缩放压在它底部) -->
             <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="8">
                 <Border Grid.Row="0" Classes="panel" Height="191">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Bottom"
-                                    Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    Spacing="2"
-                                    Margin="0,0,0,6">
+                    <Grid RowDefinitions="*,Auto">
+                        <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
+                             等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗。
+                             它的位置在 Avalonia 之上(airspace),所以提示文字不能压在它上面,
+                             只能放到下面那条按钮带上。 -->
+                        <vlc:VideoView Grid.Row="0" MediaPlayer="{Binding Video.Player}" />
+
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,6">
+                            <TextBlock Grid.Column="0"
+                                       Classes="note"
+                                       Text="视频预览"
+                                       IsVisible="{Binding ShowVideoPlaceholder}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0" />
+
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        Spacing="2">
                             <Button Classes="transport"
                                     ToolTip.Tip="回到开头"
                                     Command="{Binding GoToStartCommand}">
@@ -107,18 +120,9 @@
                                     Command="{Binding GoToEndCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
                             </Button>
-                        </StackPanel>
-
-                        <Grid>
-                            <TextBlock Classes="hint"
-                                       Text="视频预览"
-                                       IsVisible="{Binding ShowVideoPlaceholder}" />
-                            <!-- 画面是 libvlc 的原生子窗口,只在真载入视频后才显示,
-                                 免得平时留一块盖住提示文字的黑板 -->
-                            <vlc:VideoView MediaPlayer="{Binding Video.Player}"
-                                           IsVisible="{Binding HasVideo}" />
+                            </StackPanel>
                         </Grid>
-                    </DockPanel>
+                    </Grid>
                 </Border>
 
                 <Border Grid.Row="1" Classes="panel" Margin="0,8,0,0">
