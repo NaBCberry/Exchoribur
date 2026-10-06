@@ -121,11 +121,14 @@ public class TimelineCsvReaderTests
     }
 
     [Fact]
-    public void Read_reports_the_row_number_for_a_negative_time()
+    public void Read_accepts_a_negative_time_before_the_start()
     {
-        var exception = Assert.Throws<FormatException>(() => Read("frame_time_ms\n-1"));
+        // 真实工程在参考视频开始之前就有灯光帧,那些帧的时间是负的。
+        var timeline = Read("frame_time_ms,ch0_red\n-40600,3\n0,5\n");
 
-        Assert.Contains("第 2 行", exception.Message);
+        Assert.Equal(2, timeline.Frames.Count);
+        Assert.Equal(TimeSpan.FromMilliseconds(-40600), timeline.Frames[0].Time);
+        Assert.Equal(TimeSpan.Zero, timeline.Frames[1].Time);
     }
 
     [Fact]

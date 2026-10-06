@@ -24,14 +24,14 @@ public class FrameTests
 
     [Theory]
     [InlineData(-1.0)]
+    [InlineData(-40600.0)]
     [InlineData(-0.001)]
-    [InlineData(-1e12)]
-    public void Constructor_rejects_negative_time(double milliseconds)
+    public void Constructor_accepts_negative_time(double milliseconds)
     {
-        // 特性参数必须是编译期常量,TimeSpan 不是,所以这里传毫秒数值、
-        // 在方法体里再转换。
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new Frame(TimeSpan.FromMilliseconds(milliseconds), CreateDistinctChannels()));
+        // 真实工程里有 0 之前的"预备片段",所以负时间是合法数据,不能拒收。
+        var frame = new Frame(TimeSpan.FromMilliseconds(milliseconds), CreateDistinctChannels());
+
+        Assert.Equal(TimeSpan.FromMilliseconds(milliseconds), frame.Time);
     }
 
     [Theory]
@@ -76,11 +76,11 @@ public class FrameTests
     }
 
     [Fact]
-    public void Uniform_rejects_negative_time()
+    public void Uniform_accepts_negative_time()
     {
-        // 工厂方法也要守住同一条规则,不能绕过构造函数的校验。
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => Frame.Uniform(TimeSpan.FromMilliseconds(-1), new LightColor(0, 0, 0), FlashMode.Solid));
+        var frame = Frame.Uniform(TimeSpan.FromMilliseconds(-1), new LightColor(0, 0, 0), FlashMode.Solid);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(-1), frame.Time);
     }
 
     [Fact]

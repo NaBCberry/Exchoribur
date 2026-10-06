@@ -138,11 +138,7 @@ public static class TimelineCsvReader
             throw new FormatException($"第 {rowNumber} 行的 frame_time_ms 不是有效数字:{text}");
         }
 
-        if (milliseconds < 0)
-        {
-            throw new FormatException($"第 {rowNumber} 行的 frame_time_ms 是负数:{text}");
-        }
-
+        // 负数是允许的:工程里可能有 0 之前的预备片段。
         return TimeSpan.FromMilliseconds(milliseconds);
     }
 }

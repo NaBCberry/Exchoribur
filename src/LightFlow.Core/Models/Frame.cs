@@ -9,10 +9,6 @@ public sealed class Frame
 
     public Frame(TimeSpan time, IReadOnlyList<ChannelState> channels)
     {
-        if (time < TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(time), time, "时间戳必须为非负数。");
-        }
         if (channels.Count != ChannelCount)
         {
             throw new ArgumentException($"通道数量必须为 {ChannelCount}。", nameof(channels));
