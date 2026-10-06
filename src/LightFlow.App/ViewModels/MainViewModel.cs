@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LightFlow.App.Controls;
@@ -37,7 +38,17 @@ public partial class MainViewModel : ViewModelBase
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
         StatusText = EmptyStatusText;
         WindowTitle = "LightFlow";
+
+        // 视频每解出一帧就抬一次序号;位图是同一个对象,界面靠它知道内容变了。
+        Video.FrameUpdated += (_, _) => VideoFrameVersion++;
     }
+
+    /// <summary>预览用的当前帧画面。</summary>
+    public WriteableBitmap? VideoFrame => Video.Frame;
+
+    /// <summary>视频帧序号,每来一帧加一,给画面控件当刷新信号。</summary>
+    [ObservableProperty]
+    public partial int VideoFrameVersion { get; set; }
 
     /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
     [ObservableProperty]
@@ -77,10 +88,10 @@ public partial class MainViewModel : ViewModelBase
         {
             var length = Duration;
 
-            // Length 在媒体还没读出来之前是 0,这时不算数。
-            if (HasVideo && Video.Player is { Length: > 0 } player)
+            // 长度在媒体还没读出来之前是 0,这时不算数。
+            if (HasVideo && Video.Length > TimeSpan.Zero)
             {
-                var videoLength = TimeSpan.FromMilliseconds(player.Length);
+                var videoLength = Video.Length;
                 if (videoLength > length)
                 {
                     length = videoLength;
@@ -135,7 +146,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         // 导入后先停在播放头位置:正在播放的话就让它跟着播,否则停住等按播放。
-        if (!Video.Open(path, PlayheadTime, pauseAfterStart: !IsPlaying))
+        if (!Video.Load(path))
         {
             HasError = true;
             StatusText = $"打开视频 {fileName} 失败。";
@@ -238,7 +249,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _playback.Stop();
         _clock?.Stop();
-        Video.Player?.Stop();
+        Video.Stop();
         SyncPlaybackFlags();
         PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
@@ -279,7 +290,7 @@ public partial class MainViewModel : ViewModelBase
         if (!_playback.IsPlaying)
         {
             _clock?.Stop();
-            Video.Player?.SetPause(true);
+        Video.Pause();
         }
     }
 
@@ -297,10 +308,10 @@ public partial class MainViewModel : ViewModelBase
         PlayheadTime = _playback.Position;
         _clock?.Start(AdvancePlayback);
 
-        if (HasVideo && Video.Player is { } player)
+        if (HasVideo)
         {
-            player.Play();
-            player.Time = (long)PlayheadTime.TotalMilliseconds;
+            Video.Play();
+            Video.Seek(PlayheadTime);
         }
     }
 
@@ -313,7 +324,7 @@ public partial class MainViewModel : ViewModelBase
 
         _playback.Pause();
         _clock?.Stop();
-        Video.Player?.SetPause(true);
+        Video.Pause();
         SyncPlaybackFlags();
     }
 
@@ -334,9 +345,9 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>把视频挪到播放头所在的位置(暂停着看某一帧时用)。</summary>
     private void KeepVideoAtPlayhead()
     {
-        if (HasVideo && Video.Player is { } player)
+        if (HasVideo)
         {
-            player.Time = (long)PlayheadTime.TotalMilliseconds;
+            Video.Seek(PlayheadTime);
         }
     }
 
@@ -351,14 +362,14 @@ public partial class MainViewModel : ViewModelBase
         // 两个时钟都按真实时间走,长期飘移不大,偶尔纠正一次就够。
         const double toleranceMilliseconds = 2000;
 
-        if (!_playback.IsPlaying || !HasVideo || Video.Player is not { } player)
+        if (!_playback.IsPlaying || !HasVideo)
         {
             return;
         }
 
-        if (Math.Abs(player.Time - PlayheadTime.TotalMilliseconds) > toleranceMilliseconds)
+        if (Math.Abs((Video.Position - PlayheadTime).TotalMilliseconds) > toleranceMilliseconds)
         {
-            player.Time = (long)PlayheadTime.TotalMilliseconds;
+            Video.Seek(PlayheadTime);
         }
     }
 

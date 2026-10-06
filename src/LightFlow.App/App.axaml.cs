@@ -37,6 +37,7 @@ public partial class App : Application
                 _ = viewModel.LoadAsync(path);
             }
 
+
         }
 
         base.OnFrameworkInitializationCompleted();

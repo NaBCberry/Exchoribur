@@ -90,16 +90,42 @@
         <Setter Property="Height" Value="20" />
     </Style>
 
-    <!-- 播放/停止/循环:鼠标移上去时图标本身变色,方便一眼认出这三个主控件 -->
-    <Style Selector="Button.transport.play:pointerover Path.icon.play">
+    <!--
+        播放/停止/循环这三个主控件不要灰底方块:悬停、按下、选中都保持透明,
+        只有图标本身变色。前面几个导航按钮仍用上面那套底色的反馈。
+    -->
+    <Style Selector="Button.transport.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="Button.transport.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ToggleButton.transport.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ToggleButton.transport.primary:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- 播放:悬停变绿 -->
+    <Style Selector="Button.transport.primary.play:pointerover Path.icon.play">
         <Setter Property="Stroke" Value="#5CCB5F" />
     </Style>
 
-    <Style Selector="Button.transport.stop:pointerover Path.icon.stop">
+    <!-- 停止:悬停变红 -->
+    <Style Selector="Button.transport.primary.stop:pointerover Path.icon.stop">
         <Setter Property="Stroke" Value="#E0574B" />
     </Style>
 
-    <Style Selector="ToggleButton.transport.loop:pointerover Path.icon.loop">
+    <!-- 循环:开着橙色、关着绿色 -->
+    <Style Selector="ToggleButton.transport.primary.loop Path.icon.loop">
+        <Setter Property="Stroke" Value="#5CCB5F" />
+    </Style>
+
+    <Style Selector="ToggleButton.transport.primary.loop:checked Path.icon.loop">
         <Setter Property="Stroke" Value="#E8A33D" />
     </Style>
 

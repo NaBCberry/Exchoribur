@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LightFlow.App.ViewModels"
         xmlns:controls="using:LightFlow.App.Controls"
-        xmlns:vlc="using:LibVLCSharp.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="760"
@@ -104,7 +103,7 @@
                 </Button>
 
                 <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
-                <Button Classes="transport play"
+                <Button Classes="transport primary play"
                         ToolTip.Tip="播放 / 暂停"
                         Command="{Binding TogglePlayCommand}">
                     <Panel>
@@ -116,12 +115,12 @@
                               IsVisible="{Binding IsPlaying}" />
                     </Panel>
                 </Button>
-                <Button Classes="transport stop"
+                <Button Classes="transport primary stop"
                         ToolTip.Tip="停止"
                         Command="{Binding StopPlaybackCommand}">
                     <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
                 </Button>
-                <ToggleButton Classes="transport loop"
+                <ToggleButton Classes="transport primary loop"
                               ToolTip.Tip="循环播放"
                               IsChecked="{Binding IsLooping}">
                     <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
@@ -145,7 +144,8 @@
                         <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
                              等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
                              而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
-                        <vlc:VideoView x:Name="VideoPanel" />
+                        <controls:VideoSurface Frame="{Binding VideoFrame}"
+                                               FrameVersion="{Binding VideoFrameVersion}" />
                     </DockPanel>
                 </Border>
 

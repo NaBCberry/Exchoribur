@@ -1,42 +1,61 @@
-using LibVLCSharp.Shared;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
-// LibVLCSharp 里那个负责找原生库的类叫 Core,和我们自己的 LightFlow.Core 同名,
-// 直接用 Core 会被解析成我们的命名空间,所以起个别名。
+using LibVLCSharp.Shared;
 using VlcCore = LibVLCSharp.Shared.Core;
 
 namespace LightFlow.App.Services;
 
 /// <summary>
-/// 视频预览:解码交给 libvlc,画面交给 VideoView 显示。
-/// 初始化失败(比如系统里没有 libvlc)不算致命——预览那块空着,其他功能照用,
-/// 失败原因留在 <see cref="ErrorMessage"/> 里给状态栏用。
+/// 视频预览:让 libvlc 把每一帧像素交给我们(BGRA),自己画进位图。
+/// 不用它的原生窗口控件,所以不会弹独立窗口、没有 airspace 限制,
+/// 也能精确做到"载入后停在第一帧"。代价是每帧多一次内存拷贝。
 /// </summary>
-/// <remarks>
-/// 两条踩过的经验:
-/// 一是 VideoView 必须一直在可视树里。折叠着的话原生宿主窗口根本不会创建,
-/// 这时去 Play() 就会让 libvlc 自己弹一个独立窗口出来。
-/// 二是 LibVLCSharp 固定用 3.9.7.1,原因见工程文件里的注释。
-/// </remarks>
 public sealed class VideoService : IDisposable
 {
-    private readonly LibVLC? _libVlc;
+    private const int FrameWidth = 1280;
+    private const int FrameHeight = 720;
+    private const int BytesPerPixel = 4;
+    private const int RowBytes = FrameWidth * BytesPerPixel;
+    private const int FrameBytes = RowBytes * FrameHeight;
 
-    /// <summary>打开视频后要停在哪个位置;等第一帧真的出来再停,不然画面是黑的。</summary>
-    private TimeSpan? _pauseAfterStart;
+    private readonly object _sync = new();
+
+    /// <summary>libvlc 写当前帧用的缓冲。</summary>
+    private readonly byte[] _vlcBuffer = new byte[FrameBytes];
+
+    /// <summary>界面线程取帧用的缓冲,避免读到写了一半的像素。</summary>
+    private readonly byte[] _latestFrame = new byte[FrameBytes];
+
+    private readonly GCHandle _vlcBufferPin;
+    private readonly IntPtr _vlcBufferPointer;
+    private readonly LibVLC? _libVlc;
+    private readonly MediaPlayer? _player;
+
+    private bool _bitmapUpdateQueued;
 
     public VideoService()
     {
         try
         {
-            // 找到原生 libvlc:Windows / macOS 由 NuGet 包带过来,
-            // Linux 需要系统装 libvlc(发行版包名一般是 libvlc-dev 或 vlc-plugin-base)。
             VlcCore.Initialize();
             _libVlc = new LibVLC();
+            _player = new MediaPlayer(_libVlc);
 
-            Player = new MediaPlayer(_libVlc)
-            {
-                Volume = 80,
-            };
+            _vlcBufferPin = GCHandle.Alloc(_vlcBuffer, GCHandleType.Pinned);
+            _vlcBufferPointer = _vlcBufferPin.AddrOfPinnedObject();
+
+            // BGRA 与 Avalonia 位图的 Bgra8888 一致,可以整块拷贝,不用逐像素转换。
+            _player.SetVideoFormat("BGRA", FrameWidth, FrameHeight, RowBytes);
+            _player.SetVideoCallbacks(LockFrame, UnlockFrame, DisplayFrame);
+
+            Frame = new WriteableBitmap(
+                new PixelSize(FrameWidth, FrameHeight),
+                new Vector(96, 96),
+                PixelFormat.Bgra8888,
+                AlphaFormat.Opaque);
         }
         catch (Exception exception)
         {
@@ -44,72 +63,128 @@ public sealed class VideoService : IDisposable
         }
     }
 
-    public MediaPlayer? Player { get; }
+    /// <summary>当前帧画面;解码器不可用时为 null。</summary>
+    public WriteableBitmap? Frame { get; }
 
     public string? ErrorMessage { get; }
 
-    public bool IsAvailable => Player is not null;
+    public bool IsAvailable => _player is not null;
 
-    /// <summary>
-    /// 打开视频。pauseAfterStart 为真时,等它真正开始播放(第一帧解码出来)之后
-    /// 停在 <paramref name="startAt"/> 位置——直接刚 Play 就暂停的话,第一帧还没出来,
-    /// 预览会是一片黑,看着像没打开。
-    /// </summary>
-    public bool Open(string path, TimeSpan startAt, bool pauseAfterStart)
+    /// <summary>有新一帧画好了(界面线程触发),界面据此重画。</summary>
+    public event EventHandler? FrameUpdated;
+
+    public TimeSpan Position => TimeSpan.FromMilliseconds(_player?.Time ?? 0);
+
+    /// <summary>视频总长;媒体还没读出来时为 0。</summary>
+    public TimeSpan Length
     {
-        if (_libVlc is null || Player is null)
+        get
+        {
+            var length = _player?.Length ?? 0;
+            return length > 0 ? TimeSpan.FromMilliseconds(length) : TimeSpan.Zero;
+        }
+    }
+
+    /// <summary>载入视频并开始播放。</summary>
+    public bool Load(string path)
+    {
+        if (_libVlc is null || _player is null)
         {
             return false;
         }
 
-        if (pauseAfterStart)
-        {
-            _pauseAfterStart = startAt < TimeSpan.Zero ? TimeSpan.Zero : startAt;
-
-            // 起播稍等再把画面停住。为什么要等:刚 Play() 时第一帧还没解出来,
-            // 立刻暂停的话预览是一片黑,看着像"视频打不开"。
-            // 为什么不听 VLC 的 Playing 事件:实测那个事件到了之后状态仍报 Playing,
-            // 而且在事件回调里设时间有时会抛异常,不如按时间兜底来得稳。
-            DispatcherTimer.RunOnce(
-                PauseAtPendingPosition,
-                TimeSpan.FromMilliseconds(250),
-                DispatcherPriority.Background);
-        }
-
+        _player.Volume = 80;
         using var media = new Media(_libVlc, path, FromType.FromPath);
-        return Player.Play(media);
+
+        return _player.Play(media);
     }
 
-    /// <summary>把播放定位到打开时要求的位置并暂停;失败就让视频继续播,总比黑着强。</summary>
-    private void PauseAtPendingPosition()
+    public void Play() => _player?.Play();
+
+    public void Pause() => _player?.SetPause(true);
+
+    public void Stop() => _player?.Stop();
+
+    public void Seek(TimeSpan position)
     {
-        if (Player is not { } player || _pauseAfterStart is not { } position)
+        if (_player is { } player)
+        {
+            player.Time = (long)Math.Max(0, position.TotalMilliseconds);
+        }
+    }
+
+    /// <summary>libvlc 要一块可写内存放当前帧,把固定住的那块地址给它。</summary>
+    private IntPtr LockFrame(IntPtr opaque, IntPtr planes)
+    {
+        Marshal.WriteIntPtr(planes, _vlcBufferPointer);
+        return _vlcBufferPointer;
+    }
+
+    private void UnlockFrame(IntPtr opaque, IntPtr picture, IntPtr planes)
+    {
+    }
+
+    /// <summary>LibVLC 说这一帧齐了:搬到我们的缓冲,再排队画到位图上。</summary>
+    private void DisplayFrame(IntPtr opaque, IntPtr picture)
+    {
+        lock (_sync)
+        {
+            Buffer.BlockCopy(_vlcBuffer, 0, _latestFrame, 0, FrameBytes);
+        }
+
+        QueueBitmapUpdate();
+    }
+
+    private void QueueBitmapUpdate()
+    {
+        if (_bitmapUpdateQueued)
         {
             return;
         }
 
-        _pauseAfterStart = null;
+        _bitmapUpdateQueued = true;
 
-        try
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                _bitmapUpdateQueued = false;
+                CopyToBitmap();
+
+                FrameUpdated?.Invoke(this, EventArgs.Empty);
+            },
+            DispatcherPriority.Render);
+    }
+
+    private void CopyToBitmap()
+    {
+        if (Frame is not { } bitmap)
         {
-            player.Time = (long)position.TotalMilliseconds;
-            player.SetPause(true);
+            return;
         }
-        catch (Exception exception)
+
+        using var buffer = bitmap.Lock();
+
+        lock (_sync)
         {
-            Console.Error.WriteLine($"[video] 定位并暂停失败:{exception.Message}");
+            for (var row = 0; row < FrameHeight; row++)
+            {
+                Marshal.Copy(
+                    _latestFrame,
+                    row * RowBytes,
+                    buffer.Address + (row * buffer.RowBytes),
+                    RowBytes);
+            }
         }
     }
 
-    public void Play() => Player?.Play();
-
-    public void Pause() => Player?.Pause();
-
-    public void Stop() => Player?.Stop();
-
     public void Dispose()
     {
-        Player?.Dispose();
+        _player?.Dispose();
         _libVlc?.Dispose();
+
+        if (_vlcBufferPin.IsAllocated)
+        {
+            _vlcBufferPin.Free();
+        }
     }
 }
