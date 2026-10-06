@@ -68,6 +68,30 @@ public partial class MainViewModel : ViewModelBase
         => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[^1].Time;
 
     /// <summary>
+    /// 能播多长:有时间轴按时间轴算,只有视频就按视频算,两边都有时取长的那个。
+    /// 这样"只导入视频、还没导入灯光数据"时也能按播放预览视频。
+    /// </summary>
+    private TimeSpan PlaybackLength
+    {
+        get
+        {
+            var length = Duration;
+
+            // Length 在媒体还没读出来之前是 0,这时不算数。
+            if (HasVideo && Video.Player is { Length: > 0 } player)
+            {
+                var videoLength = TimeSpan.FromMilliseconds(player.Length);
+                if (videoLength > length)
+                {
+                    length = videoLength;
+                }
+            }
+
+            return length;
+        }
+    }
+
+    /// <summary>
     /// 时间轴的取景框:现在看哪一段、放大到多少。
     /// 界面上的滚轮缩放、拖动平移和工具栏按钮都改它这一个对象。
     /// </summary>
@@ -121,13 +145,9 @@ public partial class MainViewModel : ViewModelBase
         HasError = false;
         StatusText = $"已载入参考视频 {fileName}。";
 
-        // 视频刚载入时是自己从头发播放的,把它对到播放头上:
-        // 没在播放就停在当前这一帧,方便对着播放头看画面。
+        // 刚载入的视频先照常播着(第一帧常常是黑的,暂停在那里会让人以为没打开),
+        // 只把它对齐到播放头;按了播放/暂停键之后两边就由同一条时间线带着走。
         KeepVideoAtPlayhead();
-        if (!_playback.IsPlaying)
-        {
-            Video.Player?.SetPause(true);
-        }
 
         return true;
     }
@@ -146,7 +166,7 @@ public partial class MainViewModel : ViewModelBase
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
         _playback.Stop();
-        _playback.SetDuration(Duration);
+        _playback.SetDuration(PlaybackLength);
         SyncPlaybackFlags();
         _clock?.Stop();
 
@@ -268,7 +288,7 @@ public partial class MainViewModel : ViewModelBase
 
     private void StartPlayback()
     {
-        _playback.SetDuration(Duration);
+        _playback.SetDuration(PlaybackLength);
         _playback.Play();
 
         if (!_playback.IsPlaying)
@@ -304,7 +324,7 @@ public partial class MainViewModel : ViewModelBase
     private void Seek(TimeSpan position)
     {
         PausePlayback();
-        _playback.SetDuration(Duration);
+        _playback.SetDuration(PlaybackLength);
         _playback.Seek(position);
 
         PlayheadTime = _playback.Position;
