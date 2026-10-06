@@ -48,6 +48,30 @@ public sealed class TimelineNamingTests : IDisposable
     }
 
     [Fact]
+    public async Task Importing_into_an_open_project_replaces_its_timeline_without_asking()
+    {
+        var first = WriteTimeline("第一版.csv");
+        var second = Path.Combine(_directory, "第二版.csv");
+        File.WriteAllText(second, $"{Header}\n0,0,3,0,0,\n500,0,9,0,0,\n");
+
+        var picker = new StubFilePicker(first);
+        var viewModel = new MainViewModel(picker, clock: null, new StubNamePrompt("巡演工程"));
+
+        await viewModel.OpenCommand.ExecuteAsync(null);
+        Assert.Equal("巡演工程", viewModel.TimelineName);
+        Assert.False(viewModel.IsModified);
+
+        // 第二次导入:同一份工程里换数据,不问名字也不换工程名,只算一次改动。
+        picker.Path = second;
+        await viewModel.OpenCommand.ExecuteAsync(null);
+
+        Assert.Equal("巡演工程", viewModel.TimelineName);
+        Assert.Equal(2, viewModel.Frames.Count);
+        Assert.True(viewModel.IsModified);
+        Assert.Equal("*巡演工程 — Exchoribur", viewModel.WindowTitle);
+    }
+
+    [Fact]
     public async Task Loading_without_a_prompt_falls_back_to_the_file_name()
     {
         var path = WriteTimeline("20260718_beijing_marked.csv");
@@ -79,8 +103,11 @@ public sealed class TimelineNamingTests : IDisposable
 
     private sealed class StubFilePicker(string? path) : IFilePicker
     {
-        public Task<string?> PickTimelineAsync() => Task.FromResult(path);
+        /// <summary>可以中途换掉,用来模拟"再导入另一份文件"。</summary>
+        public string? Path { get; set; } = path;
 
-        public Task<string?> PickVideoAsync() => Task.FromResult(path);
+        public Task<string?> PickTimelineAsync() => Task.FromResult(Path);
+
+        public Task<string?> PickVideoAsync() => Task.FromResult(Path);
     }
 }

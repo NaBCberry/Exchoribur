@@ -18,8 +18,8 @@
                         VerticalAlignment="Center"
                         Spacing="8"
                         Margin="0,0,14,0">
-                <Button Content="取消" Click="OnCancel" Padding="18,4" />
                 <Button Content="确定" Click="OnConfirm" Padding="18,4" />
+                <Button Content="取消" Click="OnCancel" Padding="18,4" />
             </StackPanel>
         </Border>
 

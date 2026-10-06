@@ -277,6 +277,13 @@ public partial class MainViewModel : ViewModelBase
             return; // 用户点了取消
         }
 
+        // 已经有工程:这是改里面的数据,不新建也不问名字。
+        if (Document is not null)
+        {
+            await LoadAsync(path);
+            return;
+        }
+
         // 导入前先问工程名;取消就什么都不做,主窗口保持原样。
         var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
         if (name is null)
@@ -284,8 +291,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        CreateDocument(name);
-        await LoadAsync(path);
+        await LoadAsync(path, name);
     }
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
@@ -301,6 +307,15 @@ public partial class MainViewModel : ViewModelBase
         if (path is null)
         {
             return; // 用户点了取消
+        }
+
+        // 已经有工程:只是换掉参考媒体。
+        if (Document is not null)
+        {
+            OpenVideo(path);
+            Document.AttachMedia(path);
+            IsModified = Document.IsModified;
+            return;
         }
 
         var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
@@ -476,7 +491,11 @@ public partial class MainViewModel : ViewModelBase
     /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;
     /// 出错只改状态栏,已经打开的内容保持不动。
     /// </summary>
-    public async Task LoadAsync(string path)
+    /// <summary>
+    /// 读一个 CSV。documentName 是刚在命名对话框里起的新工程名;
+    /// 不传就是"往已有工程里换数据"或者"用文件名兜底新建"。
+    /// </summary>
+    public async Task LoadAsync(string path, string? documentName = null)
     {
         var fileName = Path.GetFileName(path);
 
@@ -486,13 +505,22 @@ public partial class MainViewModel : ViewModelBase
 
             Timeline = timeline;
 
-            // 工程名:已经有名字(用户刚起的)就保留,命令行直接给文件时用文件名兜底。
+            // 已有工程:这是把里面的时间轴换掉;没有工程:用文件名兜底新建。
+            // 用户在命名对话框里起的名字优先。
+            var existing = Document;
             Document = new TimelineDocument(
-                Document?.Name ?? Path.GetFileNameWithoutExtension(fileName),
+                documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName),
                 timeline,
-                Document?.MediaPath);
+                existing?.MediaPath);
+
+            // 只有"往已有工程里换数据"才算改动;新建工程不算。
+            if (existing is not null && documentName is null)
+            {
+                Document.MarkModified();
+            }
+
             TimelineName = Document.Name;
-            IsModified = false;
+            IsModified = Document.IsModified;
             OnPropertyChanged(nameof(Document));
             UpdateWindowTitle();
 
