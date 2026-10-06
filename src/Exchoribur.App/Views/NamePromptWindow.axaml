@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="180"
+        x:Class="Exchoribur.App.Views.NamePromptWindow"
+        Width="440" Height="184"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Height="52"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Margin="0,0,14,0">
+                <Button Content="取消" Click="OnCancel" Padding="18,4" />
+                <Button Content="确定" Click="OnConfirm" Padding="18,4" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="18" Spacing="8">
+            <TextBlock Classes="panelTitle" Text="给这条时间线起个名字" />
+            <TextBox x:Name="NameBox" PlaceholderText="例如:乐鸣东方 2026 巡演" />
+        </StackPanel>
+    </DockPanel>
+
+</Window>

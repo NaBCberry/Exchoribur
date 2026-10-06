@@ -32,7 +32,10 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(TimeSpan.FromSeconds(2), viewModel.Duration);
         Assert.False(viewModel.HasError);
         Assert.Contains("show.csv", viewModel.StatusText);
-        Assert.Contains("show.csv", viewModel.WindowTitle);
+
+        // 标题显示的是工程名,没起名字时用文件名(不含扩展名)。
+        Assert.Equal("show — Exchoribur", viewModel.WindowTitle);
+        Assert.Equal("show", viewModel.TimelineName);
 
         // 播放头回到开头,通道状态也应该跟着换成第一帧。
         Assert.Equal(TimeSpan.Zero, viewModel.PlayheadTime);

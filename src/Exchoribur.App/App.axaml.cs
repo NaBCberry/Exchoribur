@@ -22,7 +22,8 @@ public partial class App : Application
             var window = new MainWindow();
             var viewModel = new MainViewModel(
                 new StorageProviderFilePicker(window),
-                new DispatcherPlaybackClock());
+                new DispatcherPlaybackClock(),
+                new WindowNamePrompt(window));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;

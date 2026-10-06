@@ -21,6 +21,7 @@ public partial class MainViewModel : ViewModelBase
 
     private readonly IFilePicker? _filePicker;
     private readonly IPlaybackClock? _clock;
+    private readonly INamePrompt? _namePrompt;
     private readonly PlaybackState _playback = new();
 
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
@@ -29,18 +30,20 @@ public partial class MainViewModel : ViewModelBase
     {
     }
 
-    public MainViewModel(IFilePicker? filePicker, IPlaybackClock? clock = null)
+    public MainViewModel(
+        IFilePicker? filePicker,
+        IPlaybackClock? clock = null,
+        INamePrompt? namePrompt = null)
     {
         _filePicker = filePicker;
         _clock = clock;
+        _namePrompt = namePrompt;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
         StatusText = EmptyStatusText;
         WindowTitle = "Exchoribur";
 
-        // 视频每解出一帧就抬一次序号;位图是同一个对象,界面靠它知道内容变了。
-        Video.FrameUpdated += (_, _) => VideoFrameVersion++;
     }
 
     /// <summary>预览用的当前帧画面。</summary>
@@ -49,6 +52,43 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>视频帧序号,每来一帧加一,给画面控件当刷新信号。</summary>
     [ObservableProperty]
     public partial int VideoFrameVersion { get; set; }
+
+    /// <summary>当前工程。还没导入任何东西时是 null。</summary>
+    public TimelineDocument? Document { get; private set; }
+
+    /// <summary>工程名,显示在窗口标题上。</summary>
+    [ObservableProperty]
+    public partial string TimelineName { get; set; } = TimelineDocument.DefaultName;
+
+    /// <summary>跟上次保存相比有没有改动,标题上用 * 提示。</summary>
+    [ObservableProperty]
+    public partial bool IsModified { get; set; }
+
+    partial void OnTimelineNameChanged(string value) => UpdateWindowTitle();
+
+    partial void OnIsModifiedChanged(bool value) => UpdateWindowTitle();
+
+    /// <summary>新建一个空工程,用它承载接下来的导入。</summary>
+    private void CreateDocument(string name, string? mediaPath = null)
+    {
+        Document = new TimelineDocument(name, Timeline.Empty, mediaPath);
+        TimelineName = Document.Name;
+        IsModified = false;
+
+        OnPropertyChanged(nameof(Document));
+        UpdateWindowTitle();
+    }
+
+    private void UpdateWindowTitle()
+        => WindowTitle = Document is null
+            ? "Exchoribur"
+            : $"{(IsModified ? "*" : string.Empty)}{TimelineName} — Exchoribur";
+
+    /// <summary>问一个名字;测试或命令行模式下没有对话框,直接沿用建议名。</summary>
+    private async Task<string?> AskForTimelineNameAsync(string suggestedName)
+        => _namePrompt is null
+            ? suggestedName
+            : await _namePrompt.AskAsync("新建时间线", suggestedName);
 
     /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
     [ObservableProperty]
@@ -118,8 +158,26 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>用户偏好设置(滚轮方向之类),设置窗口改的就是这一份。</summary>
     public SettingsViewModel Settings { get; } = new();
 
-    /// <summary>视频预览用的播放器;系统里没有 libvlc 时它自己会带着失败原因待着。</summary>
-    public VideoService Video { get; } = new();
+    private VideoService? _video;
+
+    /// <summary>
+    /// 视频预览用的播放器。第一次真正用到时才创建:它会加载 libvlc(重、会起线程),
+    /// 没导入视频的场合没必要付这个代价。
+    /// </summary>
+    public VideoService Video
+    {
+        get
+        {
+            if (_video is null)
+            {
+                _video = new VideoService();
+                // 每解出一帧抬一次序号;位图是同一个对象,界面靠它知道内容变了。
+                _video.FrameUpdated += (_, _) => VideoFrameVersion++;
+            }
+
+            return _video;
+        }
+    }
 
     /// <summary>是否已经载入了参考视频,用来决定预览框是显示画面还是提示文字。</summary>
     [ObservableProperty]
@@ -219,6 +277,14 @@ public partial class MainViewModel : ViewModelBase
             return; // 用户点了取消
         }
 
+        // 导入前先问工程名;取消就什么都不做,主窗口保持原样。
+        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
+        if (name is null)
+        {
+            return;
+        }
+
+        CreateDocument(name);
         await LoadAsync(path);
     }
 
@@ -237,6 +303,14 @@ public partial class MainViewModel : ViewModelBase
             return; // 用户点了取消
         }
 
+        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
+        if (name is null)
+        {
+            return;
+        }
+
+        // 只导入视频也是新工程:参考媒体记在工程上,灯光数据等之后再导入。
+        CreateDocument(name, path);
         OpenVideo(path);
     }
 
@@ -411,7 +485,17 @@ public partial class MainViewModel : ViewModelBase
             var timeline = await TimelineCsvFile.LoadAsync(path);
 
             Timeline = timeline;
-            WindowTitle = $"{fileName} — Exchoribur";
+
+            // 工程名:已经有名字(用户刚起的)就保留,命令行直接给文件时用文件名兜底。
+            Document = new TimelineDocument(
+                Document?.Name ?? Path.GetFileNameWithoutExtension(fileName),
+                timeline,
+                Document?.MediaPath);
+            TimelineName = Document.Name;
+            IsModified = false;
+            OnPropertyChanged(nameof(Document));
+            UpdateWindowTitle();
+
             HasError = false;
             StatusText = timeline.Frames.Count == 0
                 ? $"已载入 {fileName},但里面一帧都没有。"
