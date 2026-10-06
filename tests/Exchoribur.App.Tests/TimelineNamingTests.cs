@@ -109,5 +109,9 @@ public sealed class TimelineNamingTests : IDisposable
         public Task<string?> PickTimelineAsync() => Task.FromResult(Path);
 
         public Task<string?> PickVideoAsync() => Task.FromResult(Path);
+
+        public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }

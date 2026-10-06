@@ -22,17 +22,35 @@
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveProjectCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveProjectAsCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
         <!-- 顶部菜单 -->
         <Menu DockPanel.Dock="Top" Background="{DynamicResource ChromeBackgroundBrush}">
             <MenuItem Header="文件">
-                <MenuItem Header="打开…"
+                <MenuItem Header="打开工程…" Command="{Binding OpenProjectCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="保存工程" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Save}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="另存为…" Command="{Binding SaveProjectAsCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.SaveAs}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="导入时间轴 CSV…"
                           Command="{Binding OpenCommand}"
                           InputGesture="Ctrl+O">
                     <MenuItem.Icon>
-                        <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Import}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="导入参考媒体…" Command="{Binding ImportVideoCommand}">

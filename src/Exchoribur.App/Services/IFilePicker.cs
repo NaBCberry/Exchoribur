@@ -11,4 +11,10 @@ public interface IFilePicker
 
     /// <summary>挑一个参考视频(用来对齐预览);用户点了取消返回 null。</summary>
     Task<string?> PickVideoAsync();
+
+    /// <summary>挑一个工程文件(.exb)来打开;取消返回 null。</summary>
+    Task<string?> PickProjectAsync();
+
+    /// <summary>问工程存到哪儿;取消返回 null。</summary>
+    Task<string?> PickProjectSaveAsync(string suggestedName);
 }

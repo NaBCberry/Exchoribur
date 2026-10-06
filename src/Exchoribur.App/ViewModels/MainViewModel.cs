@@ -22,6 +22,9 @@ public partial class MainViewModel : ViewModelBase
     private readonly IFilePicker? _filePicker;
     private readonly IPlaybackClock? _clock;
     private readonly INamePrompt? _namePrompt;
+
+    /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
+    private string? _projectPath;
     private readonly PlaybackState _playback = new();
 
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
@@ -292,6 +295,125 @@ public partial class MainViewModel : ViewModelBase
         }
 
         await LoadAsync(path, name);
+    }
+
+    /// <summary>菜单「文件 → 打开工程」:读一个 .exb,连参考媒体一起挂上。</summary>
+    [RelayCommand]
+    private async Task OpenProjectAsync()
+    {
+        if (_filePicker is null)
+        {
+            return;
+        }
+
+        var path = await _filePicker.PickProjectAsync();
+        if (path is null)
+        {
+            return;
+        }
+
+        await LoadProjectAsync(path);
+    }
+
+    /// <summary>保存工程。没存过就当作另存为。</summary>
+    [RelayCommand]
+    private async Task SaveProjectAsync()
+    {
+        if (Document is null)
+        {
+            HasError = true;
+            StatusText = "还没有工程可保存:先打开工程或导入 CSV/视频。";
+            return;
+        }
+
+        if (_projectPath is null)
+        {
+            await SaveProjectAsAsync();
+            return;
+        }
+
+        SaveProjectTo(_projectPath);
+    }
+
+    [RelayCommand]
+    private async Task SaveProjectAsAsync()
+    {
+        if (Document is null || _filePicker is null)
+        {
+            return;
+        }
+
+        var path = await _filePicker.PickProjectSaveAsync($"{TimelineName}{ProjectFileFormat.Extension}");
+        if (path is null)
+        {
+            return;
+        }
+
+        SaveProjectTo(path);
+    }
+
+    /// <summary>打开工程文件。失败只改状态栏,不动已经打开的内容。</summary>
+    public async Task<bool> LoadProjectAsync(string path)
+    {
+        var fileName = Path.GetFileName(path);
+
+        try
+        {
+            // 读容器和解压媒体都不该卡住界面。
+            var document = await Task.Run(() => ProjectFile.Load(path));
+
+            _projectPath = path;
+            Document = document;
+            Timeline = document.Timeline;
+            TimelineName = document.Name;
+            IsModified = document.IsModified;
+            OnPropertyChanged(nameof(Document));
+            UpdateWindowTitle();
+
+            HasError = false;
+            HasVideo = document.MediaPath is { } media && OpenVideo(media);
+
+            StatusText = $"已打开工程 {fileName}:{document.Timeline.Frames.Count:N0} 帧,"
+                + $"{document.Timeline.Markers.Count:N0} 个标记。";
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or FormatException
+            or InvalidDataException)
+        {
+            HasError = true;
+            StatusText = $"打开工程 {fileName} 失败:{exception.Message}";
+            return false;
+        }
+    }
+
+    private void SaveProjectTo(string path)
+    {
+        if (Document is null)
+        {
+            return;
+        }
+
+        var fileName = Path.GetFileName(path);
+
+        try
+        {
+            ProjectFile.Save(path, Document);
+
+            _projectPath = path;
+            Document.MarkSaved();
+            IsModified = false;
+            UpdateWindowTitle();
+
+            HasError = false;
+            StatusText = $"已保存工程 {fileName}。";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            HasError = true;
+            StatusText = $"保存工程 {fileName} 失败:{exception.Message}";
+        }
     }
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>

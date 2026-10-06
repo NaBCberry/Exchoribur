@@ -6,6 +6,9 @@ namespace Exchoribur.Core;
 /// </summary>
 public static class ProjectFileFormat
 {
+    /// <summary>容器格式版本。结构变了一定要加,旧工程靠它判断能不能读。</summary>
+    public const int FormatVersion = 1;
+
     /// <summary>扩展名:EX + Baton。容器本身是 zip(参考 osu 的 .osz 做法)。</summary>
     public const string Extension = ".exb";
 

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Exchoribur.Core;
 
 namespace Exchoribur.App.Services;
 
@@ -22,6 +23,29 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
             },
             FilePickerFileTypes.All,
         ]);
+
+    public Task<string?> PickProjectAsync() => PickAsync(
+        "打开工程",
+        [CreateProjectFileType(), FilePickerFileTypes.All]);
+
+    public async Task<string?> PickProjectSaveAsync(string suggestedName)
+    {
+        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "保存工程",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = ProjectFileFormat.Extension.TrimStart('.'),
+            FileTypeChoices = [CreateProjectFileType()],
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
+    private static FilePickerFileType CreateProjectFileType()
+        => new(ProjectFileFormat.DisplayName)
+        {
+            Patterns = [$"*{ProjectFileFormat.Extension}"],
+        };
 
     private async Task<string?> PickAsync(string title, IReadOnlyList<FilePickerFileType> filters)
     {

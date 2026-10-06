@@ -118,5 +118,9 @@ public sealed class MainViewModelTests : IDisposable
         public Task<string?> PickTimelineAsync() => Task.FromResult(path);
 
         public Task<string?> PickVideoAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }
