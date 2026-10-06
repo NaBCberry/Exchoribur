@@ -83,6 +83,26 @@
         <Setter Property="Height" Value="15" />
     </Style>
 
+    <!-- 全局播放条上播放/停止/循环用的大图标 -->
+    <Style Selector="Path.icon.big">
+        <Setter Property="StrokeThickness" Value="1.6" />
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+    </Style>
+
+    <!-- 播放/停止/循环:鼠标移上去时图标本身变色,方便一眼认出这三个主控件 -->
+    <Style Selector="Button.transport.play:pointerover Path.icon.play">
+        <Setter Property="Stroke" Value="#5CCB5F" />
+    </Style>
+
+    <Style Selector="Button.transport.stop:pointerover Path.icon.stop">
+        <Setter Property="Stroke" Value="#E0574B" />
+    </Style>
+
+    <Style Selector="ToggleButton.transport.loop:pointerover Path.icon.loop">
+        <Setter Property="Stroke" Value="#E8A33D" />
+    </Style>
+
     <Style Selector="Border.panel">
         <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />

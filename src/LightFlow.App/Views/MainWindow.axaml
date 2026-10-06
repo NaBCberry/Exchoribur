@@ -72,6 +72,63 @@
                        VerticalAlignment="Center" />
         </Border>
 
+        <!-- 全局播放条:这些控件管的是整条时间线,不属于某一块面板 -->
+        <Border DockPanel.Dock="Bottom"
+                Height="44"
+                Background="{DynamicResource ChromeBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <Button Classes="transport"
+                        ToolTip.Tip="回到开头"
+                        Command="{Binding GoToStartCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToStart}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="上一帧"
+                        Command="{Binding PreviousFrameCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.PreviousFrame}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="下一帧"
+                        Command="{Binding NextFrameCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.NextFrame}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="跳到结尾"
+                        Command="{Binding GoToEndCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToEnd}" />
+                </Button>
+
+                <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
+                <Button Classes="transport play"
+                        ToolTip.Tip="播放 / 暂停"
+                        Command="{Binding TogglePlayCommand}">
+                    <Panel>
+                        <Path Classes="icon big play"
+                              Data="{x:Static controls:Icons.Play}"
+                              IsVisible="{Binding IsPaused}" />
+                        <Path Classes="icon big play"
+                              Data="{x:Static controls:Icons.Pause}"
+                              IsVisible="{Binding IsPlaying}" />
+                    </Panel>
+                </Button>
+                <Button Classes="transport stop"
+                        ToolTip.Tip="停止"
+                        Command="{Binding StopPlaybackCommand}">
+                    <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
+                </Button>
+                <ToggleButton Classes="transport loop"
+                              ToolTip.Tip="循环播放"
+                              IsChecked="{Binding IsLooping}">
+                    <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
+                </ToggleButton>
+            </StackPanel>
+        </Border>
+
         <Grid ColumnDefinitions="340,*">
             <!-- 左栏:视频预览(播放控制压在它底部)+ 十通道状态(缩放压在它底部) -->
             <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="8">
@@ -85,63 +142,10 @@
                             <TextBlock Classes="panelTitle" Text="视频预览" />
                         </StackPanel>
 
-                        <Grid RowDefinitions="*,Auto">
-                            <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
-                                 等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
-                                 而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
-                            <vlc:VideoView Grid.Row="0" x:Name="VideoPanel" />
-
-                            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,6">
-                            <StackPanel Grid.Column="1"
-                                        Orientation="Horizontal"
-                                        HorizontalAlignment="Center"
-                                        Spacing="2">
-                            <Button Classes="transport"
-                                    ToolTip.Tip="回到开头"
-                                    Command="{Binding GoToStartCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="上一帧"
-                                    Command="{Binding PreviousFrameCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.PreviousFrame}" />
-                            </Button>
-                            <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
-                            <Button Classes="transport"
-                                    ToolTip.Tip="播放 / 暂停"
-                                    Command="{Binding TogglePlayCommand}">
-                                <Panel>
-                                    <Path Classes="icon"
-                                          Data="{x:Static controls:Icons.Play}"
-                                          IsVisible="{Binding IsPaused}" />
-                                    <Path Classes="icon"
-                                          Data="{x:Static controls:Icons.Pause}"
-                                          IsVisible="{Binding IsPlaying}" />
-                                </Panel>
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="停止"
-                                    Command="{Binding StopPlaybackCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.Stop}" />
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="下一帧"
-                                    Command="{Binding NextFrameCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
-                            </Button>
-                            <Button Classes="transport"
-                                    ToolTip.Tip="跳到结尾"
-                                    Command="{Binding GoToEndCommand}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
-                            </Button>
-                            <ToggleButton Classes="transport"
-                                          ToolTip.Tip="循环播放"
-                                          IsChecked="{Binding IsLooping}">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.Loop}" />
-                            </ToggleButton>
-                            </StackPanel>
-                            </Grid>
-                        </Grid>
+                        <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
+                             等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
+                             而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
+                        <vlc:VideoView x:Name="VideoPanel" />
                     </DockPanel>
                 </Border>
 

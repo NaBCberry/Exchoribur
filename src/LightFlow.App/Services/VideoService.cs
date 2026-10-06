@@ -66,13 +66,13 @@ public sealed class VideoService : IDisposable
         {
             _pauseAfterStart = startAt < TimeSpan.Zero ? TimeSpan.Zero : startAt;
 
-            // 起播约 0.7 秒后再定位并暂停。为什么要等:刚 Play() 时第一帧还没解出来,
+            // 起播稍等再把画面停住。为什么要等:刚 Play() 时第一帧还没解出来,
             // 立刻暂停的话预览是一片黑,看着像"视频打不开"。
             // 为什么不听 VLC 的 Playing 事件:实测那个事件到了之后状态仍报 Playing,
             // 而且在事件回调里设时间有时会抛异常,不如按时间兜底来得稳。
             DispatcherTimer.RunOnce(
                 PauseAtPendingPosition,
-                TimeSpan.FromMilliseconds(700),
+                TimeSpan.FromMilliseconds(250),
                 DispatcherPriority.Background);
         }
 
