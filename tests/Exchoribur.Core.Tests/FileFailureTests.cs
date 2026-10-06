@@ -12,8 +12,8 @@ public sealed class FileFailureTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
-    [Fact]
-    public void A_file_held_open_by_another_program_is_recognised()
+    [WindowsFact]
+    public void A_file_held_open_by_another_program_counts_as_in_use()
     {
         var path = Path.Combine(_directory, "被占用.csv");
         File.WriteAllText(path, "open");
@@ -21,17 +21,8 @@ public sealed class FileFailureTests : IDisposable
         // 别的程序只允许别人读,这时候写入一定失败。
         using var holder = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         var exception = Assert.ThrowsAny<Exception>(() => File.Create(path).Dispose());
-        var reason = FileFailure.Classify(exception);
 
-        // Windows 上系统给的就是共享冲突;别的平台错误码不同,只要求别认成"不认识"。
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Equal(FileFailureReason.InUse, reason);
-        }
-        else
-        {
-            Assert.NotEqual(FileFailureReason.Unknown, reason);
-        }
+        Assert.Equal(FileFailureReason.InUse, FileFailure.Classify(exception));
     }
 
     [Fact]

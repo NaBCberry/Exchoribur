@@ -136,14 +136,13 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Saving_over_a_locked_file_reports_a_failure_instead_of_crashing()
+    public async Task A_failed_save_reports_in_the_status_bar_instead_of_crashing()
     {
         var csv = WriteFile("show.csv", $"{Header}\n0,0,15,0,0,\n2000,0,0,15,0,\n");
-        var project = Path.Combine(_directory, "show.exb");
-        ProjectFile.Save(project, new TimelineDocument("show", Timeline.Empty));
 
-        // 解压工具(比如 Bandizip)打开着这个工程:只允许别人读,不允许写。
-        using var holder = new FileStream(project, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // 工程路径的上一层是个文件、不是目录,写进去必然失败。
+        var blocker = WriteFile("挡路的文件", string.Empty);
+        var project = Path.Combine(blocker, "show.exb");
 
         var viewModel = new MainViewModel(new StubFilePicker(csv) { ProjectSavePath = project });
         await viewModel.OpenCommand.ExecuteAsync(null);
