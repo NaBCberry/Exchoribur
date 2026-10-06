@@ -81,7 +81,7 @@
                              等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗。
                              它的位置在 Avalonia 之上(airspace),所以提示文字不能压在它上面,
                              只能放到下面那条按钮带上。 -->
-                        <vlc:VideoView Grid.Row="0" MediaPlayer="{Binding Video.Player}" />
+                        <vlc:VideoView Grid.Row="0" x:Name="VideoPanel" />
 
                         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,6">
                             <TextBlock Grid.Column="0"

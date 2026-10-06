@@ -19,6 +19,21 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DropEvent, OnDrop);
     }
 
+    /// <summary>
+    /// 播放器要在窗口打开之后才交给 VideoView:VideoView 是靠原生宿主窗口的句柄
+    /// 告诉 libvlc "画面画这儿"的,启动阶段宿主还没创建,那时赋值 libvlc 拿不到
+    /// 句柄,就会自己开一个独立窗口出来。
+    /// </summary>
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+
+        if (DataContext is MainViewModel viewModel)
+        {
+            VideoPanel.MediaPlayer = viewModel.Video.Player;
+        }
+    }
+
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
 
     /// <summary>

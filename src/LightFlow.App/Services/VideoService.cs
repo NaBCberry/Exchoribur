@@ -10,9 +10,15 @@ namespace LightFlow.App.Services;
 /// 初始化失败(比如系统里没有 libvlc)不算致命——预览那块空着,其他功能照用,
 /// 失败原因留在 <see cref="ErrorMessage"/> 里给状态栏用。
 /// </summary>
+/// <remarks>
+/// 两条踩过的经验:
+/// 一是 VideoView 必须一直在可视树里。折叠着的话原生宿主窗口根本不会创建,
+/// 这时去 Play() 就会让 libvlc 自己弹一个独立窗口出来。
+/// 二是 LibVLCSharp 固定用 3.9.7.1,原因见工程文件里的注释。
+/// </remarks>
 public sealed class VideoService : IDisposable
 {
-    private LibVLC? _libVlc;
+    private readonly LibVLC? _libVlc;
 
     public VideoService()
     {
