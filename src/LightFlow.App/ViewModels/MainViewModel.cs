@@ -134,7 +134,8 @@ public partial class MainViewModel : ViewModelBase
             return false;
         }
 
-        if (!Video.Open(path))
+        // 导入后先停在播放头位置:正在播放的话就让它跟着播,否则停住等按播放。
+        if (!Video.Open(path, PlayheadTime, pauseAfterStart: !IsPlaying))
         {
             HasError = true;
             StatusText = $"打开视频 {fileName} 失败。";
@@ -144,10 +145,6 @@ public partial class MainViewModel : ViewModelBase
         HasVideo = true;
         HasError = false;
         StatusText = $"已载入参考视频 {fileName}。";
-
-        // 刚载入的视频先照常播着(第一帧常常是黑的,暂停在那里会让人以为没打开),
-        // 只把它对齐到播放头;按了播放/暂停键之后两边就由同一条时间线带着走。
-        KeepVideoAtPlayhead();
 
         return true;
     }
@@ -349,7 +346,10 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void KeepVideoInSync()
     {
-        const double toleranceMilliseconds = 250;
+        // 容差给得大是故意的:libvlc 报的时间本身有几百毫秒的粒度,
+        // 容差太小就会一直去 seek,每 seek 一次画面就顿一下,看着就是"卡一下动一下"。
+        // 两个时钟都按真实时间走,长期飘移不大,偶尔纠正一次就够。
+        const double toleranceMilliseconds = 2000;
 
         if (!_playback.IsPlaying || !HasVideo || Video.Player is not { } player)
         {
