@@ -5,6 +5,7 @@ using LightFlow.App.Controls;
 using LightFlow.App.Services;
 using LightFlow.Core;
 using LightFlow.Core.Models;
+using LightFlow.Core.Playback;
 using LightFlow.Core.Storage;
 
 namespace LightFlow.App.ViewModels;
@@ -18,6 +19,8 @@ public partial class MainViewModel : ViewModelBase
     private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
 
     private readonly IFilePicker? _filePicker;
+    private readonly IPlaybackClock? _clock;
+    private readonly PlaybackState _playback = new();
 
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
     public MainViewModel()
@@ -25,9 +28,10 @@ public partial class MainViewModel : ViewModelBase
     {
     }
 
-    public MainViewModel(IFilePicker? filePicker)
+    public MainViewModel(IFilePicker? filePicker, IPlaybackClock? clock = null)
     {
         _filePicker = filePicker;
+        _clock = clock;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
@@ -79,6 +83,21 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HasVideo { get; set; }
 
+    /// <summary>是不是正在播放。播放/暂停那个按钮的图标跟着它换。</summary>
+    [ObservableProperty]
+    public partial bool IsPlaying { get; set; }
+
+    /// <summary>取反给界面用:一个按钮里放两个图标,靠这两个布尔量切换显隐。</summary>
+    public bool IsPaused => !IsPlaying;
+
+    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(IsPaused));
+
+    /// <summary>播到结尾要不要绕回开头接着播。</summary>
+    [ObservableProperty]
+    public partial bool IsLooping { get; set; }
+
+    partial void OnIsLoopingChanged(bool value) => _playback.Loop = value;
+
     /// <summary>打开参考视频。解码器不可用或文件打不开时只改状态栏,不动已经打开的内容。</summary>
     public bool OpenVideo(string path)
     {
@@ -101,6 +120,15 @@ public partial class MainViewModel : ViewModelBase
         HasVideo = true;
         HasError = false;
         StatusText = $"已载入参考视频 {fileName}。";
+
+        // 视频刚载入时是自己从头发播放的,把它对到播放头上:
+        // 没在播放就停在当前这一帧,方便对着播放头看画面。
+        KeepVideoAtPlayhead();
+        if (!_playback.IsPlaying)
+        {
+            Video.Player?.SetPause(true);
+        }
+
         return true;
     }
 
@@ -115,6 +143,12 @@ public partial class MainViewModel : ViewModelBase
         // 因为播放头本来就是 0 的时候 setter 不会触发变更回调。
         PlayheadTime = TimeSpan.Zero;
         CurrentFrame = value.GetFrameAt(PlayheadTime);
+
+        // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
+        _playback.Stop();
+        _playback.SetDuration(Duration);
+        SyncPlaybackFlags();
+        _clock?.Stop();
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
         Viewport.SetContent(Duration);
@@ -163,17 +197,149 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void GoToStart()
+    private void GoToStart() => Seek(TimeSpan.Zero);
+
+    [RelayCommand]
+    private void GoToEnd() => Seek(Duration);
+
+    /// <summary>播放和暂停合成一个按钮:正在播就暂停,否则从当前位置播。</summary>
+    [RelayCommand]
+    private void TogglePlay()
     {
-        PlayheadTime = TimeSpan.Zero;
+        if (IsPlaying)
+        {
+            PausePlayback();
+        }
+        else
+        {
+            StartPlayback();
+        }
+    }
+
+    [RelayCommand]
+    private void StopPlayback()
+    {
+        _playback.Stop();
+        _clock?.Stop();
+        Video.Player?.Stop();
+        SyncPlaybackFlags();
+        PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
     }
 
     [RelayCommand]
-    private void GoToEnd()
+    private void PreviousFrame()
     {
-        PlayheadTime = Duration;
+        PausePlayback();
+        Seek(Timeline.GetPreviousFrameTime(PlayheadTime) ?? TimeSpan.Zero);
+    }
+
+    [RelayCommand]
+    private void NextFrame()
+    {
+        PausePlayback();
+        Seek(Timeline.GetNextFrameTime(PlayheadTime) ?? Duration);
+    }
+
+    /// <summary>
+    /// 时钟每过一帧调一次(测试里直接喂时间)。播放头是主时钟:
+    /// 灯光时间轴跟着它走,视频也跟着它走,所以两边永远是同一条时间线。
+    /// </summary>
+    public void AdvancePlayback(TimeSpan elapsed)
+    {
+        if (!_playback.Advance(elapsed))
+        {
+            return;
+        }
+
+        PlayheadTime = _playback.Position;
+        SyncPlaybackFlags();
+
+        // 播放时让播放头一直留在画面里:跑到右边会自动翻页。
         Viewport.EnsureVisible(PlayheadTime);
+        KeepVideoInSync();
+
+        if (!_playback.IsPlaying)
+        {
+            _clock?.Stop();
+            Video.Player?.SetPause(true);
+        }
+    }
+
+    private void StartPlayback()
+    {
+        _playback.SetDuration(Duration);
+        _playback.Play();
+
+        if (!_playback.IsPlaying)
+        {
+            return; // 没有内容可播
+        }
+
+        SyncPlaybackFlags();
+        PlayheadTime = _playback.Position;
+        _clock?.Start(AdvancePlayback);
+
+        if (HasVideo && Video.Player is { } player)
+        {
+            player.Play();
+            player.Time = (long)PlayheadTime.TotalMilliseconds;
+        }
+    }
+
+    private void PausePlayback()
+    {
+        if (!_playback.IsPlaying)
+        {
+            return;
+        }
+
+        _playback.Pause();
+        _clock?.Stop();
+        Video.Player?.SetPause(true);
+        SyncPlaybackFlags();
+    }
+
+    /// <summary>把播放头挪到指定位置:暂停状态下用,位置、视口、视频一起跟上。</summary>
+    private void Seek(TimeSpan position)
+    {
+        PausePlayback();
+        _playback.SetDuration(Duration);
+        _playback.Seek(position);
+
+        PlayheadTime = _playback.Position;
+        Viewport.EnsureVisible(PlayheadTime);
+        KeepVideoAtPlayhead();
+    }
+
+    private void SyncPlaybackFlags() => IsPlaying = _playback.IsPlaying;
+
+    /// <summary>把视频挪到播放头所在的位置(暂停着看某一帧时用)。</summary>
+    private void KeepVideoAtPlayhead()
+    {
+        if (HasVideo && Video.Player is { } player)
+        {
+            player.Time = (long)PlayheadTime.TotalMilliseconds;
+        }
+    }
+
+    /// <summary>
+    /// 视频是跟着播放头走的,但它是独立解码的,时间长了会飘。
+    /// 偏得不多就不动它(频繁 seek 会卡),超过容差才拉回来一次。
+    /// </summary>
+    private void KeepVideoInSync()
+    {
+        const double toleranceMilliseconds = 250;
+
+        if (!_playback.IsPlaying || !HasVideo || Video.Player is not { } player)
+        {
+            return;
+        }
+
+        if (Math.Abs(player.Time - PlayheadTime.TotalMilliseconds) > toleranceMilliseconds)
+        {
+            player.Time = (long)PlayheadTime.TotalMilliseconds;
+        }
     }
 
     [RelayCommand]

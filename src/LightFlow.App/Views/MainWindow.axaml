@@ -101,19 +101,32 @@
                                     Command="{Binding GoToStartCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.GoToStart}" />
                             </Button>
-                            <Button Classes="transport" ToolTip.Tip="上一帧">
+                            <Button Classes="transport"
+                                    ToolTip.Tip="上一帧"
+                                    Command="{Binding PreviousFrameCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.PreviousFrame}" />
                             </Button>
-                            <Button Classes="transport" ToolTip.Tip="播放">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.Play}" />
+                            <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
+                            <Button Classes="transport"
+                                    ToolTip.Tip="播放 / 暂停"
+                                    Command="{Binding TogglePlayCommand}">
+                                <Panel>
+                                    <Path Classes="icon"
+                                          Data="{x:Static controls:Icons.Play}"
+                                          IsVisible="{Binding IsPaused}" />
+                                    <Path Classes="icon"
+                                          Data="{x:Static controls:Icons.Pause}"
+                                          IsVisible="{Binding IsPlaying}" />
+                                </Panel>
                             </Button>
-                            <Button Classes="transport" ToolTip.Tip="暂停">
-                                <Path Classes="icon" Data="{x:Static controls:Icons.Pause}" />
-                            </Button>
-                            <Button Classes="transport" ToolTip.Tip="停止">
+                            <Button Classes="transport"
+                                    ToolTip.Tip="停止"
+                                    Command="{Binding StopPlaybackCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.Stop}" />
                             </Button>
-                            <Button Classes="transport" ToolTip.Tip="下一帧">
+                            <Button Classes="transport"
+                                    ToolTip.Tip="下一帧"
+                                    Command="{Binding NextFrameCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.NextFrame}" />
                             </Button>
                             <Button Classes="transport"
@@ -121,6 +134,11 @@
                                     Command="{Binding GoToEndCommand}">
                                 <Path Classes="icon" Data="{x:Static controls:Icons.GoToEnd}" />
                             </Button>
+                            <ToggleButton Classes="transport"
+                                          ToolTip.Tip="循环播放"
+                                          IsChecked="{Binding IsLooping}">
+                                <Path Classes="icon" Data="{x:Static controls:Icons.Loop}" />
+                            </ToggleButton>
                             </StackPanel>
                             </Grid>
                         </Grid>

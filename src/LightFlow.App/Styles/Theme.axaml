@@ -115,4 +115,9 @@
         <Setter Property="Background" Value="#40FFFFFF" />
     </Style>
 
+    <!-- 循环这类开关按钮:开着的时候给一层暖色底,一眼能看出状态 -->
+    <Style Selector="ToggleButton.transport:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#33FF5A36" />
+    </Style>
+
 </Styles>
