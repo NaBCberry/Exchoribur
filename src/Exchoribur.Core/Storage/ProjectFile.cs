@@ -14,8 +14,30 @@ public static class ProjectFile
 {
     private static readonly JsonSerializerOptions ManifestOptions = new() { WriteIndented = true };
 
+    /// <summary>打包时每次搬运多少字节。1 MiB 对机械盘和 SSD 都不算大。</summary>
+    private const int CopyBufferSize = 1 << 20;
+
     /// <summary>保存工程。参考媒体不存在时只存时间轴。</summary>
     public static void Save(string path, TimelineDocument document)
+        => Save(path, document, progress: null);
+
+    /// <summary>
+    /// 保存工程的后台版本。参考视频是原样复制进容器的,几百兆的素材在界面线程上
+    /// 搬运会让窗口整段卡死,所以整个打包丢到线程池执行;进度通过 progress 报回来。
+    /// </summary>
+    public static Task SaveAsync(
+        string path,
+        TimelineDocument document,
+        IProgress<ProjectSaveProgress>? progress = null)
+    {
+        // 参数不对就当场抛,别等到后台线程里才炸。
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(document);
+
+        return Task.Run(() => Save(path, document, progress));
+    }
+
+    private static void Save(string path, TimelineDocument document, IProgress<ProjectSaveProgress>? progress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(document);
@@ -33,29 +55,81 @@ public static class ProjectFile
             MediaName = mediaPath is null ? null : Path.GetFileName(mediaPath),
         };
 
+        var timelineJson = TimelineJson.Write(document.Timeline);
+
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
+        // 进度按字节算:几百兆的视频和几兆的时间轴放一起,谁占时间一目了然。
+        var timelineBytes = Encoding.UTF8.GetByteCount(timelineJson);
+        var mediaBytes = mediaPath is null ? 0 : new FileInfo(mediaPath).Length;
+        var totalBytes = timelineBytes + mediaBytes;
+
         using var stream = File.Create(path);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
 
         WriteText(archive, ProjectFileFormat.ManifestName, JsonSerializer.Serialize(manifest, ManifestOptions));
-        WriteText(archive, ProjectFileFormat.TimelineName, TimelineJson.Write(document.Timeline));
+        WriteText(archive, ProjectFileFormat.TimelineName, timelineJson);
+        progress?.Report(new ProjectSaveProgress(
+            ProjectSaveStage.Timeline,
+            Percent(timelineBytes, totalBytes) / 100d));
 
         if (mediaPath is not null)
         {
-            var entry = archive.CreateEntry(
-                $"{ProjectFileFormat.MediaDirectory}/{manifest.MediaName}",
-                CompressionLevel.NoCompression);
-
-            using var entryStream = entry.Open();
-            using var source = File.OpenRead(mediaPath);
-            source.CopyTo(entryStream);
+            CopyMedia(archive, mediaPath, timelineBytes, totalBytes, progress);
         }
     }
+
+    /// <summary>
+    /// 把参考视频塞进容器。这里用"仅存储":视频本身已经压过了,再压一遍只是白等。
+    /// 进度每提高一个百分点报一次,免得大文件把界面线程刷爆。
+    /// </summary>
+    private static void CopyMedia(
+        ZipArchive archive,
+        string mediaPath,
+        long bytesBefore,
+        long totalBytes,
+        IProgress<ProjectSaveProgress>? progress)
+    {
+        var entry = archive.CreateEntry(
+            $"{ProjectFileFormat.MediaDirectory}/{Path.GetFileName(mediaPath)}",
+            CompressionLevel.NoCompression);
+
+        using var entryStream = entry.Open();
+        using var source = File.OpenRead(mediaPath);
+
+        var buffer = new byte[CopyBufferSize];
+        long copied = 0;
+        var lastPercent = -1;
+
+        while (true)
+        {
+            var read = source.Read(buffer, 0, buffer.Length);
+            if (read == 0)
+            {
+                break;
+            }
+
+            entryStream.Write(buffer, 0, read);
+            copied += read;
+
+            var percent = Percent(bytesBefore + copied, totalBytes);
+            if (percent == lastPercent)
+            {
+                continue;
+            }
+
+            lastPercent = percent;
+            progress?.Report(new ProjectSaveProgress(ProjectSaveStage.Media, percent / 100d));
+        }
+    }
+
+    /// <summary>完成百分比,向下取整;没有要写的字节时算作已完成。</summary>
+    private static int Percent(long written, long total)
+        => total <= 0 ? 100 : (int)Math.Clamp(written * 100 / total, 0, 100);
 
     /// <summary>
     /// 打开工程。参考媒体会解到临时目录(同一个工程重复打开会复用),

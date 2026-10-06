@@ -78,15 +78,26 @@
             </MenuItem>
         </Menu>
 
-        <!-- 底部状态栏:打开文件的结果、报错都显示在这里 -->
+        <!-- 底部状态栏:打开文件的结果、报错、保存进度都显示在这里 -->
         <Border DockPanel.Dock="Bottom"
                 Height="26"
                 Background="{DynamicResource ChromeBackgroundBrush}">
-            <TextBlock Classes="status"
-                       Classes.error="{Binding HasError}"
-                       Text="{Binding StatusText}"
-                       Margin="12,0"
-                       VerticalAlignment="Center" />
+            <Grid ColumnDefinitions="*,Auto" Margin="12,0">
+                <TextBlock Classes="status"
+                           Classes.error="{Binding HasError}"
+                           Text="{Binding StatusText}"
+                           VerticalAlignment="Center" />
+                <!-- 只在保存时出现的细进度条:打包大素材要等几十秒,没有它看不出还在动 -->
+                <ProgressBar Grid.Column="1"
+                             Width="140"
+                             Height="4"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding SaveProgress}"
+                             IsVisible="{Binding IsSaving}"
+                             Foreground="{DynamicResource AccentBrush}"
+                             VerticalAlignment="Center" />
+            </Grid>
         </Border>
 
         <!-- 全局播放条:这些控件管的是整条时间线,不属于某一块面板 -->

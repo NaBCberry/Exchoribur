@@ -88,11 +88,72 @@ public sealed class ProjectFileTests : IDisposable
             () => ProjectFile.Load(Path.Combine(_directory, "没有这个文件.exb")));
     }
 
+    [Fact]
+    public async Task Async_save_writes_the_project_and_reports_progress()
+    {
+        var media = Path.Combine(_directory, "show.mp4");
+        File.WriteAllBytes(media, new byte[3 * 1024 * 1024]);
+
+        var project = Path.Combine(_directory, "进度.exb");
+        var reports = new List<ProjectSaveProgress>();
+
+        await ProjectFile.SaveAsync(
+            project,
+            new TimelineDocument("进度", CreateTimeline(), media),
+            new Recorder(reports));
+
+        // 参考视频占了大头,所以进度里应该出现"打包媒体"这一段,并且最后正好是 100%。
+        Assert.NotEmpty(reports);
+        Assert.Contains(reports, report => report.Stage == ProjectSaveStage.Media);
+        Assert.Equal(1, reports[^1].Fraction, 6);
+        Assert.Equal(reports.Select(report => report.Fraction).OrderBy(value => value),
+            reports.Select(report => report.Fraction));
+
+        // 后台保存出来的文件和同步保存的一样能读回来。
+        var loaded = ProjectFile.Load(project);
+        Assert.Equal("进度", loaded.Name);
+        Assert.Equal(File.ReadAllBytes(media), File.ReadAllBytes(loaded.MediaPath!));
+    }
+
+    [Fact]
+    public async Task Async_save_without_media_only_reports_the_timeline_stage()
+    {
+        var project = Path.Combine(_directory, "只有时间轴.exb");
+        var reports = new List<ProjectSaveProgress>();
+
+        await ProjectFile.SaveAsync(
+            project,
+            new TimelineDocument("只有时间轴", CreateTimeline()),
+            new Recorder(reports));
+
+        Assert.All(reports, report => Assert.Equal(ProjectSaveStage.Timeline, report.Stage));
+        Assert.Equal(1, reports[^1].Fraction, 6);
+    }
+
+    [Fact]
+    public async Task Async_save_can_be_called_without_a_progress_listener()
+    {
+        var project = Path.Combine(_directory, "没进度.exb");
+
+        await ProjectFile.SaveAsync(project, new TimelineDocument("没进度", CreateTimeline()));
+
+        Assert.True(File.Exists(project));
+    }
+
     private static Timeline CreateTimeline()
     {
         var first = Frame.Uniform(TimeSpan.Zero, new LightColor(15, 0, 0), FlashMode.Solid);
         var second = Frame.Uniform(TimeSpan.FromMilliseconds(500.5), new LightColor(0, 7, 15), FlashMode.Blink2Hz);
 
         return new Timeline([first, second], [new TimelineMarker(TimeSpan.FromMilliseconds(500.5), "副歌")]);
+    }
+
+    /// <summary>
+    /// 把报上来的进度按顺序收进列表。界面用的是 Progress&lt;T&gt;(会切回界面线程),
+    /// 测试里不需要那层调度,这样断言才是确定的。
+    /// </summary>
+    private sealed class Recorder(List<ProjectSaveProgress> reports) : IProgress<ProjectSaveProgress>
+    {
+        public void Report(ProjectSaveProgress value) => reports.Add(value);
     }
 }

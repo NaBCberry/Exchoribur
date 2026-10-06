@@ -67,6 +67,14 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsModified { get; set; }
 
+    /// <summary>正在打包工程。状态栏靠它显示进度条,同时也挡住重复的保存请求。</summary>
+    [ObservableProperty]
+    public partial bool IsSaving { get; set; }
+
+    /// <summary>保存进度 0-100,只给状态栏那根细进度条用。</summary>
+    [ObservableProperty]
+    public partial double SaveProgress { get; set; }
+
     partial void OnTimelineNameChanged(string value) => UpdateWindowTitle();
 
     partial void OnIsModifiedChanged(bool value) => UpdateWindowTitle();
@@ -332,7 +340,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        SaveProjectTo(_projectPath);
+        await SaveProjectToAsync(_projectPath);
     }
 
     [RelayCommand]
@@ -349,7 +357,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        SaveProjectTo(path);
+        await SaveProjectToAsync(path);
     }
 
     /// <summary>打开工程文件。失败只改状态栏,不动已经打开的内容。</summary>
@@ -388,21 +396,44 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    private void SaveProjectTo(string path)
+    /// <summary>
+    /// 保存工程。打包要原样复制整个参考视频,放在界面线程上做窗口会整段卡住,
+    /// 所以丢给后台跑,进度显示在状态栏上。
+    /// </summary>
+    private async Task SaveProjectToAsync(string path)
     {
-        if (Document is null)
+        if (Document is null || IsSaving)
         {
             return;
         }
 
+        var document = Document;
         var fileName = Path.GetFileName(path);
+
+        IsSaving = true;
+        SaveProgress = 0;
+        HasError = false;
+        StatusText = $"正在保存工程 {fileName}…";
 
         try
         {
-            ProjectFile.Save(path, Document);
+            // Progress 是在界面线程上建的,后台线程报上来的进度会自动回到界面线程。
+            var progress = new Progress<ProjectSaveProgress>(report =>
+            {
+                // 保存已经收尾就不再改状态栏,免得最后一步的进度把结果盖掉。
+                if (!IsSaving)
+                {
+                    return;
+                }
+
+                StatusText = DescribeSaveProgress(fileName, report);
+                SaveProgress = report.Fraction * 100;
+            });
+
+            await ProjectFile.SaveAsync(path, document, progress);
 
             _projectPath = path;
-            Document.MarkSaved();
+            document.MarkSaved();
             IsModified = false;
             UpdateWindowTitle();
 
@@ -414,7 +445,21 @@ public partial class MainViewModel : ViewModelBase
             HasError = true;
             StatusText = $"保存工程 {fileName} 失败:{exception.Message}";
         }
+        finally
+        {
+            IsSaving = false;
+            SaveProgress = 0;
+        }
     }
+
+    /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
+    internal static string DescribeSaveProgress(string fileName, ProjectSaveProgress progress)
+        => progress.Stage switch
+        {
+            ProjectSaveStage.Media =>
+                $"正在保存工程 {fileName}…打包参考视频 {progress.Fraction * 100:F0}%",
+            _ => $"正在保存工程 {fileName}…整理时间轴数据",
+        };
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
     [RelayCommand]

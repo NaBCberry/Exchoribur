@@ -1,6 +1,7 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Tests;
 
@@ -105,6 +106,48 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(300, viewModel.Viewport.Scale, 6);
     }
 
+    [Fact]
+    public async Task Saving_a_project_writes_the_file_and_reports_it()
+    {
+        var csv = WriteFile("show.csv", $"{Header}\n0,0,15,0,0,开场\n2000,0,0,15,0,\n");
+        var project = Path.Combine(_directory, "show.exb");
+        var viewModel = new MainViewModel(new StubFilePicker(csv) { ProjectSavePath = project });
+
+        await viewModel.OpenCommand.ExecuteAsync(null);
+        await viewModel.SaveProjectCommand.ExecuteAsync(null);
+
+        Assert.True(File.Exists(project));
+        Assert.False(viewModel.IsSaving);
+        Assert.False(viewModel.HasError);
+        Assert.False(viewModel.IsModified);
+        Assert.Contains("show.exb", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task Saving_without_a_project_says_so_in_the_status_bar()
+    {
+        var viewModel = new MainViewModel(new StubFilePicker(path: null));
+
+        await viewModel.SaveProjectCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasError);
+        Assert.Contains("还没有工程", viewModel.StatusText);
+        Assert.False(viewModel.IsSaving);
+    }
+
+    [Fact]
+    public void Save_progress_text_names_the_stage_and_the_percentage()
+    {
+        var media = MainViewModel.DescribeSaveProgress(
+            "演出.exb", new ProjectSaveProgress(ProjectSaveStage.Media, 0.42));
+        var timeline = MainViewModel.DescribeSaveProgress(
+            "演出.exb", new ProjectSaveProgress(ProjectSaveStage.Timeline, 0.01));
+
+        Assert.Contains("演出.exb", media);
+        Assert.Contains("42%", media);
+        Assert.Contains("时间轴", timeline);
+    }
+
     private string WriteFile(string name, string content)
     {
         var path = Path.Combine(_directory, name);
@@ -121,6 +164,9 @@ public sealed class MainViewModelTests : IDisposable
 
         public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
+        /// <summary>"另存为"要写到哪。不设就是用户点了取消。</summary>
+        public string? ProjectSavePath { get; init; }
+
+        public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult(ProjectSavePath);
     }
 }
