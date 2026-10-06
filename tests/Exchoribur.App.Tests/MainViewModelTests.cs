@@ -136,6 +136,43 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Saving_over_a_locked_file_reports_a_failure_instead_of_crashing()
+    {
+        var csv = WriteFile("show.csv", $"{Header}\n0,0,15,0,0,\n2000,0,0,15,0,\n");
+        var project = Path.Combine(_directory, "show.exb");
+        ProjectFile.Save(project, new TimelineDocument("show", Timeline.Empty));
+
+        // 解压工具(比如 Bandizip)打开着这个工程:只允许别人读,不允许写。
+        using var holder = new FileStream(project, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        var viewModel = new MainViewModel(new StubFilePicker(csv) { ProjectSavePath = project });
+        await viewModel.OpenCommand.ExecuteAsync(null);
+
+        // 保存失败只能体现在状态栏上,不能把异常抛到界面线程(那会直接退出程序)。
+        await viewModel.SaveProjectCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasError);
+        Assert.Contains("show.exb", viewModel.StatusText);
+        Assert.False(viewModel.IsSaving);
+    }
+
+    [Fact]
+    public void Save_failure_text_explains_what_to_do()
+    {
+        // 0x80070020 是共享冲突:文件被别的程序开着。
+        var inUse = MainViewModel.DescribeSaveFailure(
+            "演出.exb", new IOException("占用了", unchecked((int)0x80070020)));
+        var unknown = MainViewModel.DescribeSaveFailure(
+            "演出.exb", new InvalidOperationException("自爆"));
+
+        Assert.Contains("演出.exb", inUse);
+        Assert.Contains("占用", inUse);
+
+        // 认不出来的原因就原样显示,别硬编一个可能不对的解释。
+        Assert.Contains("自爆", unknown);
+    }
+
+    [Fact]
     public void Save_progress_text_names_the_stage_and_the_percentage()
     {
         var media = MainViewModel.DescribeSaveProgress(

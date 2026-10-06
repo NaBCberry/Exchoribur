@@ -440,10 +440,12 @@ public partial class MainViewModel : ViewModelBase
             HasError = false;
             StatusText = $"已保存工程 {fileName}。";
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
+            // 这条链路最后落在 async void 上,漏出去的异常没人接得住,会直接把进程带走。
+            // 所以保存出任何问题都在这里收住,只写状态栏。
             HasError = true;
-            StatusText = $"保存工程 {fileName} 失败:{exception.Message}";
+            StatusText = DescribeSaveFailure(fileName, exception);
         }
         finally
         {
@@ -460,6 +462,27 @@ public partial class MainViewModel : ViewModelBase
                 $"正在保存工程 {fileName}…打包参考视频 {progress.Fraction * 100:F0}%",
             _ => $"正在保存工程 {fileName}…整理时间轴数据",
         };
+
+    /// <summary>
+    /// 保存失败时状态栏那句话。系统给的是英文原文,而且只说"被占用",
+    /// 不会告诉用户该去关什么,所以能认出来的原因换成能照着做的说法。
+    /// </summary>
+    internal static string DescribeSaveFailure(string fileName, Exception exception)
+    {
+        var reason = FileFailure.Classify(exception) switch
+        {
+            FileFailureReason.InUse =>
+                "文件正被其他程序占用,关掉打开它的程序(解压工具、播放器、网盘同步)再试",
+            FileFailureReason.AccessDenied =>
+                "文件写不进去,可能是只读的,也可能正被其他程序占用",
+            FileFailureReason.DiskFull => "磁盘空间不够",
+            _ => null,
+        };
+
+        return reason is null
+            ? $"保存工程 {fileName} 失败:{exception.Message}"
+            : $"保存工程 {fileName} 失败:{reason}。";
+    }
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
     [RelayCommand]
