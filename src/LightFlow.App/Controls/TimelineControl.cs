@@ -40,6 +40,7 @@ public sealed class TimelineControl : Control
     private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
     private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.Parse("#E0B457"));
     private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
+    private static readonly IBrush UnplayableMask = new SolidColorBrush(Color.Parse("#8C808080"));
     private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
     private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
     private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
@@ -246,6 +247,7 @@ public sealed class TimelineControl : Control
                     }
                 }
 
+                DrawUnplayableRegion(context, viewport, trackHeight);
                 DrawMarkers(context, viewport);
             }
 
@@ -360,6 +362,32 @@ public sealed class TimelineControl : Control
         }
 
         context.FillRectangle(BrushFor(colorKey), new Rect(from, top, to - from, height));
+    }
+
+    /// <summary>
+    /// 0 之前的"预备片段"区域:数据是真的,但播放头走不到那里,
+    /// 所以盖一层半透明灰表示不可播放。等编辑功能上了可以把这些帧整体挪到 0 之后。
+    /// </summary>
+    private void DrawUnplayableRegion(
+        DrawingContext context,
+        TimelineViewport viewport,
+        double trackHeight)
+    {
+        if (viewport.Start >= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        // MapTime 给的是轨道内的相对坐标,再减一次左边留白才是长度。
+        var width = viewport.MapTime(TimeSpan.Zero) - TimelineLayout.TrackLeft;
+        if (width <= 0)
+        {
+            return;
+        }
+
+        context.FillRectangle(
+            UnplayableMask,
+            new Rect(TimelineLayout.TrackLeft, TimelineLayout.RulerHeight, width, trackHeight));
     }
 
     /// <summary>

@@ -17,6 +17,7 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     private const double MaxPixelsPerSecond = 2000;
 
     private TimeSpan _duration;
+    private TimeSpan _contentStart;
     private TimeSpan _start;
     private double _trackWidth;
     private double _scale = 1;
@@ -46,12 +47,22 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     private double MinScale
         => _duration > TimeSpan.Zero && _trackWidth > 0 ? _trackWidth / _duration.TotalSeconds : 1;
 
-    /// <summary>换了一份数据:时长变了,视口回到"整条铺满"。</summary>
-    public void SetContent(TimeSpan duration)
+    /// <summary>内容的起点。工程里可能有 0 之前的预备片段,所以可能是负数。</summary>
+    public TimeSpan ContentStart => _contentStart;
+
+    /// <summary>换了一份从 0 开始的数据。</summary>
+    public void SetContent(TimeSpan duration) => SetContent(TimeSpan.Zero, duration);
+
+    /// <summary>
+    /// 换了一份数据:内容范围是 [contentStart, contentStart + contentLength],
+    /// 视口回到"整条铺满"。起点允许是负数,用来显示 0 之前的预备片段。
+    /// </summary>
+    public void SetContent(TimeSpan contentStart, TimeSpan contentLength)
     {
-        _duration = duration > TimeSpan.Zero ? duration : TimeSpan.Zero;
+        _contentStart = contentStart;
+        _duration = contentLength > TimeSpan.Zero ? contentLength : TimeSpan.Zero;
         _isFitToWidth = true;
-        _start = TimeSpan.Zero;
+        _start = _contentStart;
         _scale = MinScale;
         RaiseChanged();
     }
@@ -69,7 +80,7 @@ public sealed class TimelineViewport : INotifyPropertyChanged
         if (_isFitToWidth)
         {
             _scale = MinScale;
-            _start = TimeSpan.Zero;
+            _start = _contentStart;
         }
         else
         {
@@ -85,7 +96,7 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     {
         _isFitToWidth = true;
         _scale = MinScale;
-        _start = TimeSpan.Zero;
+        _start = _contentStart;
         RaiseChanged();
     }
 
@@ -192,16 +203,16 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     /// </summary>
     private void ClampStart()
     {
-        var maxStart = _duration - VisibleDuration;
-        if (maxStart <= TimeSpan.Zero)
+        var maxStart = _contentStart + _duration - VisibleDuration;
+        if (maxStart <= _contentStart)
         {
-            _start = TimeSpan.Zero;
+            _start = _contentStart;
             return;
         }
 
-        if (_start < TimeSpan.Zero)
+        if (_start < _contentStart)
         {
-            _start = TimeSpan.Zero;
+            _start = _contentStart;
         }
         else if (_start > maxStart)
         {

@@ -79,6 +79,13 @@ public partial class MainViewModel : ViewModelBase
         => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[^1].Time;
 
     /// <summary>
+    /// 时间轴第一个帧的时间。工程里可能有 0 之前的预备片段,所以可能是负数。
+    /// 这些帧显示得出来但播不了(见 TimelineControl 里的灰色蒙版)。
+    /// </summary>
+    public TimeSpan TimelineStart
+        => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[0].Time;
+
+    /// <summary>
     /// 能播多长:有时间轴按时间轴算,只有视频就按视频算,两边都有时取长的那个。
     /// 这样"只导入视频、还没导入灯光数据"时也能按播放预览视频。
     /// </summary>
@@ -179,13 +186,22 @@ public partial class MainViewModel : ViewModelBase
         _clock?.Stop();
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
-        Viewport.SetContent(Duration);
+        Viewport.SetContent(TimelineStart, Duration - TimelineStart);
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
     {
         // 用领域里的阶跃语义取帧:播放头落在两帧之间时,沿用前一帧的状态。
         CurrentFrame = Timeline.GetFrameAt(value);
+
+        // 这个位置不是播放自己推出来的(用户拖动、点时间轴、跳帧),
+        // 那么播放状态机和视频都要跟过来:视频永远显示播放头所在的那一帧,
+        // 播放也从这里继续。相等时不动,免得播放中每帧都去 seek 把画面弄卡。
+        if (value != _playback.Position)
+        {
+            _playback.Seek(value);
+            KeepVideoAtPlayhead();
+        }
     }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
