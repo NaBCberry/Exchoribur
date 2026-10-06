@@ -126,7 +126,7 @@ public sealed class ProjectFileTests : IDisposable
         await ProjectFile.SaveAsync(
             project,
             new TimelineDocument("进度", CreateTimeline(), media),
-            new Recorder(reports));
+            new Recorder(reports.Add));
 
         // 参考视频占了大头,所以进度里应该出现"打包媒体"这一段,并且最后正好是 100%。
         Assert.NotEmpty(reports);
@@ -150,7 +150,7 @@ public sealed class ProjectFileTests : IDisposable
         await ProjectFile.SaveAsync(
             project,
             new TimelineDocument("只有时间轴", CreateTimeline()),
-            new Recorder(reports));
+            new Recorder(reports.Add));
 
         Assert.All(reports, report => Assert.Equal(ProjectSaveStage.Timeline, report.Stage));
         Assert.Equal(1, reports[^1].Fraction, 6);
@@ -166,6 +166,63 @@ public sealed class ProjectFileTests : IDisposable
         Assert.True(File.Exists(project));
     }
 
+    [Fact]
+    public async Task Saving_goes_through_a_temporary_file_and_leaves_none_behind()
+    {
+        var media = Path.Combine(_directory, "show.mp4");
+        File.WriteAllBytes(media, new byte[3 * 1024 * 1024]);
+
+        var project = Path.Combine(_directory, "演出.exb");
+        var temporary = project + ".saving";
+        var temporarySeen = false;
+
+        // 进度是写的途中报出来的,那一刻应该看得到临时文件。
+        await ProjectFile.SaveAsync(
+            project,
+            new TimelineDocument("演出", CreateTimeline(), media),
+            new Recorder(_ => temporarySeen |= File.Exists(temporary)));
+
+        Assert.True(temporarySeen, "保存过程中没看到临时文件,说明还是直接往目标文件写。");
+        Assert.False(File.Exists(temporary));
+        Assert.True(File.Exists(project));
+    }
+
+    [Fact]
+    public void A_save_that_cannot_write_leaves_the_old_project_alone()
+    {
+        var project = Path.Combine(_directory, "旧工程.exb");
+        ProjectFile.Save(project, new TimelineDocument("旧工程", CreateTimeline()));
+
+        // 让写入半路失败:临时文件的位置被一个目录占着。
+        Directory.CreateDirectory(project + ".saving");
+
+        Assert.ThrowsAny<Exception>(
+            () => ProjectFile.Save(project, new TimelineDocument("新工程", CreateTimeline())));
+
+        // 原来的工程一个字节都没动,照样打开得了。
+        Assert.Equal("旧工程", ProjectFile.Load(project).Name);
+    }
+
+    [WindowsFact]
+    public async Task A_locked_target_fails_before_anything_gets_copied()
+    {
+        var media = Path.Combine(_directory, "show.mp4");
+        File.WriteAllBytes(media, new byte[1024 * 1024]);
+
+        var project = Path.Combine(_directory, "占着的.exb");
+        ProjectFile.Save(project, new TimelineDocument("旧工程", CreateTimeline()));
+
+        // 解压工具(Bandizip 之类)打开着这个工程:只允许别人读。
+        using var holder = new FileStream(project, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        await Assert.ThrowsAnyAsync<IOException>(
+            () => ProjectFile.SaveAsync(project, new TimelineDocument("新工程", CreateTimeline(), media)));
+
+        // 一上来就该拒绝:临时文件根本没建,也就没白拷那一兆素材。
+        Assert.False(File.Exists(project + ".saving"));
+        Assert.Equal("旧工程", ProjectFile.Load(project).Name);
+    }
+
     private static Timeline CreateTimeline()
     {
         var first = Frame.Uniform(TimeSpan.Zero, new LightColor(15, 0, 0), FlashMode.Solid);
@@ -175,11 +232,11 @@ public sealed class ProjectFileTests : IDisposable
     }
 
     /// <summary>
-    /// 把报上来的进度按顺序收进列表。界面用的是 Progress&lt;T&gt;(会切回界面线程),
+    /// 收到进度就交给回调。界面用的是 Progress&lt;T&gt;(会切回界面线程),
     /// 测试里不需要那层调度,这样断言才是确定的。
     /// </summary>
-    private sealed class Recorder(List<ProjectSaveProgress> reports) : IProgress<ProjectSaveProgress>
+    private sealed class Recorder(Action<ProjectSaveProgress> report) : IProgress<ProjectSaveProgress>
     {
-        public void Report(ProjectSaveProgress value) => reports.Add(value);
+        public void Report(ProjectSaveProgress value) => report(value);
     }
 }

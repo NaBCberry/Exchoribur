@@ -26,7 +26,16 @@ public static class ProjectFile
     /// <summary>打包时每次搬运多少字节。1 MiB 对机械盘和 SSD 都不算大。</summary>
     private const int CopyBufferSize = 1 << 20;
 
-    /// <summary>保存工程。参考媒体不存在时只存时间轴。</summary>
+    /// <summary>
+    /// 保存过程中用的临时文件后缀。保存要是被强行中断,可能留下一个同名的临时文件,
+    /// 它不影响工程本身,下次保存会直接覆盖掉。
+    /// </summary>
+    private const string TemporarySuffix = ".saving";
+
+    /// <summary>
+    /// 保存工程。参考媒体不存在时只存时间轴。数据先写同目录的临时文件,
+    /// 写完整了才顶替原文件,所以中途失败也不会毁掉原来的工程。
+    /// </summary>
     public static void Save(string path, TimelineDocument document)
         => Save(path, document, progress: null);
 
@@ -77,18 +86,65 @@ public static class ProjectFile
         var mediaBytes = mediaPath is null ? 0 : new FileInfo(mediaPath).Length;
         var totalBytes = timelineBytes + mediaBytes;
 
-        using var stream = File.Create(path);
-        using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+        // 先写同目录的临时文件,写完整了再换成正式文件:直接往目标文件写的话,
+        // 中途失败(磁盘满、被杀进程、断电)之后,原来的工程就只剩一个空壳了。
+        var temporary = path + TemporarySuffix;
 
-        WriteText(archive, ProjectFileFormat.ManifestName, JsonSerializer.Serialize(manifest, ManifestOptions));
-        WriteText(archive, ProjectFileFormat.TimelineName, timelineJson);
-        progress?.Report(new ProjectSaveProgress(
-            ProjectSaveStage.Timeline,
-            Percent(timelineBytes, totalBytes) / 100d));
-
-        if (mediaPath is not null)
+        try
         {
-            CopyMedia(archive, mediaPath, timelineBytes, totalBytes, progress);
+            // 目标写不进去(被别的程序占着、只读)现在就报错,别等几 GB 的参考视频
+            // 拷进临时文件之后才轮到失败。
+            RequireWritableTarget(path);
+
+            using (var stream = File.Create(temporary))
+            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+            {
+                WriteText(archive, ProjectFileFormat.ManifestName, JsonSerializer.Serialize(manifest, ManifestOptions));
+                WriteText(archive, ProjectFileFormat.TimelineName, timelineJson);
+                progress?.Report(new ProjectSaveProgress(
+                    ProjectSaveStage.Timeline,
+                    Percent(timelineBytes, totalBytes) / 100d));
+
+                if (mediaPath is not null)
+                {
+                    CopyMedia(archive, mediaPath, timelineBytes, totalBytes, progress);
+                }
+            }
+
+            // 同一个目录里改名,系统只改目录项,不会把数据再搬一遍。
+            File.Move(temporary, path, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temporary);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 试一下目标文件能不能独占写入。开一下马上关,不动里面的内容;
+    /// 失败时抛出来的异常和真正写入时一样,界面能给出同样的提示。
+    /// </summary>
+    private static void RequireWritableTarget(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        using var probe = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
+    }
+
+    /// <summary>收拾没写完的临时文件。收拾不掉也不算错,真正的失败原因由调用方抛出。</summary>
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // 忽略:临时文件留着不影响工程,下次保存会覆盖它。
         }
     }
 
