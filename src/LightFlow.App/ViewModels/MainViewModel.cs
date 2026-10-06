@@ -79,10 +79,6 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HasVideo { get; set; }
 
-    public bool ShowVideoPlaceholder => !HasVideo;
-
-    partial void OnHasVideoChanged(bool value) => OnPropertyChanged(nameof(ShowVideoPlaceholder));
-
     /// <summary>打开参考视频。解码器不可用或文件打不开时只改状态栏,不动已经打开的内容。</summary>
     public bool OpenVideo(string path)
     {
