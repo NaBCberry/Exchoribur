@@ -4,7 +4,7 @@
 
 <https://github.com/ltyridium/LumaFlow>
 
-LightFlow 的功能范围、交互方式与设备输出协议,参考了开源项目 LumaFlow
+Exchoribur 的功能范围、交互方式与设备输出协议,参考了开源项目 LumaFlow
 (GPLv3,© 2026 Ltyridium)。
 
 本项目是独立实现,不包含 LumaFlow 的源代码、界面文案、图形资源或示例数据。

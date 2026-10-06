@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Exchoribur.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="300"
+        x:Class="Exchoribur.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="设置"
+        Width="460" Height="300"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Height="48"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <Button Content="关闭"
+                    Click="OnCloseClick"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,0,14,0"
+                    Padding="16,4" />
+        </Border>
+
+        <StackPanel Margin="18" Spacing="8">
+            <TextBlock Classes="panelTitle" Text="滚轮与触摸板" />
+
+            <CheckBox Content="反转鼠标滚轮方向" IsChecked="{Binding InvertMouseWheel}" />
+            <TextBlock Classes="note"
+                       Margin="26,0,0,6"
+                       Text="影响滚轮的放大缩小,以及 Shift + 滚轮的横向平移。" />
+
+            <CheckBox Content="反转触摸板横向滑动方向" IsChecked="{Binding InvertTouchpadScroll}" />
+            <TextBlock Classes="note"
+                       Margin="26,0,0,0"
+                       Text="触摸板的竖向滑动和鼠标滚轮走同一条缩放路径,竖向方向由上面那一项控制。" />
+        </StackPanel>
+    </DockPanel>
+
+</Window>

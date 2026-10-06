@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Exchoribur.App/Exchoribur.App.csproj" />
+    <Project Path="src/Exchoribur.Core/Exchoribur.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Exchoribur.App.Tests/Exchoribur.App.Tests.csproj" />
+    <Project Path="tests/Exchoribur.Core.Tests/Exchoribur.Core.Tests.csproj" />
+  </Folder>
+</Solution>

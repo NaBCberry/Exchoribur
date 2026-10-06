@@ -1,4 +1,4 @@
-# LightFlow
+# Exchoribur
 
 LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间轴上,并通过
 串口 / BLE / UDP 输出到灯光设备。
@@ -25,10 +25,10 @@ LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间�
 ## 目录结构
 
 ```
-LightFlow.slnx
-src/LightFlow.Core/       领域模型、撤销栈、特效运算、设备协议、音频分析
-src/LightFlow.App/        Avalonia 界面(引用 Core,反过来不成立)
-tests/LightFlow.Core.Tests/  Core 的单元测试
+Exchoribur.slnx
+src/Exchoribur.Core/       领域模型、撤销栈、特效运算、设备协议、音频分析
+src/Exchoribur.App/        Avalonia 界面(引用 Core,反过来不成立)
+tests/Exchoribur.Core.Tests/  Core 的单元测试
 ```
 
 ## 里程碑
@@ -42,9 +42,9 @@ tests/LightFlow.Core.Tests/  Core 的单元测试
 ## 构建
 
 ```bash
-dotnet build LightFlow.slnx     # 编译
-dotnet test  LightFlow.slnx     # 运行测试
-dotnet run --project src/LightFlow.App   # 启动应用
+dotnet build Exchoribur.slnx     # 编译
+dotnet test  Exchoribur.slnx     # 运行测试
+dotnet run --project src/Exchoribur.App   # 启动应用
 ```
 
 需要 .NET 10 SDK。CI 在 Windows、Linux、macOS 三个平台分别编译并测试。

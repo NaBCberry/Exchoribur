@@ -36,8 +36,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Restore
-        run: dotnet restore LightFlow.slnx
+        run: dotnet restore Exchoribur.slnx
       - name: Build
-        run: dotnet build LightFlow.slnx --configuration Release --no-restore
+        run: dotnet build Exchoribur.slnx --configuration Release --no-restore
       - name: Test
-        run: dotnet test LightFlow.slnx --configuration Release --no-build
+        run: dotnet test Exchoribur.slnx --configuration Release --no-build

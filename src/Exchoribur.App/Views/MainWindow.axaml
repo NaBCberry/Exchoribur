@@ -1,0 +1,229 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Exchoribur.App.ViewModels"
+        xmlns:controls="using:Exchoribur.App.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="760"
+        x:Class="Exchoribur.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Width="1280" Height="760"
+        MinWidth="960" MinHeight="600"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Title="{Binding WindowTitle}"
+        DragDrop.AllowDrop="True">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
+    </Window.KeyBindings>
+
+    <DockPanel>
+        <!-- 顶部菜单 -->
+        <Menu DockPanel.Dock="Top" Background="{DynamicResource ChromeBackgroundBrush}">
+            <MenuItem Header="文件">
+                <MenuItem Header="打开…"
+                          Command="{Binding OpenCommand}"
+                          InputGesture="Ctrl+O">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="导入参考媒体…" Command="{Binding ImportVideoCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.ImportMedia}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="退出" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="编辑">
+                <MenuItem Header="设置…" Click="OnSettingsClick">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Settings}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="视图" IsEnabled="False" />
+            <MenuItem Header="帮助">
+                <MenuItem Header="关于 Exchoribur" IsEnabled="False">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.About}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+        </Menu>
+
+        <!-- 底部状态栏:打开文件的结果、报错都显示在这里 -->
+        <Border DockPanel.Dock="Bottom"
+                Height="26"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <TextBlock Classes="status"
+                       Classes.error="{Binding HasError}"
+                       Text="{Binding StatusText}"
+                       Margin="12,0"
+                       VerticalAlignment="Center" />
+        </Border>
+
+        <!-- 全局播放条:这些控件管的是整条时间线,不属于某一块面板 -->
+        <Border DockPanel.Dock="Bottom"
+                Height="44"
+                Background="{DynamicResource ChromeBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <Button Classes="transport"
+                        ToolTip.Tip="回到开头"
+                        Command="{Binding GoToStartCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToStart}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="上一帧"
+                        Command="{Binding PreviousFrameCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.PreviousFrame}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="下一帧"
+                        Command="{Binding NextFrameCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.NextFrame}" />
+                </Button>
+                <Button Classes="transport"
+                        ToolTip.Tip="跳到结尾"
+                        Command="{Binding GoToEndCommand}">
+                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToEnd}" />
+                </Button>
+
+                <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
+                <Button Classes="transport primary play"
+                        ToolTip.Tip="播放 / 暂停"
+                        Command="{Binding TogglePlayCommand}">
+                    <Panel>
+                        <Path Classes="icon big play"
+                              Data="{x:Static controls:Icons.Play}"
+                              IsVisible="{Binding IsPaused}" />
+                        <Path Classes="icon big play"
+                              Data="{x:Static controls:Icons.Pause}"
+                              IsVisible="{Binding IsPlaying}" />
+                    </Panel>
+                </Button>
+                <Button Classes="transport primary stop"
+                        ToolTip.Tip="停止"
+                        Command="{Binding StopPlaybackCommand}">
+                    <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
+                </Button>
+                <ToggleButton Classes="transport primary loop"
+                              ToolTip.Tip="循环播放"
+                              IsChecked="{Binding IsLooping}">
+                    <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
+                </ToggleButton>
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="340,*">
+            <!-- 左栏:视频预览(播放控制压在它底部)+ 十通道状态(缩放压在它底部) -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="8">
+                <Border Grid.Row="0" Classes="panel" Height="191">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top"
+                                    Orientation="Horizontal"
+                                    Spacing="6"
+                                    Margin="10,8,0,4">
+                            <Path Classes="icon title" Data="{x:Static controls:Icons.ImportMedia}" />
+                            <TextBlock Classes="panelTitle" Text="视频预览" />
+                        </StackPanel>
+
+                        <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
+                             等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
+                             而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
+                        <controls:VideoSurface Frame="{Binding VideoFrame}"
+                                               FrameVersion="{Binding VideoFrameVersion}" />
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Row="1" Classes="panel" Margin="0,8,0,0">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top"
+                                    Orientation="Horizontal"
+                                    Spacing="6"
+                                    Margin="10,8,0,4">
+                            <Path Classes="icon title" Data="{x:Static controls:Icons.LightStatus}" />
+                            <TextBlock Classes="panelTitle" Text="通道状态" />
+                        </StackPanel>
+
+                        <controls:LightStatusControl CurrentFrame="{Binding CurrentFrame}" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形 -->
+            <Grid Grid.Column="1" RowDefinitions="*,110" Margin="0,8,8,8">
+                <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
+                    <DockPanel>
+                        <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
+                        <Border DockPanel.Dock="Bottom"
+                                Height="26"
+                                Background="{DynamicResource ChromeBackgroundBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,3,3">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Spacing="2"
+                                        Margin="0,0,6,0">
+                                <Button Classes="transport"
+                                        ToolTip.Tip="放大(滚轮向上)"
+                                        Command="{Binding ZoomInCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
+                                </Button>
+                                <Button Classes="transport"
+                                        ToolTip.Tip="缩小(滚轮向下)"
+                                        Command="{Binding ZoomOutCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
+                                </Button>
+                                <Button Classes="transport"
+                                        ToolTip.Tip="适配全部"
+                                        Command="{Binding FitAllCommand}">
+                                    <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
+                             免得滚动时各层落在不同的合成帧上对不齐。 -->
+                        <Grid ClipToBounds="True">
+                            <controls:TimelineControl
+                                Frames="{Binding Frames}"
+                                Markers="{Binding Markers}"
+                            Viewport="{Binding Viewport}"
+                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                            InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
+                            InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
+                            Cursor="Hand" />
+                        </Grid>
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Row="1" Classes="panel">
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="7">
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
+                        <TextBlock Classes="hint" Text="音频波形(待接入)" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+
+</Window>
