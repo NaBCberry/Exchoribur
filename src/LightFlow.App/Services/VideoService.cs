@@ -34,6 +34,9 @@ public sealed class VideoService : IDisposable
     private readonly LibVLC? _libVlc;
     private readonly MediaPlayer? _player;
 
+    /// <summary>当前载入的媒体。停止时播放器会把媒体卸下来,留着它才能再播。</summary>
+    private Media? _media;
+
     private bool _bitmapUpdateQueued;
 
     public VideoService()
@@ -85,7 +88,12 @@ public sealed class VideoService : IDisposable
         }
     }
 
-    /// <summary>载入视频并开始播放。</summary>
+    /// <summary>
+    /// 载入视频,停在第一帧等待播放。
+    /// 用 libvlc 自己的 :start-paused:起播阶段调暂停或速率都会被忽略,
+    /// 这是目前唯一能确保"导入后不自己播"的办法。代价是首帧画面要等到
+    /// 第一次播放或定位才出来(现在预览框是黑的)。
+    /// </summary>
     public bool Load(string path)
     {
         if (_libVlc is null || _player is null)
@@ -93,17 +101,33 @@ public sealed class VideoService : IDisposable
             return false;
         }
 
-        _player.Volume = 80;
-        using var media = new Media(_libVlc, path, FromType.FromPath);
+        _media?.Dispose();
+        _media = new Media(_libVlc, path, FromType.FromPath);
+        _media.AddOption(":start-paused");
 
-        return _player.Play(media);
+        _player.Volume = 80;
+        return _player.Play(_media);
+    }
+
+    /// <summary>停止并回到开头。libvlc 的 Stop 会把媒体卸下来,重新挂上以便再次播放。</summary>
+    public void Stop()
+    {
+        if (_player is not { } player)
+        {
+            return;
+        }
+
+        player.Stop();
+
+        if (_media is not null)
+        {
+            player.Media = _media;
+        }
     }
 
     public void Play() => _player?.Play();
 
     public void Pause() => _player?.SetPause(true);
-
-    public void Stop() => _player?.Stop();
 
     public void Seek(TimeSpan position)
     {
@@ -181,6 +205,7 @@ public sealed class VideoService : IDisposable
     {
         _player?.Dispose();
         _libVlc?.Dispose();
+        _media?.Dispose();
 
         if (_vlcBufferPin.IsAllocated)
         {
