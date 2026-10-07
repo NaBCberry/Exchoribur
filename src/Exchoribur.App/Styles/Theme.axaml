@@ -99,6 +99,28 @@
     </Style>
 
     <!--
+        颜色面板里的常用色块:颜色直接按在按钮自己的 Background 上,
+        再把悬停和按下的底色钉回按钮自己的颜色,免得被主题的底色盖掉。
+    -->
+    <Style Selector="Button.swatch">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Margin" Value="2" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+    </Style>
+
+    <Style Selector="Button.swatch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+    </Style>
+
+    <Style Selector="Button.swatch:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+    </Style>
+
+    <!--
         播放、缩放这类图标按钮不带自己的框:它们直接压在视频预览框和通道面板上,
         所以底色透明、边框去掉,只在鼠标悬停和按下时给一层淡淡的亮色反馈。
     -->

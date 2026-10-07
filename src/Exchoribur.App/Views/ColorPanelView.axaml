@@ -1,0 +1,143 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Exchoribur.App.Controls"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="210" d:DesignHeight="560"
+             x:Class="Exchoribur.App.Views.ColorPanelView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Styles>
+        <!--
+            面板里的输入框统一做成小方框。文字靠左:居中时点在中线左边的空白处
+            光标会落在开头,接着输入就插到旧值前面,反而不好用。
+        -->
+        <Style Selector="TextBox.value">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style Selector="Slider.inline">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer>
+        <StackPanel Margin="10" Spacing="9">
+            <TextBlock Classes="panelTitle" Text="颜色" />
+
+            <!-- 常用色:白 黄 蓝 橙 绿 红 黑 灰 -->
+            <UniformGrid Columns="4" Rows="2">
+                <Button Classes="swatch" Background="#FFFFFF" ToolTip.Tip="白色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#FFFFFF" />
+                <Button Classes="swatch" Background="#FFFF00" ToolTip.Tip="黄色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#FFFF00" />
+                <Button Classes="swatch" Background="#0000FF" ToolTip.Tip="蓝色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#0000FF" />
+                <Button Classes="swatch" Background="#FF7F00" ToolTip.Tip="橙色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#FF7F00" />
+                <Button Classes="swatch" Background="#00FF00" ToolTip.Tip="绿色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#00FF00" />
+                <Button Classes="swatch" Background="#FF0000" ToolTip.Tip="红色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#FF0000" />
+                <Button Classes="swatch" Background="#000000" ToolTip.Tip="黑色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#000000" />
+                <Button Classes="swatch" Background="#808080" ToolTip.Tip="灰色"
+                        Command="{Binding Color.SetPresetCommand}" CommandParameter="#808080" />
+            </UniformGrid>
+
+            <!-- 饱和度-明度方块 + 色相竖条 -->
+            <controls:HsvPickerControl Height="140"
+                                       Hue="{Binding Color.Hue}"
+                                       Saturation="{Binding Color.Saturation}"
+                                       Value="{Binding Color.Value}" />
+
+            <!-- Hex 输入 + 预览:井号是框外的标签,框里只有六位 -->
+            <Grid ColumnDefinitions="Auto,Auto,*,26">
+                <TextBlock Text="Hex:" Classes="note" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Grid.Column="1" Text="#" Classes="note"
+                           VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox Grid.Column="2"
+                         Classes="value"
+                         Text="{Binding Color.HexText}" />
+                <Border Grid.Column="3"
+                        Width="26"
+                        Height="26"
+                        Margin="6,0,0,0"
+                        CornerRadius="3"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                        Background="{Binding Color.PreviewBrush}" />
+            </Grid>
+
+            <!-- 八位 R/G/B:数值框 + 滑块 -->
+            <Grid ColumnDefinitions="14,44,*" RowDefinitions="Auto,Auto,Auto">
+                <TextBlock Text="R" Classes="note" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Classes="value" Margin="0,2"
+                         Text="{Binding Color.RedText}" />
+                <Slider Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
+                        IsSnapToTickEnabled="True" TickFrequency="1"
+                        SmallChange="1" LargeChange="16"
+                        Margin="6,0,0,0" Value="{Binding Color.Red}" />
+
+                <TextBlock Grid.Row="1" Text="G" Classes="note" VerticalAlignment="Center" />
+                <TextBox Grid.Row="1" Grid.Column="1" Classes="value" Margin="0,2"
+                         Text="{Binding Color.GreenText}" />
+                <Slider Grid.Row="1" Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
+                        IsSnapToTickEnabled="True" TickFrequency="1"
+                        SmallChange="1" LargeChange="16"
+                        Margin="6,0,0,0" Value="{Binding Color.Green}" />
+
+                <TextBlock Grid.Row="2" Text="B" Classes="note" VerticalAlignment="Center" />
+                <TextBox Grid.Row="2" Grid.Column="1" Classes="value" Margin="0,2"
+                         Text="{Binding Color.BlueText}" />
+                <Slider Grid.Row="2" Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
+                        IsSnapToTickEnabled="True" TickFrequency="1"
+                        SmallChange="1" LargeChange="16"
+                        Margin="6,0,0,0" Value="{Binding Color.Blue}" />
+            </Grid>
+
+            <Separator Margin="0,2" />
+
+            <!-- 真正会输出的四位值:三个框一样宽,通道名标在下面,不挤 -->
+            <TextBlock Classes="panelTitle" Text="实际输出(四位 0-15)" />
+            <Grid ColumnDefinitions="26,*,*,*" RowDefinitions="Auto,Auto">
+                <Border Width="26"
+                        Height="26"
+                        CornerRadius="3"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                        Background="{Binding Color.OutputBrush}" />
+                <TextBox Grid.Column="1" Classes="value" Margin="6,0,0,0"
+                         Text="{Binding Color.FourBitRedText}" />
+                <TextBox Grid.Column="2" Classes="value" Margin="6,0,0,0"
+                         Text="{Binding Color.FourBitGreenText}" />
+                <TextBox Grid.Column="3" Classes="value" Margin="6,0,0,0"
+                        Text="{Binding Color.FourBitBlueText}" />
+
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="note"
+                           Text="R" HorizontalAlignment="Center" Margin="6,2,0,0" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Classes="note"
+                           Text="G" HorizontalAlignment="Center" Margin="6,2,0,0" />
+                <TextBlock Grid.Row="1" Grid.Column="3" Classes="note"
+                           Text="B" HorizontalAlignment="Center" Margin="6,2,0,0" />
+            </Grid>
+
+            <Button Content="应用到选中帧"
+                    Margin="0,4,0,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding ApplyEditorColorCommand}" />
+
+            <TextBlock Classes="note"
+                       Text="选中的是哪几帧、哪几个通道,就改哪些;模式保持原样,可以 Ctrl+Z 撤销。" />
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

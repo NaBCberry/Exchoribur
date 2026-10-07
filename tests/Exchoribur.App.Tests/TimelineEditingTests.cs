@@ -134,6 +134,32 @@ public sealed class TimelineEditingTests : IDisposable
     }
 
     [Fact]
+    public async Task The_panel_color_is_applied_to_the_selection()
+    {
+        var viewModel = await OpenThreeFramesAsync();
+
+        viewModel.Selection = FrameSelection.Between(
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(100),
+            ChannelMask.All);
+        viewModel.Color.HexText = "#00FF00";
+
+        viewModel.ApplyEditorColorCommand.Execute(null);
+
+        // 选中的帧按四位值改色(绿 = 0/15/0),选区外的帧一点不动。
+        Assert.Equal(Green, viewModel.Frames[0].Channels[0].Color);
+        Assert.Equal(Green, viewModel.Frames[1].Channels[0].Color);
+        Assert.Equal(Blue, viewModel.Frames[2].Channels[0].Color);
+        Assert.Contains("R0 G15 B0", viewModel.StatusText);
+        Assert.True(viewModel.CanUndo);
+
+        viewModel.UndoEditsCommand.Execute(null);
+
+        Assert.Equal(Red, viewModel.Frames[0].Channels[0].Color);
+        Assert.Equal(Blue, viewModel.Frames[1].Channels[0].Color);
+    }
+
+    [Fact]
     public async Task Opening_another_timeline_clears_the_undo_history()
     {
         var viewModel = await OpenThreeFramesAsync();

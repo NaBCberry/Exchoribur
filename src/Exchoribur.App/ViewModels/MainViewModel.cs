@@ -207,6 +207,9 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>用户偏好设置(滚轮方向之类),设置窗口改的就是这一份。</summary>
     public SettingsViewModel Settings { get; } = new();
 
+    /// <summary>右侧编辑面板里正在挑的颜色。</summary>
+    public ColorEditorViewModel Color { get; } = new();
+
     private VideoService? _video;
 
     /// <summary>
@@ -844,9 +847,39 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void SetSelectionColor()
     {
-        if (_editor is null || Document is null || CurrentFrame is not { } source)
+        if (CurrentFrame is not { } source)
         {
             return;
+        }
+
+        if (PaintSelection(channel => source.Channels[channel].Color, "设置颜色") is { } count)
+        {
+            Report($"已把 {count} 帧的颜色设成播放头所在帧的颜色。");
+        }
+    }
+
+    /// <summary>把编辑面板里挑好的颜色写进选中的通道。</summary>
+    [RelayCommand]
+    private void ApplyEditorColor()
+    {
+        var color = Color.OutputColor;
+
+        if (PaintSelection(_ => color, "设置颜色") is { } count)
+        {
+            Report($"已把 {count} 帧的 {Selection.Channels.Count()} 个通道改成 "
+                + $"R{color.Red} G{color.Green} B{color.Blue}。");
+        }
+    }
+
+    /// <summary>
+    /// 把选中帧的选中通道换成同一个颜色,闪烁模式保持原样。
+    /// 返回改了多帧;没选东西(或者没有工程)时提示一句并返回 null。
+    /// </summary>
+    private int? PaintSelection(Func<int, LightColor> colorFor, string actionName)
+    {
+        if (_editor is null || Document is null)
+        {
+            return null;
         }
 
         var frames = Timeline.Frames;
@@ -855,7 +888,7 @@ public partial class MainViewModel : ViewModelBase
         if (first < 0)
         {
             Report("先在时间轴上选一段再改颜色。", error: true);
-            return;
+            return null;
         }
 
         var before = new Frame[last - first + 1];
@@ -869,7 +902,7 @@ public partial class MainViewModel : ViewModelBase
             for (var channel = 0; channel < Frame.ChannelCount; channel++)
             {
                 states[channel] = Selection.Channels.Contains(channel)
-                    ? new ChannelState(source.Channels[channel].Color, frame.Channels[channel].Mode)
+                    ? new ChannelState(colorFor(channel), frame.Channels[channel].Mode)
                     : frame.Channels[channel];
             }
 
@@ -877,8 +910,8 @@ public partial class MainViewModel : ViewModelBase
             after[index] = new Frame(frame.Time, states);
         }
 
-        ApplyEdit(new SpliceFramesEdit("设置颜色", first, before, after));
-        Report($"已把 {before.Length} 帧的颜色设成播放头所在帧的颜色。");
+        ApplyEdit(new SpliceFramesEdit(actionName, first, before, after));
+        return before.Length;
     }
 
     /// <summary>删除选中的帧。删掉之后,那个位置的灯光自动变成沿用前一帧。</summary>
