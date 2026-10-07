@@ -482,15 +482,19 @@ public partial class MainViewModel : ViewModelBase
                 SaveProgress = report.Fraction * 100;
             });
 
-            await ProjectFile.SaveAsync(path, document, progress);
+            var result = await ProjectFile.SaveAsync(path, document, progress);
 
             _projectPath = path;
             document.MarkSaved();
             IsModified = false;
             UpdateWindowTitle();
 
-            HasError = false;
-            StatusText = $"已保存工程 {fileName}。";
+            // 参考视频不在了的话,这次只存下了时间轴。用报错样式说,免得用户以为存全了。
+            HasError = result.MissingMediaName is not null;
+            StatusText = result.MissingMediaName is null
+                ? $"工程 {fileName}已保存。"
+                : $"工程 {fileName}已保存,但参考视频 {result.MissingMediaName} 丢失,"
+                    + "视频未打包。";
         }
         catch (Exception exception)
         {

@@ -203,6 +203,43 @@ public sealed class ProjectFileTests : IDisposable
         Assert.Equal("旧工程", ProjectFile.Load(project).Name);
     }
 
+    [Fact]
+    public void Saving_reports_a_reference_video_that_is_gone()
+    {
+        var media = Path.Combine(_directory, "show.mp4");
+        File.WriteAllBytes(media, [1, 2, 3]);
+
+        var project = Path.Combine(_directory, "视频丢了.exb");
+        var document = new TimelineDocument("视频丢了", CreateTimeline(), media);
+        File.Delete(media);
+
+        var result = ProjectFile.Save(project, document);
+
+        Assert.Equal("show.mp4", result.MissingMediaName);
+
+        // 时间轴照样存下来了,只是没带视频。
+        var loaded = ProjectFile.Load(project);
+        Assert.Equal(2, loaded.Timeline.Frames.Count);
+        Assert.Null(loaded.MediaPath);
+    }
+
+    [Fact]
+    public void Saving_reports_nothing_missing_in_the_normal_cases()
+    {
+        var media = Path.Combine(_directory, "show.mp4");
+        File.WriteAllBytes(media, [1, 2, 3]);
+
+        var withMedia = ProjectFile.Save(
+            Path.Combine(_directory, "有视频.exb"),
+            new TimelineDocument("有视频", CreateTimeline(), media));
+        var withoutMedia = ProjectFile.Save(
+            Path.Combine(_directory, "没视频.exb"),
+            new TimelineDocument("没视频", CreateTimeline()));
+
+        Assert.Null(withMedia.MissingMediaName);
+        Assert.Null(withoutMedia.MissingMediaName);
+    }
+
     [WindowsFact]
     public async Task A_locked_target_fails_before_anything_gets_copied()
     {

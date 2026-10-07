@@ -36,14 +36,14 @@ public static class ProjectFile
     /// 保存工程。参考媒体不存在时只存时间轴。数据先写同目录的临时文件,
     /// 写完整了才顶替原文件,所以中途失败也不会毁掉原来的工程。
     /// </summary>
-    public static void Save(string path, TimelineDocument document)
+    public static ProjectSaveResult Save(string path, TimelineDocument document)
         => Save(path, document, progress: null);
 
     /// <summary>
     /// 保存工程的后台版本。参考视频是原样复制进容器的,几百兆的素材在界面线程上
     /// 搬运会让窗口整段卡死,所以整个打包丢到线程池执行;进度通过 progress 报回来。
     /// </summary>
-    public static Task SaveAsync(
+    public static Task<ProjectSaveResult> SaveAsync(
         string path,
         TimelineDocument document,
         IProgress<ProjectSaveProgress>? progress = null)
@@ -55,14 +55,21 @@ public static class ProjectFile
         return Task.Run(() => Save(path, document, progress));
     }
 
-    private static void Save(string path, TimelineDocument document, IProgress<ProjectSaveProgress>? progress)
+    private static ProjectSaveResult Save(
+        string path,
+        TimelineDocument document,
+        IProgress<ProjectSaveProgress>? progress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(document);
 
         var mediaPath = document.MediaPath;
+        string? missingMediaName = null;
+
         if (mediaPath is not null && !File.Exists(mediaPath))
         {
+            // 视频被移走或删掉了:只存时间轴,但要把文件名报回去,别让用户以为存全了。
+            missingMediaName = Path.GetFileName(mediaPath);
             mediaPath = null;
         }
 
@@ -113,6 +120,8 @@ public static class ProjectFile
 
             // 同一个目录里改名,系统只改目录项,不会把数据再搬一遍。
             File.Move(temporary, path, overwrite: true);
+
+            return new ProjectSaveResult(missingMediaName);
         }
         catch
         {

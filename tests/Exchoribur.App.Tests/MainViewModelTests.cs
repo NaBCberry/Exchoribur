@@ -184,6 +184,28 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Contains("时间轴", timeline);
     }
 
+    [Fact]
+    public async Task Saving_says_so_when_the_reference_video_is_gone()
+    {
+        var csv = WriteFile("show.csv", $"{Header}\n0,0,15,0,0,\n2000,0,0,15,0,\n");
+        var video = WriteFile("show.mp4", string.Empty);
+        var project = Path.Combine(_directory, "show.exb");
+
+        var viewModel = new MainViewModel(new StubFilePicker(csv) { ProjectSavePath = project });
+        await viewModel.OpenCommand.ExecuteAsync(null);
+
+        // 挂上参考视频,然后把视频文件删掉,模拟"素材被移走了"。
+        viewModel.Document!.AttachMedia(video);
+        File.Delete(video);
+
+        await viewModel.SaveProjectCommand.ExecuteAsync(null);
+
+        // 时间轴存下来了,但要明说视频没带上。
+        Assert.True(File.Exists(project));
+        Assert.True(viewModel.HasError);
+        Assert.Contains("show.mp4", viewModel.StatusText);
+    }
+
     private string WriteFile(string name, string content)
     {
         var path = Path.Combine(_directory, name);
