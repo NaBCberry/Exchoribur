@@ -382,7 +382,7 @@ public partial class MainViewModel : ViewModelBase
         if (Document is null)
         {
             HasError = true;
-            StatusText = "还没有工程可保存:先打开工程或导入 CSV/视频。";
+            StatusText = "还没有工程可保存，先打开工程或导入 CSV 或 视频。";
             return;
         }
 
@@ -528,9 +528,9 @@ public partial class MainViewModel : ViewModelBase
         var reason = FileFailure.Classify(exception) switch
         {
             FileFailureReason.InUse =>
-                "文件正被其他程序占用,关掉打开它的程序(解压工具、播放器、网盘同步)再试",
+                "文件正被其他程序占用,关掉占用程序再试",
             FileFailureReason.AccessDenied =>
-                "文件写不进去,可能是只读的,也可能正被其他程序占用",
+                "文件无法写入,文件可能只读/被占用",
             FileFailureReason.DiskFull => "磁盘空间不够",
             _ => null,
         };
