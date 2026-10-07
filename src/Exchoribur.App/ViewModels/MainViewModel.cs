@@ -22,6 +22,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IFilePicker? _filePicker;
     private readonly IPlaybackClock? _clock;
     private readonly INamePrompt? _namePrompt;
+    private readonly IUnsavedChangesPrompt? _unsavedPrompt;
 
     /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
     private string? _projectPath;
@@ -36,11 +37,13 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel(
         IFilePicker? filePicker,
         IPlaybackClock? clock = null,
-        INamePrompt? namePrompt = null)
+        INamePrompt? namePrompt = null,
+        IUnsavedChangesPrompt? unsavedPrompt = null)
     {
         _filePicker = filePicker;
         _clock = clock;
         _namePrompt = namePrompt;
+        _unsavedPrompt = unsavedPrompt;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
@@ -282,6 +285,11 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        if (!await ConfirmDiscardChangesAsync())
+        {
+            return; // 用户决定停下来处理当前工程
+        }
+
         var path = await _filePicker.PickTimelineAsync();
         if (path is null)
         {
@@ -314,6 +322,11 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        if (!await ConfirmDiscardChangesAsync())
+        {
+            return;
+        }
+
         var path = await _filePicker.PickProjectAsync();
         if (path is null)
         {
@@ -321,6 +334,45 @@ public partial class MainViewModel : ViewModelBase
         }
 
         await LoadProjectAsync(path);
+    }
+
+    /// <summary>
+    /// 换文件、关窗口之前的确认。返回 true 表示可以继续;
+    /// 用户选了取消,或者选了保存却没存成,都返回 false,调用方就停在原地。
+    /// </summary>
+    public async Task<bool> ConfirmDiscardChangesAsync()
+    {
+        // 没有对话框可用时(设计器、命令行)按原来的行为继续,不拦。
+        if (_unsavedPrompt is null || !IsModified || Document is null)
+        {
+            return true;
+        }
+
+        var choice = await _unsavedPrompt.AskAsync(TimelineName) ?? UnsavedChangesChoice.Cancel;
+
+        switch (choice)
+        {
+            case UnsavedChangesChoice.Save:
+                await SaveProjectAsync();
+
+                // 没存成(保存失败,或者另存为被取消)时工程还是脏的,继续下去就丢改动了。
+                return !IsModified;
+
+            case UnsavedChangesChoice.Discard:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>拖进窗口的 CSV 按"打开"处理:同样先拦未保存的改动。</summary>
+    public async Task OpenDroppedAsync(string path)
+    {
+        if (await ConfirmDiscardChangesAsync())
+        {
+            await LoadAsync(path);
+        }
     }
 
     /// <summary>保存工程。没存过就当作另存为。</summary>

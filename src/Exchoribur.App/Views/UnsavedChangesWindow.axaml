@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="170"
+        x:Class="Exchoribur.App.Views.UnsavedChangesWindow"
+        Width="460" Height="174"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Height="52"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Margin="0,0,14,0">
+                <Button Content="保存" Click="OnSave" Padding="18,4" />
+                <Button Content="不保存" Click="OnDiscard" Padding="18,4" />
+                <Button Content="取消" Click="OnCancel" Padding="18,4" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="18" Spacing="8">
+            <TextBlock Classes="panelTitle" Text="有未保存的改动" />
+            <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+        </StackPanel>
+    </DockPanel>
+
+</Window>

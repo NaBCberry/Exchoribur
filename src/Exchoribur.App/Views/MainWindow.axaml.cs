@@ -10,6 +10,9 @@ public partial class MainWindow : Window
 {
     private SettingsWindow? _settingsWindow;
 
+    /// <summary>已经问过未保存的改动并得到"可以关"的回答,再关就不再拦。</summary>
+    private bool _closingConfirmed;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -17,6 +20,7 @@ public partial class MainWindow : Window
         // 把 CSV 直接拖进窗口也能打开,省得每次都点菜单。
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
+        Closing += OnClosing;
     }
 
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
@@ -56,10 +60,36 @@ public partial class MainWindow : Window
             return;
         }
 
-        // LoadAsync 内部已经处理了出错情况,所以这里不用 await,
+        // 里面已经处理了出错和"要不要保存"的询问,所以这里不用 await,
         // 免得整个方法变成 async void(那种方法里的异常没人接得住)。
-        _ = viewModel.LoadAsync(path);
+        _ = viewModel.OpenDroppedAsync(path);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 关窗口前先处理未保存的改动。事件处理里没法等对话框,所以先取消这次关闭,
+    /// 问完再自己关一次。
+    /// </summary>
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // 正在保存就先别插话,存完用户再关一次就行,免得弹出两个对话框。
+        if (_closingConfirmed || DataContext is not MainViewModel viewModel
+            || !viewModel.IsModified || viewModel.IsSaving)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        _ = CloseAfterConfirmAsync(viewModel);
+    }
+
+    private async Task CloseAfterConfirmAsync(MainViewModel viewModel)
+    {
+        if (await viewModel.ConfirmDiscardChangesAsync())
+        {
+            _closingConfirmed = true;
+            Close();
+        }
     }
 
     /// <summary>一次可能拖进来一堆文件,只认第一个 .csv。</summary>

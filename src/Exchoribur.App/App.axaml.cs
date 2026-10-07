@@ -23,7 +23,8 @@ public partial class App : Application
             var viewModel = new MainViewModel(
                 new StorageProviderFilePicker(window),
                 new DispatcherPlaybackClock(),
-                new WindowNamePrompt(window));
+                new WindowNamePrompt(window),
+                new WindowUnsavedChangesPrompt(window));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;
