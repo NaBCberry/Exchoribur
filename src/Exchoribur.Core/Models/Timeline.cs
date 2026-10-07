@@ -58,6 +58,32 @@ public sealed class Timeline
     }
 
     /// <summary>
+    /// 插入位置:第一个时间不早于 time 的帧下标;全都比它早时就是帧数(追加到最后)。
+    /// 插入新帧时用它定位,同一时间的旧帧会排在新帧后面。
+    /// </summary>
+    public int GetInsertIndex(TimeSpan time)
+    {
+        var low = 0;
+        var high = _frames.Length;
+
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+
+            if (_frames[middle].Time < time)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
+    /// <summary>
     /// 取上一个帧的时间:严格早于 time 的最近一帧。没有更早的帧时返回 null。
     /// 同一时间有多帧时,退到比它更早的那个时间点。
     /// </summary>
