@@ -24,6 +24,12 @@
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveProjectCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveProjectAsCommand}" />
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoEditsCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoEditsCommand}" />
+        <KeyBinding Gesture="Ctrl+A" Command="{Binding SelectAllCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding ClearSelectionCommand}" />
+        <KeyBinding Gesture="Delete" Command="{Binding DeleteSelectedFramesCommand}" />
+        <KeyBinding Gesture="Insert" Command="{Binding InsertFrameAtPlayheadCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -62,6 +68,50 @@
                 <MenuItem Header="退出" Click="OnExitClick" />
             </MenuItem>
             <MenuItem Header="编辑">
+                <MenuItem Header="{Binding UndoLabel}"
+                          Command="{Binding UndoEditsCommand}"
+                          InputGesture="Ctrl+Z">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Undo}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="{Binding RedoLabel}"
+                          Command="{Binding RedoEditsCommand}"
+                          InputGesture="Ctrl+Y">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Redo}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="全选" Command="{Binding SelectAllCommand}" InputGesture="Ctrl+A">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Channels}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="取消选择"
+                          Command="{Binding ClearSelectionCommand}"
+                          InputGesture="Escape" />
+                <Separator />
+                <MenuItem Header="把选中帧设为播放头颜色" Command="{Binding SetSelectionColorCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="在播放头插入帧"
+                          Command="{Binding InsertFrameAtPlayheadCommand}"
+                          InputGesture="Insert">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.InsertFrame}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="删除选中帧"
+                          Command="{Binding DeleteSelectedFramesCommand}"
+                          InputGesture="Delete">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
                 <MenuItem Header="设置…" Click="OnSettingsClick">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Settings}" />
@@ -235,6 +285,7 @@
                                 Markers="{Binding Markers}"
                             Viewport="{Binding Viewport}"
                             PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                            Selection="{Binding Selection, Mode=TwoWay}"
                             InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
                             InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
                             Cursor="Hand" />

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.Services;
 using Exchoribur.Core;
+using Exchoribur.Core.Editing;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Playback;
 using Exchoribur.Core.Storage;
@@ -28,6 +29,9 @@ public partial class MainViewModel : ViewModelBase
     private string? _projectPath;
     private readonly PlaybackState _playback = new();
 
+    /// <summary>当前工程的编辑栈(撤销、重做)。没有时间轴时是 null。</summary>
+    private TimelineEditor? _editor;
+
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
     public MainViewModel()
         : this(filePicker: null)
@@ -49,6 +53,8 @@ public partial class MainViewModel : ViewModelBase
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
         StatusText = EmptyStatusText;
         WindowTitle = "Exchoribur";
+        UndoLabel = "撤销";
+        RedoLabel = "重做";
 
     }
 
@@ -69,6 +75,35 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>跟上次保存相比有没有改动,标题上用 * 提示。</summary>
     [ObservableProperty]
     public partial bool IsModified { get; set; }
+
+    /// <summary>时间轴上的选区:选中了哪一段时间、哪几个通道。</summary>
+    [ObservableProperty]
+    public partial FrameSelection Selection { get; set; }
+
+    /// <summary>选区里有多少帧,给编辑面板和状态栏显示。</summary>
+    [ObservableProperty]
+    public partial int SelectedFrameCount { get; set; }
+
+    /// <summary>能不能撤销/重做,决定菜单项是灰的还是可点的。</summary>
+    [ObservableProperty]
+    public partial bool CanUndo { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanRedo { get; set; }
+
+    /// <summary>菜单文字,比如"撤销 设置颜色"。</summary>
+    [ObservableProperty]
+    public partial string UndoLabel { get; set; }
+
+    [ObservableProperty]
+    public partial string RedoLabel { get; set; }
+
+    partial void OnSelectionChanged(FrameSelection value)
+        => SelectedFrameCount = SelectionResolver.CountFrames(Timeline, value);
+
+    partial void OnCanUndoChanged(bool value) => UndoEditsCommand.NotifyCanExecuteChanged();
+
+    partial void OnCanRedoChanged(bool value) => RedoEditsCommand.NotifyCanExecuteChanged();
 
     /// <summary>正在打包工程。状态栏靠它显示进度条,同时也挡住重复的保存请求。</summary>
     [ObservableProperty]
@@ -245,11 +280,31 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(Frames));
         OnPropertyChanged(nameof(Markers));
         OnPropertyChanged(nameof(Duration));
+        OnPropertyChanged(nameof(TimelineStart));
 
-        // 换了文件就把播放头拨回开头;这里必须显式重算一次当前帧,
-        // 因为播放头本来就是 0 的时候 setter 不会触发变更回调。
-        PlayheadTime = TimeSpan.Zero;
+        // 播放头位置没变,但脚下的帧可能换了,得重算一次。
         CurrentFrame = value.GetFrameAt(PlayheadTime);
+
+        // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、选区、撤销历史
+        // 都该留在原地;只有换成另一条时间轴(打开、导入、新建)才从头开始。
+        if (!ReferenceEquals(_editor?.Timeline, value))
+        {
+            StartEditing(value);
+        }
+    }
+
+    /// <summary>
+    /// 开始编辑一条新的时间轴:播放头拨回开头、视口整条铺满、选区清空、撤销历史清空。
+    /// </summary>
+    private void StartEditing(Timeline timeline)
+    {
+        _editor = new TimelineEditor(timeline);
+        Selection = FrameSelection.Empty;
+        SyncEditorState();
+
+        // 这里必须显式重算一次当前帧,因为播放头本来就是 0 的时候 setter 不会触发变更回调。
+        PlayheadTime = TimeSpan.Zero;
+        CurrentFrame = timeline.GetFrameAt(PlayheadTime);
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
         _playback.Stop();
@@ -259,6 +314,15 @@ public partial class MainViewModel : ViewModelBase
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
         Viewport.SetContent(TimelineStart, Duration - TimelineStart);
+    }
+
+    /// <summary>把编辑栈的状态搬到界面上:撤销/重做能不能点、菜单显示什么字。</summary>
+    private void SyncEditorState()
+    {
+        CanUndo = _editor?.CanUndo ?? false;
+        CanRedo = _editor?.CanRedo ?? false;
+        UndoLabel = _editor?.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
+        RedoLabel = _editor?.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
@@ -732,6 +796,182 @@ public partial class MainViewModel : ViewModelBase
 
     [RelayCommand]
     private void FitAll() => Viewport.FitAll();
+
+    /// <summary>撤销上一步编辑。</summary>
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void UndoEdits()
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        PausePlayback();
+        _editor.Undo();
+        PublishEditorTimeline();
+        Report($"已撤销:{_editor.RedoName}。");
+    }
+
+    /// <summary>重做上一步被撤销的编辑。</summary>
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    private void RedoEdits()
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        PausePlayback();
+        _editor.Redo();
+        PublishEditorTimeline();
+        Report($"已重做:{_editor.UndoName}。");
+    }
+
+    /// <summary>选中整条时间轴的全部通道。</summary>
+    [RelayCommand]
+    private void SelectAll() => Selection = Timeline.Frames.Count == 0
+        ? FrameSelection.Empty
+        : FrameSelection.Between(TimelineStart, Duration, ChannelMask.All);
+
+    /// <summary>取消选择。</summary>
+    [RelayCommand]
+    private void ClearSelection() => Selection = FrameSelection.Empty;
+
+    /// <summary>
+    /// 把选中帧的颜色设成播放头那一帧的颜色。闪烁模式保持各自的原样,
+    /// 编辑面板做出来之前先用它验证整条"选区 → 编辑 → 撤销"的链路。
+    /// </summary>
+    [RelayCommand]
+    private void SetSelectionColor()
+    {
+        if (_editor is null || Document is null || CurrentFrame is not { } source)
+        {
+            return;
+        }
+
+        var frames = Timeline.Frames;
+        var (first, last) = SelectionResolver.ResolveRange(frames, Selection);
+
+        if (first < 0)
+        {
+            Report("先在时间轴上选一段再改颜色。", error: true);
+            return;
+        }
+
+        var before = new Frame[last - first + 1];
+        var after = new Frame[before.Length];
+
+        for (var index = 0; index < before.Length; index++)
+        {
+            var frame = frames[first + index];
+            var states = new ChannelState[Frame.ChannelCount];
+
+            for (var channel = 0; channel < Frame.ChannelCount; channel++)
+            {
+                states[channel] = Selection.Channels.Contains(channel)
+                    ? new ChannelState(source.Channels[channel].Color, frame.Channels[channel].Mode)
+                    : frame.Channels[channel];
+            }
+
+            before[index] = frame;
+            after[index] = new Frame(frame.Time, states);
+        }
+
+        ApplyEdit(new SpliceFramesEdit("设置颜色", first, before, after));
+        Report($"已把 {before.Length} 帧的颜色设成播放头所在帧的颜色。");
+    }
+
+    /// <summary>删除选中的帧。删掉之后,那个位置的灯光自动变成沿用前一帧。</summary>
+    [RelayCommand]
+    private void DeleteSelectedFrames()
+    {
+        if (_editor is null || Document is null)
+        {
+            return;
+        }
+
+        var frames = Timeline.Frames;
+        var (first, last) = SelectionResolver.ResolveRange(frames, Selection);
+
+        if (first < 0)
+        {
+            Report("先在时间轴上选一段再删。", error: true);
+            return;
+        }
+
+        var removed = new Frame[last - first + 1];
+        for (var index = 0; index < removed.Length; index++)
+        {
+            removed[index] = frames[first + index];
+        }
+
+        ApplyEdit(new SpliceFramesEdit("删除帧", first, removed, []));
+        Selection = FrameSelection.Empty;
+        Report($"已删除 {removed.Length} 帧。");
+    }
+
+    /// <summary>在播放头处插入一帧,默认沿用前一帧的状态(插在最前面就用全黑)。</summary>
+    [RelayCommand]
+    private void InsertFrameAtPlayhead()
+    {
+        if (_editor is null || Document is null)
+        {
+            return;
+        }
+
+        var frames = Timeline.Frames;
+        var index = Timeline.GetInsertIndex(PlayheadTime);
+        var source = index > 0 ? frames[index - 1] : null;
+
+        var states = new ChannelState[Frame.ChannelCount];
+        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        {
+            states[channel] = source is null
+                ? new ChannelState(default, FlashMode.Solid)
+                : source.Channels[channel];
+        }
+
+        ApplyEdit(new SpliceFramesEdit("插入帧", index, [], [new Frame(PlayheadTime, states)]));
+        Report($"已在 {Timecode.Format(PlayheadTime)} 插入 1 帧。");
+    }
+
+    /// <summary>走一步编辑:先停下播放,再把结果搬回界面。</summary>
+    private void ApplyEdit(ITimelineEdit edit)
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        // 边播边改会让人看不出改的是哪一帧,先停下来。
+        PausePlayback();
+
+        _editor.Apply(edit);
+        PublishEditorTimeline();
+    }
+
+    /// <summary>编辑栈换了内容之后,把结果搬回界面:时间轴对象、脏标记、撤销菜单。</summary>
+    private void PublishEditorTimeline()
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        Timeline = _editor.Timeline;
+        SelectedFrameCount = SelectionResolver.CountFrames(Timeline, Selection);
+
+        Document?.ReplaceTimeline(Timeline);
+        IsModified = Document?.IsModified ?? false;
+        SyncEditorState();
+    }
+
+    /// <summary>往状态栏写一句结果。error 为 true 时用报错的颜色。</summary>
+    private void Report(string text, bool error = false)
+    {
+        HasError = error;
+        StatusText = text;
+    }
 
     /// <summary>
     /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;

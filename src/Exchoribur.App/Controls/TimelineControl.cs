@@ -42,6 +42,13 @@ public sealed class TimelineControl : Control
     private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
     private static readonly IBrush UnplayableMask = new SolidColorBrush(Color.Parse("#8C808080"));
     private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
+
+    /// <summary>选中区域的填充:白色半透明,盖在色块上看得见选了什么,又不至于把颜色压掉。</summary>
+    private static readonly IBrush SelectionFill = new SolidColorBrush(Color.Parse("#70FFFFFF"));
+
+    /// <summary>选中区域的边框:白色实线,粗一点,一眼能看出选到哪儿了。</summary>
+    private static readonly IPen SelectionBorderPen = new Pen(new SolidColorBrush(Colors.White), 1);
+
     private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
     private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
     private static readonly IPen RowSeparatorPen = new Pen(new SolidColorBrush(Color.Parse("#2A2A2A")), 1);
@@ -61,8 +68,13 @@ public sealed class TimelineControl : Control
     private readonly Typeface _timecodeTypeface = new(TimecodeFontFamily);
 
     private bool _isScrubbing;
+    private bool _isSelecting;
     private bool _isPanning;
     private double _lastPanX;
+
+    /// <summary>框选的起点:按下那一刻的时间和通道,拖动时用它和当前位置圈范围。</summary>
+    private TimeSpan _selectionAnchorTime;
+    private int _selectionAnchorChannel;
 
     public static readonly StyledProperty<IReadOnlyList<Frame>?> FramesProperty =
         AvaloniaProperty.Register<TimelineControl, IReadOnlyList<Frame>?>(nameof(Frames));
@@ -81,6 +93,12 @@ public sealed class TimelineControl : Control
     public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty =
         AvaloniaProperty.Register<TimelineControl, TimeSpan>(nameof(PlayheadTime));
 
+    /// <summary>
+    /// 时间轴上的选区。在轨道上拖动时回写(绑定用 TwoWay),也由这个控件画出来。
+    /// </summary>
+    public static readonly StyledProperty<FrameSelection> SelectionProperty =
+        AvaloniaProperty.Register<TimelineControl, FrameSelection>(nameof(Selection));
+
     /// <summary>反转鼠标滚轮方向,在设置页里改。</summary>
     public static readonly StyledProperty<bool> InvertMouseWheelProperty =
         AvaloniaProperty.Register<TimelineControl, bool>(nameof(InvertMouseWheel));
@@ -91,7 +109,11 @@ public sealed class TimelineControl : Control
 
     static TimelineControl()
     {
-        AffectsRender<TimelineControl>(FramesProperty, MarkersProperty, PlayheadTimeProperty);
+        AffectsRender<TimelineControl>(
+            FramesProperty,
+            MarkersProperty,
+            PlayheadTimeProperty,
+            SelectionProperty);
     }
 
     public IReadOnlyList<Frame>? Frames
@@ -116,6 +138,12 @@ public sealed class TimelineControl : Control
     {
         get => GetValue(PlayheadTimeProperty);
         set => SetValue(PlayheadTimeProperty, value);
+    }
+
+    public FrameSelection Selection
+    {
+        get => GetValue(SelectionProperty);
+        set => SetValue(SelectionProperty, value);
     }
 
     public bool InvertMouseWheel
@@ -248,6 +276,7 @@ public sealed class TimelineControl : Control
                 }
 
                 DrawUnplayableRegion(context, viewport, trackHeight);
+                DrawSelection(context, viewport, rowHeight);
                 DrawMarkers(context, viewport);
             }
 
@@ -546,9 +575,22 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        _isScrubbing = true;
+        // 左键按区域分工:顶部刻度/标记带负责定位播放头,十条色带负责框选。
+        // 播放头那条竖线本身也能直接拖,否则缩放以后想微调位置就得去够顶部那一条。
+        if (point.Position.Y < TimelineLayout.RulerHeight || IsOnPlayhead(point.Position.X))
+        {
+            _isScrubbing = true;
+            e.Pointer.Capture(this);
+            SeekTo(point.Position.X);
+            e.Handled = true;
+            return;
+        }
+
+        _isSelecting = true;
+        _selectionAnchorTime = TimeAt(point.Position.X);
+        _selectionAnchorChannel = ChannelAt(point.Position.Y);
         e.Pointer.Capture(this);
-        SeekTo(point.Position.X);
+        UpdateSelection(point.Position, extend: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         e.Handled = true;
     }
 
@@ -556,19 +598,26 @@ public sealed class TimelineControl : Control
     {
         base.OnPointerMoved(e);
 
-        var x = e.GetPosition(this).X;
+        var position = e.GetPosition(this);
 
         if (_isPanning)
         {
-            Viewport?.PanByPixels(_lastPanX - x);
-            _lastPanX = x;
+            Viewport?.PanByPixels(_lastPanX - position.X);
+            _lastPanX = position.X;
             e.Handled = true;
             return;
         }
 
         if (_isScrubbing)
         {
-            SeekTo(x);
+            SeekTo(position.X);
+            e.Handled = true;
+            return;
+        }
+
+        if (_isSelecting)
+        {
+            UpdateSelection(position, extend: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             e.Handled = true;
         }
     }
@@ -577,15 +626,141 @@ public sealed class TimelineControl : Control
     {
         base.OnPointerReleased(e);
 
-        if (!_isPanning && !_isScrubbing)
+        if (!_isPanning && !_isScrubbing && !_isSelecting)
         {
             return;
         }
 
         _isPanning = false;
         _isScrubbing = false;
+        _isSelecting = false;
         e.Pointer.Capture(null);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 按当前指针位置更新选区。按住 Shift 时把新框并进原有选区(扩展),
+    /// 否则就是从按下的那个格子重新框。
+    /// </summary>
+    private void UpdateSelection(Point position, bool extend)
+    {
+        var block = FrameSelection.Between(
+            _selectionAnchorTime,
+            TimeAt(position.X),
+            ChannelMasks.Range(_selectionAnchorChannel, ChannelAt(position.Y)));
+
+        Selection = extend ? Selection.Union(block) : block;
+    }
+
+    /// <summary>横坐标对应的时间,夹在数据范围内——拖到轨道外面不该框出一段空白。</summary>
+    private TimeSpan TimeAt(double x)
+    {
+        if (Viewport is not { } viewport || Frames is not { Count: > 0 } frames)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var time = viewport.MapX(x - TimelineLayout.TrackLeft);
+
+        if (time < frames[0].Time)
+        {
+            return frames[0].Time;
+        }
+
+        return time > frames[^1].Time ? frames[^1].Time : time;
+    }
+
+    /// <summary>纵坐标对应的通道行;轨道区之外夹到最近的一行。</summary>
+    private int ChannelAt(double y)
+    {
+        var trackHeight = Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight);
+        var rowHeight = trackHeight / Frame.ChannelCount;
+
+        if (rowHeight <= 0)
+        {
+            return 0;
+        }
+
+        var index = (int)((y - TimelineLayout.RulerHeight) / rowHeight);
+        return Math.Clamp(index, 0, Frame.ChannelCount - 1);
+    }
+
+    /// <summary>指针是不是压在播放头那条竖线上。</summary>
+    private bool IsOnPlayhead(double x)
+    {
+        if (Viewport is not { } viewport)
+        {
+            return false;
+        }
+
+        var playheadX = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
+        return Math.Abs(x - playheadX) <= 4;
+    }
+
+    /// <summary>
+    /// 画选区:一块白色半透明的底,加一圈粗白边。
+    /// 范围按"选中的帧下标"算而不是按时间范围算:点选单帧时起止时间相同,
+    /// 按时间范围画会是一条零宽的线,看不出选中了。
+    /// 画在负时间灰蒙版之后,被灰盖住的那段里也看得见选了什么。
+    /// </summary>
+    private void DrawSelection(DrawingContext context, TimelineViewport viewport, double rowHeight)
+    {
+        if (Frames is not { Count: > 0 } frames || Selection.IsEmpty)
+        {
+            return;
+        }
+
+        var (first, last) = SelectionResolver.ResolveRange(frames, Selection);
+        if (first < 0)
+        {
+            return;
+        }
+
+        var trackLeft = TimelineLayout.TrackLeft;
+        var trackRight = trackLeft + TimelineLayout.GetTrackWidth(Bounds.Width);
+        var startX = Math.Clamp(trackLeft + viewport.MapTime(frames[first].Time), trackLeft, trackRight);
+
+        // 选中的最后一帧一直持续到下一帧,所以高亮也画到那里;没有下一帧就画到右边缘。
+        var endTime = last + 1 < frames.Count ? frames[last + 1].Time : TimeSpan.MaxValue;
+        var endX = endTime == TimeSpan.MaxValue
+            ? trackRight
+            : Math.Clamp(trackLeft + viewport.MapTime(endTime), trackLeft, trackRight);
+
+        if (endX <= startX)
+        {
+            return;
+        }
+
+        // 通道连续就画一个方框;万一不连续(以后支持多选),每段各画一个。
+        var channel = 0;
+        while (channel < Frame.ChannelCount)
+        {
+            if (!Selection.Channels.Contains(channel))
+            {
+                channel++;
+                continue;
+            }
+
+            var firstChannel = channel;
+            while (channel + 1 < Frame.ChannelCount && Selection.Channels.Contains(channel + 1))
+            {
+                channel++;
+            }
+
+            var top = TimelineLayout.RulerHeight + (firstChannel * rowHeight);
+            var bottom = TimelineLayout.RulerHeight + ((channel + 1) * rowHeight);
+
+            // 行与行之间有一条 1 像素的分隔线,方框稍微内缩,免得压到它上面。
+            var box = new Rect(
+                startX,
+                top + 0.5,
+                endX - startX,
+                Math.Max(0, bottom - top - 1));
+
+            context.DrawRectangle(SelectionFill, SelectionBorderPen, box);
+
+            channel++;
+        }
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
