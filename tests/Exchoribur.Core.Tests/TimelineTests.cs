@@ -2,172 +2,148 @@ using Exchoribur.Core.Models;
 
 namespace Exchoribur.Core.Tests;
 
-public class TimelineTests
+/// <summary>时间轴:块的排列、起止范围、按通道查询、状态变化点、前后跳点。</summary>
+public sealed class TimelineTests
 {
-    [Fact]
-    public void Empty_has_no_frames_and_no_markers()
-    {
-        Assert.Empty(Timeline.Empty.Frames);
-        Assert.Empty(Timeline.Empty.Markers);
-    }
+    private static readonly LightColor Red = new(15, 0, 0);
 
     [Fact]
-    public void Frames_are_sorted_by_time()
+    public void Start_and_duration_cover_all_blocks()
     {
-        var frames = new[] { CreateFrame(300), CreateFrame(100), CreateFrame(200) };
-
-        var timeline = new Timeline(frames, []);
-
-        TimeSpan[] expected =
-        [
-            TimeSpan.FromMilliseconds(100),
-            TimeSpan.FromMilliseconds(200),
-            TimeSpan.FromMilliseconds(300),
-        ];
-        Assert.Equal(expected, timeline.Frames.Select(frame => frame.Time));
-    }
-
-    [Fact]
-    public void Duplicate_frame_times_keep_their_input_order()
-    {
-        // 真实工程文件里出现过同一时间的两帧(除了 frame_id 完全相同)。
-        // 不能因此拒绝文件,所以两帧都保留,靠稳定排序保住它们的先后顺序,
-        // "后出现的覆盖先出现的"完全依赖这一点。
-        var frames = new[] { CreateFrame(1000, 3), CreateFrame(1000, 9) };
-
-        var timeline = new Timeline(frames, []);
-
-        Assert.Equal(2, timeline.Frames.Count);
-        Assert.Equal((byte)3, timeline.Frames[0].Channels[0].Color.Red);
-        Assert.Equal((byte)9, timeline.Frames[1].Channels[0].Color.Red);
-    }
-
-    [Fact]
-    public void Constructor_copies_the_given_collections()
-    {
-        var frames = new[] { CreateFrame(100) };
-        var markers = new[] { new TimelineMarker(TimeSpan.FromMilliseconds(100), "A") };
-        var timeline = new Timeline(frames, markers);
-
-        frames[0] = CreateFrame(999);
-        markers[0] = new TimelineMarker(TimeSpan.FromMilliseconds(999), "B");
-
-        Assert.Equal(TimeSpan.FromMilliseconds(100), timeline.Frames[0].Time);
-        Assert.Equal("A", timeline.Markers[0].Name);
-    }
-
-    [Fact]
-    public void GetFrameAt_returns_null_before_the_first_frame()
-    {
-        var timeline = new Timeline([CreateFrame(1000)], []);
-
-        Assert.Null(timeline.GetFrameAt(TimeSpan.FromMilliseconds(999)));
-    }
-
-    [Fact]
-    public void GetFrameAt_returns_the_frame_at_the_exact_time()
-    {
-        var timeline = new Timeline([CreateFrame(1000, 3)], []);
-
-        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(1000));
-
-        Assert.NotNull(frame);
-        Assert.Equal(TimeSpan.FromMilliseconds(1000), frame.Time);
-    }
-
-    [Fact]
-    public void GetFrameAt_returns_the_previous_frame_between_frames()
-    {
-        // 灯光状态是阶跃的:两个灯光帧之间一直沿用前一帧的状态。
-        var timeline = new Timeline([CreateFrame(1000, 3), CreateFrame(2000, 9)], []);
-
-        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(1500));
-
-        Assert.NotNull(frame);
-        Assert.Equal((byte)3, frame.Channels[0].Color.Red);
-    }
-
-    [Fact]
-    public void GetFrameAt_returns_the_last_frame_after_the_end()
-    {
-        var timeline = new Timeline([CreateFrame(1000, 3), CreateFrame(2000, 9)], []);
-
-        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(99999));
-
-        Assert.NotNull(frame);
-        Assert.Equal((byte)9, frame.Channels[0].Color.Red);
-    }
-
-    [Fact]
-    public void GetFrameAt_returns_the_last_of_several_frames_at_the_same_time()
-    {
-        // 同一时间有多帧时,后出现的覆盖先出现的。
         var timeline = new Timeline(
-            [CreateFrame(3000, 1), CreateFrame(1000, 2), CreateFrame(3000, 3)],
+            [
+                CreateBlock(channel: 1, start: TimeSpan.FromSeconds(2), length: TimeSpan.FromSeconds(1)),
+                CreateBlock(channel: 3, start: TimeSpan.FromSeconds(-1), length: TimeSpan.FromSeconds(2)),
+            ],
             []);
 
-        var frame = timeline.GetFrameAt(TimeSpan.FromMilliseconds(3000));
-
-        Assert.NotNull(frame);
-        Assert.Equal((byte)3, frame.Channels[0].Color.Red);
+        Assert.Equal(TimeSpan.FromSeconds(-1), timeline.Start);
+        Assert.Equal(TimeSpan.FromSeconds(3), timeline.Duration);
     }
 
     [Fact]
-    public void GetFrameAt_returns_null_for_empty_timeline()
+    public void An_empty_timeline_is_zero_length()
     {
-        Assert.Null(Timeline.Empty.GetFrameAt(TimeSpan.Zero));
+        Assert.Equal(TimeSpan.Zero, Timeline.Empty.Start);
+        Assert.Equal(TimeSpan.Zero, Timeline.Empty.Duration);
+        Assert.Empty(Timeline.Empty.FrameTimes);
     }
 
     [Fact]
-    public void Markers_are_sorted_by_time()
+    public void Blocks_can_be_found_by_id_and_by_channel()
     {
-        var markers = new[]
-        {
-            new TimelineMarker(TimeSpan.FromMilliseconds(300), "C"),
-            new TimelineMarker(TimeSpan.FromMilliseconds(100), "A"),
-            new TimelineMarker(TimeSpan.FromMilliseconds(200), "B"),
-        };
+        var first = CreateBlock(channel: 2, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(1));
+        var second = CreateBlock(channel: 2, start: TimeSpan.FromSeconds(5), length: TimeSpan.FromSeconds(1));
+        var third = CreateBlock(channel: 7, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(1));
+        var timeline = new Timeline([third, first, second], []);
 
-        var timeline = new Timeline([], markers);
-
-        string[] expected = ["A", "B", "C"];
-        Assert.Equal(expected, timeline.Markers.Select(marker => marker.Name));
+        Assert.Equal(first, timeline.FindBlock(first.Id));
+        Assert.Null(timeline.FindBlock(Guid.NewGuid()));
+        Assert.Equal([first, second], timeline.BlocksOnChannel(2));
+        Assert.Equal([third], timeline.BlocksOnChannel(7));
+        Assert.Empty(timeline.BlocksOnChannel(9));
     }
 
     [Fact]
-    public void Markers_at_the_same_time_keep_their_input_order()
+    public void Blocks_at_a_moment_only_include_the_ones_covering_it()
     {
-        // 同一时间允许多个标记。排序必须稳定,否则"跳到下一个标记"会随机
-        // 先跳到其中一个,同一个文件每次表现都不同。
-        var markers = new[]
-        {
-            new TimelineMarker(TimeSpan.FromMilliseconds(3000), "A"),
-            new TimelineMarker(TimeSpan.FromMilliseconds(1000), "B"),
-            new TimelineMarker(TimeSpan.FromMilliseconds(3000), "C"),
-        };
+        var first = CreateBlock(channel: 0, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(1));
+        var second = CreateBlock(channel: 0, start: TimeSpan.FromSeconds(2), length: TimeSpan.FromSeconds(1));
+        var timeline = new Timeline([first, second], []);
 
-        var timeline = new Timeline([], markers);
-
-        // A 和 C 时间相同,排序后必须保持 A 在前、C 在后。
-        string[] expected = ["B", "A", "C"];
-        Assert.Equal(expected, timeline.Markers.Select(marker => marker.Name));
+        Assert.Equal([first], timeline.BlocksAt(0, TimeSpan.FromMilliseconds(500)));
+        Assert.Empty(timeline.BlocksAt(0, TimeSpan.FromMilliseconds(1500)));
+        Assert.Equal([second], timeline.BlocksAt(0, TimeSpan.FromSeconds(2)));
     }
 
     [Fact]
-    public void Markers_do_not_need_to_sit_on_a_frame()
+    public void Overlap_is_reported_per_channel_and_time()
     {
-        // 标记依附于时间点,不要求落在灯光帧上——这是与旧文件格式最根本的区别。
-        var frames = new[] { CreateFrame(0), CreateFrame(1000) };
-        var markers = new[] { new TimelineMarker(TimeSpan.FromMilliseconds(1234.5), "画面切点") };
+        var first = CreateBlock(channel: 0, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(3));
+        var second = CreateBlock(channel: 0, start: TimeSpan.FromSeconds(1), length: TimeSpan.FromSeconds(3));
+        var otherChannel = CreateBlock(channel: 1, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(3));
+        var timeline = new Timeline([first, second, otherChannel], []);
 
-        var timeline = new Timeline(frames, markers);
-
-        Assert.Equal(TimeSpan.FromMilliseconds(1234.5), timeline.Markers[0].Time);
+        Assert.True(timeline.IsOverlapping(0, TimeSpan.FromSeconds(2)));
+        Assert.False(timeline.IsOverlapping(0, TimeSpan.FromMilliseconds(500)));
+        Assert.False(timeline.IsOverlapping(1, TimeSpan.FromSeconds(2)));
+        Assert.True(timeline.HasOverlap);
     }
 
-    private static Frame CreateFrame(double milliseconds, byte red = 0)
-        => Frame.Uniform(
-            TimeSpan.FromMilliseconds(milliseconds),
-            new LightColor(red, 0, 0),
-            FlashMode.Solid);
+    [Fact]
+    public void A_timeline_without_overlap_says_so()
+    {
+        var timeline = new Timeline(
+            [
+                CreateBlock(channel: 0, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(1)),
+                CreateBlock(channel: 0, start: TimeSpan.FromSeconds(1), length: TimeSpan.FromSeconds(1)),
+            ],
+            []);
+
+        Assert.False(timeline.HasOverlap);
+    }
+
+    [Fact]
+    public void Frame_times_include_block_ends_and_are_unique_and_sorted()
+    {
+        var block = new Block(
+            Block.NewId(),
+            "块",
+            0,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(2),
+            [
+                new BlockFrame(TimeSpan.Zero, State()),
+                new BlockFrame(TimeSpan.FromMilliseconds(500), State()),
+            ]);
+
+        var timeline = new Timeline([block], []);
+
+        // 起点、中间的变化点、块结束(回落)。
+        Assert.Equal(
+            [
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromMilliseconds(1500),
+                TimeSpan.FromSeconds(3),
+            ],
+            timeline.FrameTimes);
+    }
+
+    [Fact]
+    public void Next_and_previous_frame_times_are_strict()
+    {
+        var block = new Block(
+            Block.NewId(),
+            "块",
+            0,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(2),
+            [
+                new BlockFrame(TimeSpan.Zero, State()),
+                new BlockFrame(TimeSpan.FromSeconds(1), State()),
+            ]);
+
+        var timeline = new Timeline([block], []);
+
+        Assert.Equal(TimeSpan.FromSeconds(1), timeline.GetNextFrameTime(TimeSpan.Zero));
+        Assert.Equal(TimeSpan.FromSeconds(2), timeline.GetNextFrameTime(TimeSpan.FromSeconds(1)));
+        Assert.Null(timeline.GetNextFrameTime(TimeSpan.FromSeconds(2)));
+
+        Assert.Null(timeline.GetPreviousFrameTime(TimeSpan.Zero));
+        Assert.Equal(TimeSpan.Zero, timeline.GetPreviousFrameTime(TimeSpan.FromSeconds(1)));
+        Assert.Equal(TimeSpan.FromSeconds(1), timeline.GetPreviousFrameTime(TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
+    public void Duplicate_block_ids_are_rejected()
+    {
+        var block = CreateBlock(channel: 0, start: TimeSpan.Zero, length: TimeSpan.FromSeconds(1));
+
+        Assert.Throws<ArgumentException>(() => new Timeline([block, block], []));
+    }
+
+    private static Block CreateBlock(int channel, TimeSpan start, TimeSpan length)
+        => new(Block.NewId(), "块", channel, start, length, [new BlockFrame(TimeSpan.Zero, State())]);
+
+    private static ChannelState State() => new(Red, FlashMode.Solid);
 }

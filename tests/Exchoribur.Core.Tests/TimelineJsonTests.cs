@@ -3,93 +3,99 @@ using Exchoribur.Core.Storage;
 
 namespace Exchoribur.Core.Tests;
 
-/// <summary>时间轴 JSON 的写法:结构看得清、数字不丢精度、中文不转义。</summary>
+/// <summary>工程里的时间轴 JSON:块和标记存得住、读得回,排版也看得懂。</summary>
 public sealed class TimelineJsonTests
 {
+    private static readonly LightColor Red = new(15, 0, 0);
+    private static readonly LightColor Blue = new(0, 0, 15);
+
     [Fact]
-    public void Json_has_line_breaks_instead_of_one_long_line()
+    public void Blocks_and_markers_survive_a_round_trip()
     {
-        var json = TimelineJson.Write(CreateTimeline(50));
-        var lines = json.Split('\n');
+        var group = Guid.NewGuid();
 
-        Assert.Contains("  \"Times\": [", json);
-        Assert.Contains("  \"Channels\": [", json);
-        Assert.Contains("      \"Functions\": [", json);
+        var block = new Block(
+            Block.NewId(),
+            "副歌 \"高潮\"",
+            3,
+            TimeSpan.FromSeconds(-1.5),
+            TimeSpan.FromSeconds(2),
+            [
+                new BlockFrame(TimeSpan.Zero, new ChannelState(Red, FlashMode.Blink2Hz)),
+                new BlockFrame(TimeSpan.FromMilliseconds(500.5), new ChannelState(Blue, FlashMode.Solid)),
+            ],
+            group);
 
-        // 五十帧也要摊开成几十行,但每行不能长到看不完。
-        Assert.True(lines.Length > 10, $"只有 {lines.Length} 行,还是挤成一团。");
-        Assert.All(lines, line => Assert.True(line.Length <= 200, $"有一行长 {line.Length} 个字符。"));
+        var timeline = new Timeline([block], [new TimelineMarker(TimeSpan.FromSeconds(2), "结尾")]);
+
+        var reloaded = TimelineJson.Read(TimelineJson.Write(timeline));
+
+        var restored = Assert.Single(reloaded.Blocks);
+
+        Assert.Equal(block.Id, restored.Id);
+        Assert.Equal("副歌 \"高潮\"", restored.Name);
+        Assert.Equal(3, restored.Channel);
+        Assert.Equal(TimeSpan.FromMilliseconds(-1500), restored.Start);
+        Assert.Equal(TimeSpan.FromSeconds(2), restored.Length);
+        Assert.Equal(group, restored.LinkGroupId);
+        Assert.Equal(2, restored.Frames.Count);
+        Assert.Equal(FlashMode.Blink2Hz, restored.Frames[0].State.Mode);
+        Assert.Equal(Red, restored.Frames[0].State.Color);
+        Assert.Equal(TimeSpan.FromMilliseconds(500.5), restored.Frames[1].Offset);
+        Assert.Equal("结尾", Assert.Single(reloaded.Markers).Name);
     }
 
     [Fact]
-    public void Long_columns_stay_far_below_one_number_per_line()
+    public void The_file_is_readable()
     {
-        var json = TimelineJson.Write(CreateTimeline(2000));
+        var json = TimelineJson.Write(new Timeline(
+            [new Block(Block.NewId(), "乐鸣东方", 0, TimeSpan.Zero, TimeSpan.FromSeconds(1), [Frame()])],
+            []));
 
-        // 2000 帧 × 41 列 = 82000 个数字,一行一个就是 82000 行。
-        var lines = json.Split('\n').Length;
-
-        Assert.True(lines < 82000 / 8, $"行数 {lines} 太多了,说明数字没有按行打包。");
+        Assert.Contains("\"Blocks\": [", json);
+        Assert.Contains("乐鸣东方", json);
+        Assert.Contains("{ \"Offset\": 0, \"Mode\": 0, \"Red\": 15", json);
+        Assert.True(json.Split('\n').Length > 5, "文件应该是一行行看得懂的,不是挤成一团。");
     }
 
     [Fact]
-    public void Frame_times_survive_being_written_and_read_back()
-    {
-        // 真实数据里的毫秒是这种带小数的值,写短了帧时间就对不上。
-        var time = TimeSpan.FromMilliseconds(163.653);
-        var timeline = new Timeline([Frame.Uniform(time, new LightColor(15, 0, 0), FlashMode.Solid)], []);
-
-        var json = TimelineJson.Write(timeline);
-
-        Assert.Contains("163.653", json);
-        Assert.Equal(time, TimelineJson.Read(json).Frames[0].Time);
-    }
-
-    [Fact]
-    public void Marker_names_are_kept_readable()
-    {
-        var timeline = new Timeline(
-            [Frame.Uniform(TimeSpan.Zero, new LightColor(15, 0, 0), FlashMode.Solid)],
-            [new TimelineMarker(TimeSpan.FromMilliseconds(900), "副歌 \"高潮\"")]);
-
-        var json = TimelineJson.Write(timeline);
-
-        // 中文写成 \uXXXX 就没法直接翻文件了;引号还是要转义,不然 JSON 就坏了。
-        Assert.Contains("副歌", json);
-        Assert.Equal("副歌 \"高潮\"", TimelineJson.Read(json).Markers[0].Name);
-    }
-
-    [Fact]
-    public void An_empty_timeline_writes_empty_arrays()
+    public void An_empty_timeline_writes_empty_lists()
     {
         var json = TimelineJson.Write(Timeline.Empty);
 
-        Assert.Contains("\"Times\": []", json);
+        Assert.Contains("\"Blocks\": []", json);
         Assert.Contains("\"Markers\": []", json);
-
-        var loaded = TimelineJson.Read(json);
-
-        Assert.Empty(loaded.Frames);
-        Assert.Empty(loaded.Markers);
+        Assert.Empty(TimelineJson.Read(json).Blocks);
     }
 
-    private static Timeline CreateTimeline(int frameCount)
+    [Fact]
+    public void A_block_with_a_bad_channel_is_reported()
     {
-        var frames = new List<Frame>(frameCount);
+        var json = "{\"Version\": 1, \"Blocks\": [{\"Id\": \"x\", \"Name\": \"坏块\", \"Channel\": 99, "
+            + "\"Start\": 0, \"Length\": 1000, \"Frames\": []}], \"Markers\": []}";
 
-        for (var index = 0; index < frameCount; index++)
-        {
-            var channels = new ChannelState[Frame.ChannelCount];
-            for (var channel = 0; channel < Frame.ChannelCount; channel++)
-            {
-                channels[channel] = new ChannelState(
-                    new LightColor((byte)(index % 16), (byte)(channel % 16), 0),
-                    FlashMode.Solid);
-            }
-
-            frames.Add(new Frame(TimeSpan.FromMilliseconds(index * 180), channels));
-        }
-
-        return new Timeline(frames, []);
+        Assert.Throws<FormatException>(() => TimelineJson.Read(json));
     }
+
+    [Fact]
+    public void A_version_mismatch_is_reported()
+    {
+        var json = "{\"Version\": 99, \"Blocks\": [], \"Markers\": []}";
+
+        Assert.Throws<FormatException>(() => TimelineJson.Read(json));
+    }
+
+    [Fact]
+    public void The_old_frame_based_format_is_rejected_loudly()
+    {
+        var json = "{\"Version\": 1, \"Times\": [0], \"Channels\": [], \"Markers\": [], "
+            + "\"Frames\": [1]}";
+
+        var exception = Assert.Throws<FormatException>(() => TimelineJson.Read(json));
+
+        Assert.Contains("旧格式", exception.Message);
+    }
+
+    private static BlockFrame Frame()
+        => new(TimeSpan.Zero, new ChannelState(Red, FlashMode.Solid));
 }

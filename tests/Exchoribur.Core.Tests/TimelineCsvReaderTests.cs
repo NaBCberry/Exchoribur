@@ -3,168 +3,83 @@ using Exchoribur.Core.Storage;
 
 namespace Exchoribur.Core.Tests;
 
-public class TimelineCsvReaderTests
+/// <summary>CSV 导入:按通道切成块、只留状态变化点、整条黑的通道不生成块。</summary>
+public sealed class TimelineCsvReaderTests
 {
+    private const string Header =
+        "frame_time_ms,ch0_function,ch0_red,ch0_green,ch0_blue,"
+        + "ch1_function,ch1_red,ch1_green,ch1_blue,marker";
+
     [Fact]
-    public void Read_maps_frames_and_markers()
+    public void A_csv_becomes_one_block_per_channel_with_content()
     {
-        var timeline = Read("""
-            frame_time_ms,ch0_function,ch0_red,ch0_green,ch0_blue,marker
-            0,0,15,0,0,Start
-            500.5,2,0,15,0,
-            """);
+        var timeline = Read(
+            $"{Header}\n0,0,15,0,0,0,0,15,0,开场\n500,0,0,0,15,0,0,15,0,\n");
 
-        Assert.Equal(2, timeline.Frames.Count);
-        Assert.Equal(TimeSpan.Zero, timeline.Frames[0].Time);
-        Assert.Equal(TimeSpan.FromMilliseconds(500.5), timeline.Frames[1].Time);
+        Assert.Equal(2, timeline.Blocks.Count);
+        Assert.All(timeline.Blocks, block => Assert.Equal("测试工程", block.Name));
 
-        var first = timeline.Frames[0].Channels[0];
-        Assert.Equal(new LightColor(15, 0, 0), first.Color);
-        Assert.Equal(FlashMode.Solid, first.Mode);
-
-        var second = timeline.Frames[1].Channels[0];
-        Assert.Equal(new LightColor(0, 15, 0), second.Color);
-        Assert.Equal(FlashMode.Blink2Hz, second.Mode);
-
-        // 标记的时间就是它所在那一行的时间。
-        var marker = Assert.Single(timeline.Markers);
-        Assert.Equal("Start", marker.Name);
-        Assert.Equal(TimeSpan.Zero, marker.Time);
+        var first = timeline.BlocksOnChannel(0).Single();
+        Assert.Equal(TimeSpan.Zero, first.Start);
+        Assert.Equal(2, first.Frames.Count);
+        Assert.Equal(new LightColor(15, 0, 0), first.Frames[0].State.Color);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), first.Frames[1].Offset);
     }
 
     [Fact]
-    public void Read_uses_defaults_for_channels_without_columns()
+    public void Only_changes_become_frames()
     {
-        // 整张表只有 ch0_red 一列,其余通道列都不存在——不报错,按默认值填。
-        var timeline = Read("""
-            frame_time_ms,ch0_red
-            100,15
-            """);
+        var timeline = Read(
+            $"{Header}\n0,0,15,0,0,0,0,0,0,\n100,0,15,0,0,0,0,0,0,"
+            + "\n200,0,15,0,0,0,0,0,0,\n300,0,15,0,0,0,0,0,0,\n");
 
-        var channels = timeline.Frames[0].Channels;
-        Assert.Equal(Frame.ChannelCount, channels.Count);
-        Assert.Equal(new LightColor(15, 0, 0), channels[0].Color);
+        var block = timeline.BlocksOnChannel(0).Single();
 
-        for (var channel = 1; channel < Frame.ChannelCount; channel++)
-        {
-            Assert.Equal(new LightColor(0, 0, 0), channels[channel].Color);
-            Assert.Equal(FlashMode.Solid, channels[channel].Mode);
-        }
+        Assert.Single(block.Frames);
+        // 四行,间隔 100 毫秒:块铺到最后一帧再往后一格。
+        Assert.Equal(TimeSpan.FromMilliseconds(400), block.Length);
     }
 
     [Fact]
-    public void Read_works_without_a_marker_column()
+    public void Channels_that_stay_dark_get_no_block()
     {
-        var timeline = Read("""
-            frame_time_ms,ch0_red
-            0,1
-            """);
+        var timeline = Read($"{Header}\n0,0,15,0,0,0,0,0,0,\n500,0,0,0,15,0,0,0,0,\n");
 
-        Assert.Empty(timeline.Markers);
+        var block = Assert.Single(timeline.Blocks);
+        Assert.Equal(0, block.Channel);
     }
 
     [Fact]
-    public void Read_trims_marker_names()
+    public void Markers_are_read()
     {
-        var timeline = Read("""
-            frame_time_ms,marker
-            100,"  副歌  "
-            """);
+        var timeline = Read(
+            $"{Header}\n0,0,15,0,0,0,0,0,0,前奏\n1000,0,0,0,15,0,0,0,0,副歌\n");
 
-        Assert.Equal("副歌", Assert.Single(timeline.Markers).Name);
+        Assert.Equal(2, timeline.Markers.Count);
+        Assert.Equal("前奏", timeline.Markers[0].Name);
+        Assert.Equal(TimeSpan.FromSeconds(1), timeline.Markers[1].Time);
     }
 
     [Fact]
-    public void Read_ignores_markers_that_are_only_whitespace()
+    public void Negative_times_are_kept()
     {
-        var timeline = Read("""
-            frame_time_ms,marker
-            100,"   "
-            """);
+        var timeline = Read($"{Header}\n-2000,0,15,0,0,0,0,0,0,\n0,0,0,0,15,0,0,0,0,\n");
 
-        Assert.Empty(timeline.Markers);
+        var block = timeline.BlocksOnChannel(0).Single();
+
+        Assert.Equal(TimeSpan.FromSeconds(-2), block.Start);
+        Assert.True(timeline.Start < TimeSpan.Zero);
     }
 
     [Fact]
-    public void Read_keeps_frames_that_share_a_time()
-    {
-        // 真实文件里有同一时间的两帧,不能因此丢掉其中一帧。
-        var timeline = Read("""
-            frame_time_ms,ch0_red
-            1000,3
-            1000,9
-            """);
-
-        Assert.Equal(2, timeline.Frames.Count);
-        Assert.Equal((byte)3, timeline.Frames[0].Channels[0].Color.Red);
-        Assert.Equal((byte)9, timeline.Frames[1].Channels[0].Color.Red);
-    }
-
-    [Fact]
-    public void Read_throws_without_the_time_column()
-    {
-        Assert.Throws<FormatException>(() => Read("ch0_red,marker\n15,Start"));
-    }
-
-    [Theory]
-    [InlineData("abc")]
-    [InlineData(" ")]
-    [InlineData("NaN")]
-    [InlineData("Infinity")]
-    public void Read_reports_the_row_number_for_a_bad_time(string badTime)
-    {
-        // 第 1 行是表头,所以第二行数据对应"第 3 行"。
-        var exception = Assert.Throws<FormatException>(
-            () => Read($"frame_time_ms\n0\n{badTime}"));
-
-        Assert.Contains("第 3 行", exception.Message);
-    }
-
-    [Fact]
-    public void Read_accepts_a_negative_time_before_the_start()
-    {
-        // 真实工程在参考视频开始之前就有灯光帧,那些帧的时间是负的。
-        var timeline = Read("frame_time_ms,ch0_red\n-40600,3\n0,5\n");
-
-        Assert.Equal(2, timeline.Frames.Count);
-        Assert.Equal(TimeSpan.FromMilliseconds(-40600), timeline.Frames[0].Time);
-        Assert.Equal(TimeSpan.Zero, timeline.Frames[1].Time);
-    }
-
-    [Fact]
-    public void Read_reports_an_unknown_flash_mode()
-    {
-        // function 只有 0-3 是已知的,7 必须被拒绝而不是悄悄塞进模型。
-        var exception = Assert.Throws<FormatException>(
-            () => Read("frame_time_ms,ch0_function\n0,7"));
-
-        Assert.Contains("ch0_function", exception.Message);
-        Assert.Contains("7", exception.Message);
-    }
-
-    [Theory]
-    [InlineData("ch0_red", "16")]
-    [InlineData("ch0_green", "20")]
-    [InlineData("ch0_blue", "255")]
-    public void Read_reports_a_component_above_the_four_bit_range(string column, string value)
+    public void A_broken_number_reports_the_row()
     {
         var exception = Assert.Throws<FormatException>(
-            () => Read($"frame_time_ms,{column}\n0,{value}"));
+            () => Read($"{Header}\n0,0,abc,0,0,0,0,0,0,\n"));
 
-        Assert.Contains(column, exception.Message);
-    }
-
-    [Fact]
-    public void Read_reports_a_truncated_row()
-    {
-        // 字段数少于表头说明这一行被截断了,不能宽容处理:
-        // 否则时间读得到、颜色全变黑,灯光会莫名其妙灭掉。
-        var exception = Assert.Throws<FormatException>(
-            () => Read("frame_time_ms,marker\n0,Start\n0"));
-
-        Assert.Contains("第 3 行", exception.Message);
+        Assert.Contains("第 2 行", exception.Message);
     }
 
     private static Timeline Read(string csv)
-        => TimelineCsvReader.Read(CsvTable.Parse(csv));
+        => TimelineCsvReader.Read(CsvTable.Parse(csv), "测试工程");
 }

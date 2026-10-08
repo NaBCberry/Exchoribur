@@ -3,83 +3,124 @@ using Exchoribur.Core.Models;
 
 namespace Exchoribur.Core.Tests;
 
-/// <summary>编辑栈:应用、撤销、重做、清空,以及下标对不上时拒绝执行。</summary>
+/// <summary>块编辑命令:新建、移动、删除、批量复制,以及撤销重做的往返。</summary>
 public sealed class TimelineEditorTests
 {
+    private static readonly LightColor Red = new(15, 0, 0);
+
     [Fact]
-    public void A_color_change_can_be_undone_and_redone()
+    public void A_new_block_can_be_undone_and_redone()
     {
-        var timeline = CreateTimeline(3);
-        var editor = new TimelineEditor(timeline);
-        var brighter = new LightColor(15, 0, 0);
+        var editor = new TimelineEditor(Timeline.Empty);
+        var block = CreateBlock(channel: 0, start: TimeSpan.Zero);
 
-        editor.Apply(ColorEdit(timeline, index: 1, brighter));
+        editor.Apply(new BlockSetEdit("新建块", [], [block]));
 
-        Assert.Equal(brighter, editor.Timeline.Frames[1].Channels[0].Color);
-        Assert.True(editor.CanUndo);
-        Assert.False(editor.CanRedo);
-        Assert.Equal("设置颜色", editor.UndoName);
+        Assert.Single(editor.Timeline.Blocks);
+        Assert.Equal("新建块", editor.UndoName);
 
         editor.Undo();
 
-        Assert.Equal(PresetColor, editor.Timeline.Frames[1].Channels[0].Color);
+        Assert.Empty(editor.Timeline.Blocks);
         Assert.False(editor.CanUndo);
         Assert.True(editor.CanRedo);
-        Assert.Equal("设置颜色", editor.RedoName);
+        Assert.Equal("新建块", editor.RedoName);
 
         editor.Redo();
 
-        Assert.Equal(brighter, editor.Timeline.Frames[1].Channels[0].Color);
-        Assert.True(editor.CanUndo);
+        Assert.Single(editor.Timeline.Blocks);
     }
 
     [Fact]
-    public void Inserting_a_frame_grows_the_timeline_and_undo_takes_it_back()
+    public void Moving_a_block_only_changes_its_position()
     {
-        var timeline = CreateTimeline(3);
-        var editor = new TimelineEditor(timeline);
-        var inserted = Frame.Uniform(TimeSpan.FromMilliseconds(50), new LightColor(1, 2, 3), FlashMode.Solid);
+        var block = CreateBlock(channel: 1, start: TimeSpan.Zero);
+        var editor = new TimelineEditor(new Timeline([block], []));
 
-        editor.Apply(new SpliceFramesEdit("插入帧", 1, [], [inserted]));
+        editor.Apply(new BlockSetEdit("移动块", [block], [block.MovedTo(TimeSpan.FromSeconds(3), 5)]));
 
-        Assert.Equal(4, editor.Timeline.Frames.Count);
-        Assert.Equal(TimeSpan.FromMilliseconds(50), editor.Timeline.Frames[1].Time);
+        var current = Assert.Single(editor.Timeline.Blocks);
+        Assert.Equal(TimeSpan.FromSeconds(3), current.Start);
+        Assert.Equal(5, current.Channel);
+        Assert.Equal(block.Frames.Count, current.Frames.Count);
 
         editor.Undo();
 
-        Assert.Equal(3, editor.Timeline.Frames.Count);
-        Assert.Equal(TimeSpan.FromMilliseconds(100), editor.Timeline.Frames[1].Time);
+        var restored = Assert.Single(editor.Timeline.Blocks);
+        Assert.Equal(TimeSpan.Zero, restored.Start);
+        Assert.Equal(1, restored.Channel);
     }
 
     [Fact]
-    public void Deleting_frames_shrinks_the_timeline_and_undo_puts_them_back()
+    public void Deleting_a_block_can_be_undone()
     {
-        var timeline = CreateTimeline(4);
-        var editor = new TimelineEditor(timeline);
-        var removed = timeline.Frames.Skip(1).Take(2).ToArray();
+        var block = CreateBlock(channel: 0, start: TimeSpan.Zero);
+        var editor = new TimelineEditor(new Timeline([block], []));
 
-        editor.Apply(new SpliceFramesEdit("删除帧", 1, removed, []));
+        editor.Apply(new BlockSetEdit("删除块", [block], []));
 
-        Assert.Equal(2, editor.Timeline.Frames.Count);
-        Assert.Equal(TimeSpan.FromMilliseconds(300), editor.Timeline.Frames[1].Time);
+        Assert.Empty(editor.Timeline.Blocks);
 
         editor.Undo();
 
-        Assert.Equal(4, editor.Timeline.Frames.Count);
-        Assert.Equal(TimeSpan.FromMilliseconds(100), editor.Timeline.Frames[1].Time);
+        Assert.Single(editor.Timeline.Blocks);
+    }
+
+    [Fact]
+    public void Copying_to_the_other_channels_is_one_step()
+    {
+        var block = CreateBlock(channel: 0, start: TimeSpan.Zero);
+        var editor = new TimelineEditor(new Timeline([block], []));
+
+        var copies = new List<Block>();
+        for (var channel = 1; channel < Frame.ChannelCount; channel++)
+        {
+            copies.Add(new Block(Block.NewId(), block.Name, channel, block.Start, block.Length, block.Frames));
+        }
+
+        editor.Apply(new BlockSetEdit("复制到其他通道", [], copies));
+
+        Assert.Equal(Frame.ChannelCount, editor.Timeline.Blocks.Count);
+        Assert.Equal("复制到其他通道", editor.UndoName);
+
+        editor.Undo();
+
+        Assert.Single(editor.Timeline.Blocks);
+    }
+
+    [Fact]
+    public void Linking_and_unlinking_can_be_undone()
+    {
+        var first = CreateBlock(channel: 0, start: TimeSpan.Zero);
+        var second = CreateBlock(channel: 1, start: TimeSpan.Zero);
+        var editor = new TimelineEditor(new Timeline([first, second], []));
+        var group = Guid.NewGuid();
+
+        editor.Apply(new BlockSetEdit(
+            "链接块",
+            [first, second],
+            [first.WithLinkGroup(group), second.WithLinkGroup(group)]));
+
+        Assert.All(editor.Timeline.Blocks, block => Assert.Equal(group, block.LinkGroupId));
+
+        editor.Undo();
+
+        Assert.All(editor.Timeline.Blocks, block => Assert.Null(block.LinkGroupId));
     }
 
     [Fact]
     public void A_new_edit_throws_away_the_redo_branch()
     {
-        var timeline = CreateTimeline(2);
-        var editor = new TimelineEditor(timeline);
+        var editor = new TimelineEditor(Timeline.Empty);
 
-        editor.Apply(ColorEdit(editor.Timeline, 0, new LightColor(1, 0, 0)));
+        editor.Apply(new BlockSetEdit("新建块", [], [CreateBlock(channel: 0, start: TimeSpan.Zero)]));
         editor.Undo();
         Assert.True(editor.CanRedo);
 
-        editor.Apply(ColorEdit(editor.Timeline, 1, new LightColor(2, 0, 0)));
+        editor.Apply(new BlockSetEdit(
+            "新建块",
+            [],
+            [CreateBlock(channel: 3, start: TimeSpan.FromSeconds(5))]));
 
         Assert.False(editor.CanRedo);
         Assert.Null(editor.RedoName);
@@ -88,24 +129,27 @@ public sealed class TimelineEditorTests
     [Fact]
     public void Reset_clears_the_history()
     {
-        var editor = new TimelineEditor(CreateTimeline(2));
-        editor.Apply(ColorEdit(editor.Timeline, 0, new LightColor(1, 0, 0)));
+        var editor = new TimelineEditor(Timeline.Empty);
+        editor.Apply(new BlockSetEdit("新建块", [], [CreateBlock(channel: 0, start: TimeSpan.Zero)]));
 
-        editor.Reset(CreateTimeline(5));
+        editor.Reset(new Timeline([CreateBlock(channel: 1, start: TimeSpan.Zero)], []));
 
         Assert.False(editor.CanUndo);
         Assert.False(editor.CanRedo);
-        Assert.Equal(5, editor.Timeline.Frames.Count);
+        Assert.Single(editor.Timeline.Blocks);
     }
 
     [Fact]
     public void Only_the_newest_steps_are_kept()
     {
-        var editor = new TimelineEditor(CreateTimeline(1));
+        var editor = new TimelineEditor(Timeline.Empty);
 
         for (var step = 0; step < 60; step++)
         {
-            editor.Apply(ColorEdit(editor.Timeline, 0, new LightColor((byte)(step % 16), 0, 0)));
+            editor.Apply(new BlockSetEdit(
+                "新建块",
+                [],
+                [CreateBlock(channel: 0, start: TimeSpan.FromSeconds(step))]));
         }
 
         var undone = 0;
@@ -121,44 +165,24 @@ public sealed class TimelineEditorTests
     [Fact]
     public void An_edit_that_does_not_line_up_with_the_timeline_is_rejected()
     {
-        var editor = new TimelineEditor(CreateTimeline(2));
-        var removed = CreateTimeline(2).Frames;
+        var editor = new TimelineEditor(Timeline.Empty);
+        var stranger = CreateBlock(channel: 0, start: TimeSpan.Zero);
 
-        // 从第 1 帧起删 2 帧,但整条只有 2 帧。
-        var edit = new SpliceFramesEdit("删除帧", 1, removed, []);
-
-        Assert.Throws<InvalidOperationException>(() => editor.Apply(edit));
+        // 要替换的块根本不在时间轴里。
+        Assert.Throws<InvalidOperationException>(() => editor.Apply(
+            new BlockSetEdit("移动块", [stranger], [stranger.MovedTo(TimeSpan.FromSeconds(1), 0)])));
     }
 
     [Fact]
     public void An_empty_edit_is_not_allowed()
-        => Assert.Throws<ArgumentException>(() => new SpliceFramesEdit("空编辑", 0, [], []));
+        => Assert.Throws<ArgumentException>(() => new BlockSetEdit("空编辑", [], []));
 
-    private static readonly LightColor PresetColor = new(0, 0, 15);
-
-    /// <summary>造一条 n 帧的时间轴,每 100 毫秒一帧,颜色都是同一个预设色。</summary>
-    private static Timeline CreateTimeline(int frameCount)
-    {
-        var frames = new List<Frame>(frameCount);
-
-        for (var index = 0; index < frameCount; index++)
-        {
-            frames.Add(Frame.Uniform(
-                TimeSpan.FromMilliseconds(index * 100),
-                PresetColor,
-                FlashMode.Solid));
-        }
-
-        return new Timeline(frames, []);
-    }
-
-    /// <summary>只改第 index 帧第 0 个通道的颜色,其余原样,方便验证撤销。</summary>
-    private static SpliceFramesEdit ColorEdit(Timeline timeline, int index, LightColor color)
-    {
-        var frame = timeline.Frames[index];
-        var states = frame.Channels.ToArray();
-        states[0] = new ChannelState(color, states[0].Mode);
-
-        return new SpliceFramesEdit("设置颜色", index, [frame], [new Frame(frame.Time, states)]);
-    }
+    private static Block CreateBlock(int channel, TimeSpan start)
+        => new(
+            Block.NewId(),
+            "块",
+            channel,
+            start,
+            TimeSpan.FromSeconds(1),
+            [new BlockFrame(TimeSpan.Zero, new ChannelState(Red, FlashMode.Solid))]);
 }

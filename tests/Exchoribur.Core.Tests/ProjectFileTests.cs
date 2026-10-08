@@ -24,11 +24,16 @@ public sealed class ProjectFileTests : IDisposable
 
         var loaded = TimelineJson.Read(json);
 
-        Assert.Equal(timeline.Frames.Count, loaded.Frames.Count);
-        Assert.Equal(timeline.Frames[0].Time, loaded.Frames[0].Time);
-        Assert.Equal(500.5, loaded.Frames[1].Time.TotalMilliseconds, 6);
-        Assert.Equal(timeline.Frames[1].Channels[3].Color, loaded.Frames[1].Channels[3].Color);
-        Assert.Equal(timeline.Frames[1].Channels[3].Mode, loaded.Frames[1].Channels[3].Mode);
+        var original = Assert.Single(timeline.Blocks);
+        var restored = Assert.Single(loaded.Blocks);
+
+        Assert.Equal(original.Name, restored.Name);
+        Assert.Equal(original.Channel, restored.Channel);
+        Assert.Equal(original.Start, restored.Start);
+        Assert.Equal(original.Length, restored.Length);
+        Assert.Equal(original.Frames.Count, restored.Frames.Count);
+        Assert.Equal(original.Frames[1].Offset, restored.Frames[1].Offset);
+        Assert.Equal(original.Frames[1].State, restored.Frames[1].State);
         Assert.Equal(timeline.Markers, loaded.Markers);
     }
 
@@ -45,7 +50,7 @@ public sealed class ProjectFileTests : IDisposable
         var loaded = ProjectFile.Load(project);
 
         Assert.Equal("乐鸣东方 2026", loaded.Name);
-        Assert.Equal(2, loaded.Timeline.Frames.Count);
+        Assert.Single(loaded.Timeline.Blocks);
         Assert.False(loaded.IsModified);
 
         // 媒体被解到临时目录,内容要和原文件一致。
@@ -219,7 +224,7 @@ public sealed class ProjectFileTests : IDisposable
 
         // 时间轴照样存下来了,只是没带视频。
         var loaded = ProjectFile.Load(project);
-        Assert.Equal(2, loaded.Timeline.Frames.Count);
+        Assert.Single(loaded.Timeline.Blocks);
         Assert.Null(loaded.MediaPath);
     }
 
@@ -262,10 +267,20 @@ public sealed class ProjectFileTests : IDisposable
 
     private static Timeline CreateTimeline()
     {
-        var first = Frame.Uniform(TimeSpan.Zero, new LightColor(15, 0, 0), FlashMode.Solid);
-        var second = Frame.Uniform(TimeSpan.FromMilliseconds(500.5), new LightColor(0, 7, 15), FlashMode.Blink2Hz);
+        var block = new Block(
+            Block.NewId(),
+            "副歌",
+            3,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1),
+            [
+                new BlockFrame(TimeSpan.Zero, new ChannelState(new LightColor(15, 0, 0), FlashMode.Solid)),
+                new BlockFrame(
+                    TimeSpan.FromMilliseconds(500.5),
+                    new ChannelState(new LightColor(0, 7, 15), FlashMode.Blink2Hz)),
+            ]);
 
-        return new Timeline([first, second], [new TimelineMarker(TimeSpan.FromMilliseconds(500.5), "副歌")]);
+        return new Timeline([block], [new TimelineMarker(TimeSpan.FromMilliseconds(500.5), "副歌")]);
     }
 
     /// <summary>
