@@ -369,7 +369,9 @@
                             PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
                             SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
                             FocusTime="{Binding CurrentBlockFocus}"
-                            FocusSpacing="{Binding CurrentBlockSpacing}" />
+                            FocusSpacing="{Binding CurrentBlockSpacing}"
+                            InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
+                            InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}" />
                     </DockPanel>
                 </Border>
 

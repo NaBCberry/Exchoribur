@@ -31,6 +31,12 @@ public sealed class BlockEditorControl : Control
     private const double FrameMarkerWidth = 2;
     private const int TextCacheLimit = 256;
 
+    /// <summary>滚轮一格放大/缩小的比例。</summary>
+    private const double ZoomPerWheelStep = 1.25;
+
+    /// <summary>滚轮一格平移多少像素。</summary>
+    private const double PanPixelsPerWheelStep = 60;
+
     private static readonly IBrush Background = new SolidColorBrush(Color.Parse("#151515"));
     private static readonly IBrush RowBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
     private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
@@ -63,6 +69,9 @@ public sealed class BlockEditorControl : Control
     private bool _isScrubbing;
     private bool _isSelectingFrames;
 
+    /// <summary>当前这个块已经对过焦了没有。对完焦之后视口就交给用户自己缩放平移。</summary>
+    private bool _focusApplied;
+
     public static readonly StyledProperty<IReadOnlyList<Block>?> BlocksProperty =
         AvaloniaProperty.Register<BlockEditorControl, IReadOnlyList<Block>?>(nameof(Blocks));
 
@@ -92,6 +101,14 @@ public sealed class BlockEditorControl : Control
     /// <summary>这一帧到下一帧的间隔;取景会把它放大到占面板一半宽度。</summary>
     public static readonly StyledProperty<TimeSpan> FocusSpacingProperty =
         AvaloniaProperty.Register<BlockEditorControl, TimeSpan>(nameof(FocusSpacing));
+
+    /// <summary>反转鼠标滚轮方向,和主时间轴用同一个设置。</summary>
+    public static readonly StyledProperty<bool> InvertMouseWheelProperty =
+        AvaloniaProperty.Register<BlockEditorControl, bool>(nameof(InvertMouseWheel));
+
+    /// <summary>反转触摸板横向滑动方向。</summary>
+    public static readonly StyledProperty<bool> InvertTouchpadScrollProperty =
+        AvaloniaProperty.Register<BlockEditorControl, bool>(nameof(InvertTouchpadScroll));
 
     static BlockEditorControl()
     {
@@ -147,6 +164,18 @@ public sealed class BlockEditorControl : Control
         set => SetValue(FocusSpacingProperty, value);
     }
 
+    public bool InvertMouseWheel
+    {
+        get => GetValue(InvertMouseWheelProperty);
+        set => SetValue(InvertMouseWheelProperty, value);
+    }
+
+    public bool InvertTouchpadScroll
+    {
+        get => GetValue(InvertTouchpadScrollProperty);
+        set => SetValue(InvertTouchpadScrollProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -175,6 +204,8 @@ public sealed class BlockEditorControl : Control
         }
         else if (change.Property == FocusTimeProperty || change.Property == FocusSpacingProperty)
         {
+            // 换了一个块:重新对焦。之后视口就交给用户,缩放平移不再被冲掉。
+            _focusApplied = false;
             ApplyFocus();
             InvalidateVisual();
         }
@@ -191,6 +222,11 @@ public sealed class BlockEditorControl : Control
     /// </summary>
     private void ApplyFocus()
     {
+        if (_focusApplied)
+        {
+            return;
+        }
+
         var viewport = Viewport;
         var spacing = FocusSpacing > TimeSpan.Zero ? FocusSpacing : TimeSpan.FromSeconds(1);
 
@@ -201,6 +237,45 @@ public sealed class BlockEditorControl : Control
 
         viewport.SetContent(FocusTime - (spacing / 2), spacing * 2);
         viewport.FitAll();
+        _focusApplied = true;
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        if (Viewport is not { } viewport)
+        {
+            return;
+        }
+
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        switch (TimelineWheel.Decide(e.Delta.X, e.Delta.Y, shift))
+        {
+            case TimelineWheelAction.Pan when shift:
+                viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
+                    e.Delta.X,
+                    e.Delta.Y,
+                    InvertMouseWheel,
+                    PanPixelsPerWheelStep));
+                break;
+
+            case TimelineWheelAction.Pan:
+                viewport.PanByPixels(TimelineWheel.TouchpadPanPixels(
+                    e.Delta.X,
+                    InvertTouchpadScroll,
+                    PanPixelsPerWheelStep));
+                break;
+
+            default:
+                viewport.Zoom(
+                    TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
+                    e.GetPosition(this).X - TrackLeft);
+                break;
+        }
+
+        e.Handled = true;
     }
 
     public override void Render(DrawingContext context)

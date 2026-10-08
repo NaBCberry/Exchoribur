@@ -125,11 +125,11 @@ public partial class MainViewModel : ViewModelBase
         _ => new SolidColorBrush(Avalonia.Media.Colors.White),
     };
 
-    /// <summary>块编辑器要聚焦的时刻:播放头在块里就跟着播放头,否则用块的开头。</summary>
-    public TimeSpan CurrentBlockFocus
-        => CurrentBlock is { } block && PlayheadTime > block.Start && PlayheadTime < block.End
-            ? PlayheadTime
-            : CurrentBlock?.Start ?? TimeSpan.Zero;
+    /// <summary>
+    /// 块编辑器打开时聚焦的时刻:用块的开头。
+    /// 不跟播放头走是有意的——跟着走的话播放头一动编辑器就重新对焦,用户的缩放平移会被冲掉。
+    /// </summary>
+    public TimeSpan CurrentBlockFocus => CurrentBlock?.Start ?? TimeSpan.Zero;
 
     /// <summary>聚焦那一帧到下一帧的间隔;没有下一帧就用块剩下的长度,再不行给 1 秒。</summary>
     public TimeSpan CurrentBlockSpacing
@@ -449,10 +449,6 @@ public partial class MainViewModel : ViewModelBase
     {
         // 按块的取样规则取这一刻的灯光:落在块之间就是黑场。
         CurrentFrame = BlockSampler.Sample(Timeline, value);
-
-        // 块编辑器跟着播放头聚焦,所以它的取景基准也会变。
-        OnPropertyChanged(nameof(CurrentBlockFocus));
-        OnPropertyChanged(nameof(CurrentBlockSpacing));
 
         // 这个位置不是播放自己推出来的(用户拖动、点时间轴、跳帧),
         // 那么播放状态机和视频都要跟过来:视频永远显示播放头所在的那一帧,
