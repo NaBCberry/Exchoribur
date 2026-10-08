@@ -50,6 +50,22 @@ public sealed class TimelineCsvReaderTests
     }
 
     [Fact]
+    public void A_long_gap_at_the_end_does_not_stretch_the_timeline()
+    {
+        // 真实文件里见过最后一段 84 秒的收尾停顿:补尾巴要用"典型间隔",
+        // 拿最后那一段当一格会让时间轴凭空长出一大截。
+        var timeline = Read(
+            $"{Header}\n0,0,15,0,0,0,0,0,0,\n100,0,15,0,0,0,0,0,0,"
+            + "\n200,0,15,0,0,0,0,0,0,\n100000,0,0,0,15,0,0,0,0,\n");
+
+        var block = timeline.BlocksOnChannel(0).Single();
+
+        // 中位数间隔是 100 毫秒,所以块到 100.1 秒,而不是 200 秒。
+        Assert.Equal(TimeSpan.FromMilliseconds(100100), block.Length);
+        Assert.Equal(TimeSpan.FromMilliseconds(100100), timeline.Duration);
+    }
+
+    [Fact]
     public void Markers_are_read()
     {
         var timeline = Read(

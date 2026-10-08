@@ -74,9 +74,10 @@ public static class TimelineCsvReader
         var start = times[0];
 
         // 时间轴铺到最后一帧再往后一格:最后那一帧的状态也要有一段持续的时间,
-        // 不然它等于没有生效。多行时用最后一段间隔,只有一行时给 1 秒兜底。
-        var spacing = times.Count >= 2 ? times[^1] - times[^2] : TimeSpan.FromSeconds(1);
-        var length = times[^1] - start + (spacing > TimeSpan.Zero ? spacing : TimeSpan.FromSeconds(1));
+        // 不然它等于没有生效。
+        // 这一格取"典型间隔"(中位数),不能取最后一段:收尾的停顿可能特别长
+        // (真实文件里见过最后一段 84 秒的),拿它当一格会让时间轴凭空长出一大截。
+        var length = times[^1] - start + TypicalSpacing(times);
 
         var blocks = new List<Block>(Frame.ChannelCount);
 
@@ -149,6 +150,34 @@ public static class TimelineCsvReader
         }
 
         return channels;
+    }
+
+    /// <summary>帧间隔的中位数,用来给最后那一帧补一段"持续到这里"的时间。</summary>
+    private static TimeSpan TypicalSpacing(List<TimeSpan> times)
+    {
+        if (times.Count < 2)
+        {
+            return TimeSpan.FromSeconds(1);
+        }
+
+        var intervals = new List<TimeSpan>(times.Count - 1);
+
+        for (var index = 1; index < times.Count; index++)
+        {
+            var interval = times[index] - times[index - 1];
+            if (interval > TimeSpan.Zero)
+            {
+                intervals.Add(interval);
+            }
+        }
+
+        if (intervals.Count == 0)
+        {
+            return TimeSpan.FromSeconds(1);
+        }
+
+        intervals.Sort();
+        return intervals[intervals.Count / 2];
     }
 
     private static FlashMode ReadMode(IReadOnlyList<string> row, int column, int rowNumber, int channel)
