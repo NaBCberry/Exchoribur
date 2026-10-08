@@ -16,7 +16,7 @@ public sealed record AppSettings
     public double? DefaultBlockLengthMilliseconds { get; init; }
 
     /// <summary>没设置过(或者设置文件里没有这一项)时用的默认块长度。</summary>
-    public const double DefaultBlockLengthFallbackMilliseconds = 2000;
+    public const double DefaultBlockLengthFallbackMilliseconds = 30000;
 
     /// <summary>新建块的默认长度。值不合理时回落到内置默认值。</summary>
     public TimeSpan DefaultBlockLength =>
