@@ -797,26 +797,32 @@ public sealed class TimelineControl : Control
         }
 
         // 设置页里的两个开关。鼠标滚轮那一项同时管缩放和 Shift+平移。
-        var wheelSign = InvertMouseWheel ? -1 : 1;
-        var touchpadSign = InvertTouchpadScroll ? -1 : 1;
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        switch (TimelineWheel.Decide(e.Delta.X, e.Delta.Y, shift))
         {
-            // Shift + 滚轮:横向平移时间轴。滚轮往上 = 往时间轴前段看。
-            var step = e.Delta.Y != 0 ? e.Delta.Y : -e.Delta.X;
-            viewport.PanByPixels(wheelSign * step * PanPixelsPerWheelStep);
-        }
-        else if (e.Delta.X != 0)
-        {
-            // 触摸板的横向滑动:方向要跟手指一致。
-            viewport.PanByPixels(touchpadSign * e.Delta.X * PanPixelsPerWheelStep);
-        }
-        else
-        {
-            // 普通滚轮:以指针位置为锚点缩放。
-            viewport.Zoom(
-                Math.Pow(ZoomPerWheelStep, wheelSign * e.Delta.Y),
-                e.GetPosition(this).X - TimelineLayout.TrackLeft);
+            case TimelineWheelAction.Pan when shift:
+                viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
+                    e.Delta.X,
+                    e.Delta.Y,
+                    InvertMouseWheel,
+                    PanPixelsPerWheelStep));
+                break;
+
+            case TimelineWheelAction.Pan:
+                // 触摸板的横向滑动。
+                viewport.PanByPixels(TimelineWheel.TouchpadPanPixels(
+                    e.Delta.X,
+                    InvertTouchpadScroll,
+                    PanPixelsPerWheelStep));
+                break;
+
+            default:
+                // 普通滚轮:以指针位置为锚点缩放。
+                viewport.Zoom(
+                    TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
+                    e.GetPosition(this).X - TimelineLayout.TrackLeft);
+                break;
         }
 
         e.Handled = true;
