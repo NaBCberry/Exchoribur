@@ -87,6 +87,11 @@ public sealed class TimelineControl : Control
     private readonly Dictionary<(string Text, double Size), FormattedText> _blockTextCache = [];
     private readonly Dictionary<string, FormattedText> _markerTextCache = [];
 
+    /// <summary>标尺带上用"左右拖动"的光标提示这里能拖播放头。</summary>
+    private static readonly Cursor ScrubCursor = new(StandardCursorType.SizeWestEast);
+    private static readonly Cursor DefaultCursor = new(StandardCursorType.Hand);
+    private bool _showingScrubCursor;
+
     private FontFamily? _cachedFontFamily;
     private Typeface _uiTypeface = Typeface.Default;
     private readonly Typeface _timecodeTypeface = new(TimecodeFontFamily);
@@ -317,7 +322,13 @@ public sealed class TimelineControl : Control
 
         UpdateTypeface();
 
-        // 左侧通道名列先铺一层不透明的底:它永远是最下层。
+        // 顶部标尺带先铺一层常驻的底色:它和左边的通道名列连成一圈"工具条",
+        // 同时也保证这条带子上始终画着东西(不然它是一片透明的)。
+        context.FillRectangle(
+            GutterBackground,
+            new Rect(0, 0, width, TimelineLayout.RulerHeight));
+
+        // 左侧通道名列再铺一层不透明的底:它永远是最下层。
         context.FillRectangle(GutterBackground, new Rect(0, 0, TimelineLayout.TrackLeft, height));
         context.FillRectangle(TrackBackground, trackRect);
 
@@ -730,8 +741,12 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 顶部刻度/标记带:定位或擦洗播放头。
-        if (point.Position.Y < TimelineLayout.RulerHeight)
+        var hit = HitTestBlock(point.Position);
+        var onBody = hit is { } body && point.Position.Y > BlockTitleBottom(body);
+
+        // 顶部刻度/标记带(再往下放宽一点):定位或擦洗播放头。
+        // 点在块身上时块优先,所以先算 onBody。
+        if (!onBody && point.Position.Y < TimelineLayout.RulerHeight)
         {
             _isScrubbing = true;
             e.Pointer.Capture(this);
@@ -739,9 +754,6 @@ public sealed class TimelineControl : Control
             e.Handled = true;
             return;
         }
-
-        var hit = HitTestBlock(point.Position);
-        var onBody = hit is { } body && point.Position.Y > BlockTitleBottom(body);
 
         if (e.ClickCount == 2)
         {
@@ -801,6 +813,15 @@ public sealed class TimelineControl : Control
         base.OnPointerMoved(e);
 
         var position = e.GetPosition(this);
+
+        // 光标提示:在标尺带上换成"左右拖动",让用户知道这里能拖播放头。
+        var onRulerBand = position.Y < TimelineLayout.RulerHeight;
+
+        if (onRulerBand != _showingScrubCursor)
+        {
+            _showingScrubCursor = onRulerBand;
+            Cursor = onRulerBand ? ScrubCursor : DefaultCursor;
+        }
 
         if (_isPanning)
         {
@@ -877,6 +898,17 @@ public sealed class TimelineControl : Control
         e.Handled = true;
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+
+        if (_showingScrubCursor)
+        {
+            _showingScrubCursor = false;
+            Cursor = DefaultCursor;
+        }
+    }
+
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
@@ -891,6 +923,18 @@ public sealed class TimelineControl : Control
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var position = e.GetPosition(this);
+
+        // Ctrl + Shift + 滚轮:上下滚动轨道(和把指针放到左边 CH 列上滚等效)。
+        if (control && shift)
+        {
+            if (_vertical.ScrollBy(-e.Delta.Y * PanPixelsPerWheelStep, TrackHeight))
+            {
+                InvalidateVisual();
+            }
+
+            e.Handled = true;
+            return;
+        }
 
         // Ctrl + 滚轮:纵向缩放(一行多高),指针所在的通道尽量不动。
         if (control && !shift)
