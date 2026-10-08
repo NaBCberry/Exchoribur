@@ -45,7 +45,7 @@ public sealed class PlaybackViewModelTests : IDisposable
         Assert.False(viewModel.IsPlaying);
         Assert.True(viewModel.IsPaused);
         Assert.False(clock.IsRunning);
-        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.PlayheadTime);
+        Assert.Equal(TimeSpan.FromSeconds(3), viewModel.PlayheadTime);
     }
 
     [Fact]
@@ -79,6 +79,7 @@ public sealed class PlaybackViewModelTests : IDisposable
     {
         var (viewModel, _) = await CreateAsync();
 
+        // 帧步进走的是"状态变化点":0 → 1s → 2s → 块结束(3s)。
         viewModel.NextFrameCommand.Execute(null);
         Assert.Equal(TimeSpan.FromSeconds(1), viewModel.PlayheadTime);
 
@@ -108,7 +109,7 @@ public sealed class PlaybackViewModelTests : IDisposable
         viewModel.IsLooping = true;
         viewModel.TogglePlayCommand.Execute(null);
 
-        clock.Tick(TimeSpan.FromSeconds(2.5));
+        clock.Tick(TimeSpan.FromSeconds(3.5));
 
         Assert.True(viewModel.IsPlaying);
         Assert.Equal(TimeSpan.FromMilliseconds(500), viewModel.PlayheadTime);
@@ -132,7 +133,10 @@ public sealed class PlaybackViewModelTests : IDisposable
     private async Task<(MainViewModel ViewModel, StubPlaybackClock Clock)> CreateAsync()
     {
         var path = Path.Combine(_directory, "show.csv");
-        File.WriteAllText(path, $"{Header}\n0,0,15,0,0,\n1000,0,15,0,0,\n2000,0,15,0,0,\n");
+        // 三个不一样的状态:块里就是三个变化点,时间轴铺到 3 秒。
+        File.WriteAllText(
+            path,
+            $"{Header}\n0,0,15,0,0,\n1000,0,0,0,15,\n2000,0,15,0,0,\n");
 
         var clock = new StubPlaybackClock();
         var viewModel = new MainViewModel(new StubFilePicker(path), clock);
@@ -174,5 +178,7 @@ public sealed class PlaybackViewModelTests : IDisposable
         public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
 
         public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickTimelineSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }

@@ -14,23 +14,31 @@ public sealed class MainViewModelTests : IDisposable
     private const string Header = "frame_time_ms,ch0_function,ch0_red,ch0_green,ch0_blue,marker";
 
     private readonly string _directory =
-        Path.Combine(Path.GetTempPath(), $"lightflow-viewmodel-{Guid.NewGuid():N}");
+        Path.Combine(Path.GetTempPath(), $"exchoribur-viewmodel-{Guid.NewGuid():N}");
 
     public MainViewModelTests() => Directory.CreateDirectory(_directory);
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public async Task Open_loads_the_picked_file_into_the_timeline()
+    public async Task Open_turns_the_csv_into_blocks_on_the_timeline()
     {
-        var path = WriteFile("show.csv", $"{Header}\n0,0,15,0,0,开场\n2000,0,0,0,15,\n");
+        var path = WriteFile(
+            "show.csv",
+            $"{Header}\n0,0,15,0,0,开场\n1000,0,0,0,15,\n2000,0,15,0,0,\n");
         var viewModel = new MainViewModel(new StubFilePicker(path));
 
         await viewModel.OpenCommand.ExecuteAsync(null);
 
-        Assert.Equal(2, viewModel.Frames.Count);
+        // 只有 CH0 有内容,所以只生成了一个块,块名就是工程名。
+        var block = Assert.Single(viewModel.Blocks);
+        Assert.Equal("show", block.Name);
+        Assert.Equal(0, block.Channel);
+        Assert.Equal(3, block.Frames.Count);
+
         Assert.Equal("开场", Assert.Single(viewModel.Markers).Name);
-        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.Duration);
+        // 块铺到最后一帧再往后一格。
+        Assert.Equal(3, viewModel.Duration.TotalSeconds, 3);
         Assert.False(viewModel.HasError);
         Assert.Contains("show.csv", viewModel.StatusText);
 
@@ -54,7 +62,7 @@ public sealed class MainViewModelTests : IDisposable
 
         await viewModel.OpenCommand.ExecuteAsync(null);
 
-        Assert.Empty(viewModel.Frames);
+        Assert.Empty(viewModel.Blocks);
         Assert.Equal(statusBefore, viewModel.StatusText);
         Assert.Equal(titleBefore, viewModel.WindowTitle);
         Assert.False(viewModel.HasError);
@@ -70,7 +78,7 @@ public sealed class MainViewModelTests : IDisposable
 
         Assert.True(viewModel.HasError);
         Assert.Contains("broken.csv", viewModel.StatusText);
-        Assert.Empty(viewModel.Frames);
+        Assert.Empty(viewModel.Blocks);
     }
 
     [Fact]
@@ -82,14 +90,14 @@ public sealed class MainViewModelTests : IDisposable
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Empty(viewModel.Frames);
+        Assert.Empty(viewModel.Blocks);
     }
 
     [Fact]
     public async Task Opening_another_file_puts_the_view_back_to_fit_all()
     {
         var first = WriteFile("first.csv", $"{Header}\n0,0,15,0,0,\n60000,0,0,15,0,\n");
-        var second = WriteFile("second.csv", $"{Header}\n0,0,15,0,0,\n2000,0,15,0,0,\n");
+        var second = WriteFile("second.csv", $"{Header}\n0,0,15,0,0,\n2000,0,0,0,15,\n");
         var viewModel = new MainViewModel(new StubFilePicker(first));
 
         // 视口要有轨道宽度才能算倍率;真跑起来这一句由时间轴控件填。
@@ -101,9 +109,9 @@ public sealed class MainViewModelTests : IDisposable
 
         await viewModel.LoadAsync(second);
 
-        // 新文件的时长(2 秒)决定新的铺满倍率,缩放位置不能留着。
+        // 新文件的时长(二帧 + 一格 = 4 秒)决定新的铺满倍率,缩放位置不能留着。
         Assert.Equal(TimeSpan.Zero, viewModel.Viewport.Start);
-        Assert.Equal(300, viewModel.Viewport.Scale, 6);
+        Assert.Equal(150, viewModel.Viewport.Scale, 2);
     }
 
     [Fact]
@@ -200,7 +208,7 @@ public sealed class MainViewModelTests : IDisposable
 
         await viewModel.SaveProjectCommand.ExecuteAsync(null);
 
-        // 时间轴存下来了,但要明说视频没带上。
+        // 工程存下来了,但要明说视频没带上。
         Assert.True(File.Exists(project));
         Assert.True(viewModel.HasError);
         Assert.Contains("show.mp4", viewModel.StatusText);
@@ -226,5 +234,7 @@ public sealed class MainViewModelTests : IDisposable
         public string? ProjectSavePath { get; init; }
 
         public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult(ProjectSavePath);
+
+        public Task<string?> PickTimelineSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }

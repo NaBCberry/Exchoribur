@@ -47,6 +47,19 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
             Patterns = [$"*{ProjectFileFormat.Extension}"],
         };
 
+    public async Task<string?> PickTimelineSaveAsync(string suggestedName)
+    {
+        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出时间轴 CSV",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "csv",
+            FileTypeChoices = [new FilePickerFileType("时间轴 CSV") { Patterns = ["*.csv"] }],
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
     private async Task<string?> PickAsync(string title, IReadOnlyList<FilePickerFileType> filters)
     {
         var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

@@ -27,6 +27,7 @@ public partial class SettingsViewModel : ViewModelBase
         var settings = SettingsStore.Load(path);
         InvertMouseWheel = settings.InvertMouseWheel;
         InvertTouchpadScroll = settings.InvertTouchpadScroll;
+        DefaultBlockLengthMilliseconds = settings.DefaultBlockLength.TotalMilliseconds;
 
         _initializing = false;
     }
@@ -39,9 +40,21 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool InvertTouchpadScroll { get; set; }
 
+    /// <summary>新建编排块的默认长度(毫秒)。</summary>
+    [ObservableProperty]
+    public partial double DefaultBlockLengthMilliseconds { get; set; }
+
+    /// <summary>新建块的默认长度,给建块的地方用。</summary>
+    public TimeSpan DefaultBlockLength
+        => DefaultBlockLengthMilliseconds is > 0 && double.IsFinite(DefaultBlockLengthMilliseconds)
+            ? TimeSpan.FromMilliseconds(DefaultBlockLengthMilliseconds)
+            : TimeSpan.FromMilliseconds(AppSettings.DefaultBlockLengthFallbackMilliseconds);
+
     partial void OnInvertMouseWheelChanged(bool value) => Save();
 
     partial void OnInvertTouchpadScrollChanged(bool value) => Save();
+
+    partial void OnDefaultBlockLengthMillisecondsChanged(double value) => Save();
 
     private void Save()
     {
@@ -56,6 +69,7 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 InvertMouseWheel = InvertMouseWheel,
                 InvertTouchpadScroll = InvertTouchpadScroll,
+                DefaultBlockLengthMilliseconds = DefaultBlockLengthMilliseconds,
             });
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

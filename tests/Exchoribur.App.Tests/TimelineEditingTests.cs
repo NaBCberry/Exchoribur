@@ -5,8 +5,8 @@ using Exchoribur.Core.Models;
 namespace Exchoribur.App.Tests;
 
 /// <summary>
-/// 编辑流程:选区 → 批量改内容 → 撤销/重做,以及脏标记和撤销菜单的联动。
-/// 鼠标框选本身在控件里,这里只测经过 ViewModel 的那一半。
+/// 编排块的编辑流程:建块、选中、移动、链接、复制到其他通道,
+/// 以及块编辑器里的改色和插删帧。全部都要能撤销。
 /// </summary>
 public sealed class TimelineEditingTests : IDisposable
 {
@@ -19,184 +19,253 @@ public sealed class TimelineEditingTests : IDisposable
     private static readonly LightColor Green = new(0, 15, 0);
 
     private readonly string _directory =
-        Path.Combine(Path.GetTempPath(), $"exchoribur-editing-{Guid.NewGuid():N}");
+        Path.Combine(Path.GetTempPath(), $"exchoribur-blocks-{Guid.NewGuid():N}");
 
     public TimelineEditingTests() => Directory.CreateDirectory(_directory);
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public async Task Selecting_everything_and_setting_the_playhead_color_can_be_undone()
+    public async Task Opening_a_csv_gives_one_block_per_channel_with_content()
     {
-        var viewModel = await OpenThreeFramesAsync();
+        var viewModel = await OpenAsync();
 
-        Assert.False(viewModel.CanUndo);
-        Assert.False(viewModel.UndoEditsCommand.CanExecute(null));
+        var block = Assert.Single(viewModel.Blocks);
+        Assert.Equal(0, block.Channel);
+        Assert.Equal("show", block.Name);
+        Assert.Equal(2, block.Frames.Count);
+    }
 
-        viewModel.SelectAllCommand.Execute(null);
+    [Fact]
+    public async Task Creating_a_block_inherits_the_state_of_that_channel()
+    {
+        var viewModel = await OpenAsync();
 
-        Assert.Equal(3, viewModel.SelectedFrameCount);
+        viewModel.CreateBlockAt(channel: 3, time: TimeSpan.Zero);
 
-        // 播放头在第一帧(红),把整条都刷成它的颜色。
-        viewModel.SetSelectionColorCommand.Execute(null);
+        Assert.Equal(2, viewModel.Blocks.Count);
 
-        Assert.True(viewModel.IsModified);
+        var created = viewModel.Blocks.Single(block => block.Channel == 3);
+        Assert.Equal("show", created.Name);
+        Assert.Equal(TimeSpan.Zero, created.Start);
+        Assert.Equal(TimeSpan.FromSeconds(2), created.Length);
+
+        // CH3 本来什么都没有,所以新块里的第一帧就是黑场。
+        Assert.Equal(BlockSampler.Dark, Assert.Single(created.Frames).State);
+
+        Assert.Contains("建了一个块", viewModel.StatusText);
         Assert.True(viewModel.CanUndo);
-        Assert.Equal("撤销 设置颜色", viewModel.UndoLabel);
-        Assert.All(viewModel.Frames, frame => Assert.Equal(Red, frame.Channels[0].Color));
+        Assert.Equal(created, viewModel.CurrentBlock);
+    }
+
+    [Fact]
+    public async Task Moving_a_block_changes_time_and_channel_and_can_be_undone()
+    {
+        var viewModel = await OpenAsync();
+        var block = Assert.Single(viewModel.Blocks);
+
+        viewModel.SelectedBlocks = [block];
+        viewModel.MoveSelectedBlocks(TimeSpan.FromSeconds(1), 2);
+
+        var moved = Assert.Single(viewModel.Blocks);
+        Assert.Equal(TimeSpan.FromSeconds(1), moved.Start);
+        Assert.Equal(2, moved.Channel);
 
         viewModel.UndoEditsCommand.Execute(null);
 
-        Assert.Equal(Blue, viewModel.Frames[2].Channels[0].Color);
-        Assert.False(viewModel.CanUndo);
-        Assert.Equal("重做 设置颜色", viewModel.RedoLabel);
-
-        viewModel.RedoEditsCommand.Execute(null);
-
-        Assert.Equal(Red, viewModel.Frames[2].Channels[0].Color);
+        var restored = Assert.Single(viewModel.Blocks);
+        Assert.Equal(TimeSpan.Zero, restored.Start);
+        Assert.Equal(0, restored.Channel);
     }
 
     [Fact]
-    public async Task Only_the_selected_channels_are_touched()
+    public async Task Deleting_a_block_removes_it_and_undo_brings_it_back()
     {
-        var viewModel = await OpenThreeFramesAsync();
+        var viewModel = await OpenAsync();
 
-        // 只选 CH1:CH0 的颜色应该一点不动,而 CH1 全被刷成播放头那一帧的 CH1 颜色(绿)。
-        viewModel.Selection = FrameSelection.Between(
-            TimeSpan.Zero,
-            TimeSpan.FromMilliseconds(400),
-            ChannelMasks.Single(1));
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.DeleteSelectedBlocksCommand.Execute(null);
 
-        viewModel.SetSelectionColorCommand.Execute(null);
-
-        Assert.Equal(Red, viewModel.Frames[0].Channels[0].Color);
-        Assert.Equal(Blue, viewModel.Frames[1].Channels[0].Color);
-        Assert.Equal(Blue, viewModel.Frames[2].Channels[0].Color);
-        Assert.All(viewModel.Frames, frame => Assert.Equal(Green, frame.Channels[1].Color));
-    }
-
-    [Fact]
-    public async Task Deleting_the_selection_removes_those_frames()
-    {
-        var viewModel = await OpenThreeFramesAsync();
-
-        viewModel.Selection = FrameSelection.Between(
-            TimeSpan.FromMilliseconds(150),
-            TimeSpan.FromMilliseconds(250),
-            ChannelMask.All);
-        Assert.Equal(1, viewModel.SelectedFrameCount);
-
-        viewModel.DeleteSelectedFramesCommand.Execute(null);
-
-        Assert.Equal(2, viewModel.Frames.Count);
-        Assert.True(viewModel.Selection.IsEmpty);
-        Assert.Contains("已删除 1 帧", viewModel.StatusText);
-        Assert.True(viewModel.IsModified);
+        Assert.Empty(viewModel.Blocks);
+        Assert.Contains("已删除", viewModel.StatusText);
 
         viewModel.UndoEditsCommand.Execute(null);
 
-        Assert.Equal(3, viewModel.Frames.Count);
+        Assert.Single(viewModel.Blocks);
     }
 
     [Fact]
-    public async Task Inserting_a_frame_copies_the_state_of_the_previous_one()
+    public async Task Copying_to_the_other_channels_adds_one_block_per_channel()
     {
-        var viewModel = await OpenThreeFramesAsync();
-        viewModel.PlayheadTime = TimeSpan.FromMilliseconds(150);
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.CopyBlockToOtherChannelsCommand.Execute(null);
+
+        Assert.Equal(Frame.ChannelCount, viewModel.Blocks.Count);
+        Assert.Contains("无法播放", viewModel.StatusText);
+
+        viewModel.UndoEditsCommand.Execute(null);
+
+        Assert.Single(viewModel.Blocks);
+    }
+
+    [Fact]
+    public async Task Linked_blocks_are_selected_together_and_move_together()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.CreateBlockAt(channel: 3, time: TimeSpan.Zero);
+        viewModel.CreateBlockAt(channel: 5, time: TimeSpan.Zero);
+
+        var third = viewModel.Blocks.Single(block => block.Channel == 3);
+        var fifth = viewModel.Blocks.Single(block => block.Channel == 5);
+
+        viewModel.SelectedBlocks = [third, fifth];
+        viewModel.ToggleLinkCommand.Execute(null);
+
+        Assert.Equal(LinkIndicator.Linked, viewModel.LinkState);
+        var group = viewModel.Blocks.Single(block => block.Channel == 3).LinkGroupId;
+        Assert.NotNull(group);
+        Assert.Equal(group, viewModel.Blocks.Single(block => block.Channel == 5).LinkGroupId);
+
+        // 只选其中一个,同组的另一个会被自动带上(链接之后块是新对象,得重新取)。
+        viewModel.SelectedBlocks = [viewModel.Blocks.Single(block => block.Channel == 3)];
+        Assert.Equal(2, viewModel.SelectedBlocks.Count);
+        Assert.Equal(LinkIndicator.Linked, viewModel.LinkState);
+
+        // 拖动整组:一起走。
+        viewModel.MoveSelectedBlocks(TimeSpan.FromSeconds(2), 0);
+
+        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.Blocks.Single(block => block.Channel == 3).Start);
+        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.Blocks.Single(block => block.Channel == 5).Start);
+
+        // 再点一次解除链接。
+        viewModel.ToggleLinkCommand.Execute(null);
+
+        Assert.All(viewModel.Blocks, block => Assert.Null(block.LinkGroupId));
+    }
+
+    [Fact]
+    public async Task A_mixed_selection_shows_the_purple_state()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.CreateBlockAt(channel: 3, time: TimeSpan.Zero);
+        viewModel.CreateBlockAt(channel: 5, time: TimeSpan.Zero);
+        viewModel.CreateBlockAt(channel: 7, time: TimeSpan.Zero);
+
+        var third = viewModel.Blocks.Single(block => block.Channel == 3);
+        var fifth = viewModel.Blocks.Single(block => block.Channel == 5);
+        var seventh = viewModel.Blocks.Single(block => block.Channel == 7);
+
+        viewModel.SelectedBlocks = [third, fifth];
+        viewModel.ToggleLinkCommand.Execute(null);
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+
+        Assert.Equal(LinkIndicator.Mixed, viewModel.LinkState);
+
+        // 紫色状态点一下:把当前选中的块重新链成一伙。
+        viewModel.ToggleLinkCommand.Execute(null);
+
+        Assert.Equal(LinkIndicator.Linked, viewModel.LinkState);
+        Assert.Single(viewModel.Blocks.Select(block => block.LinkGroupId).Distinct());
+        Assert.NotNull(viewModel.Blocks.Single(block => block.Channel == 7).LinkGroupId);
+    }
+
+    [Fact]
+    public async Task The_color_panel_paints_the_frames_of_the_open_block()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        Assert.True(viewModel.HasCurrentBlock);
+
+        viewModel.Color.HexText = "#00FF00";
+        viewModel.ApplyEditorColorCommand.Execute(null);
+
+        Assert.All(viewModel.Blocks[0].Frames, frame => Assert.Equal(Green, frame.State.Color));
+        Assert.Equal(Green, BlockSampler.SampleChannels(viewModel.Timeline, TimeSpan.Zero)[0].Color);
+        Assert.Contains("R0 G15 B0", viewModel.StatusText);
+
+        viewModel.UndoEditsCommand.Execute(null);
+
+        Assert.Equal(Red, viewModel.Blocks[0].Frames[0].State.Color);
+        Assert.Equal(Blue, viewModel.Blocks[0].Frames[1].State.Color);
+    }
+
+    [Fact]
+    public async Task Only_the_selected_frames_get_painted()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.SelectedFrames = BlockFrameRange.Single(1);
+
+        viewModel.Color.HexText = "#00FF00";
+        viewModel.ApplyEditorColorCommand.Execute(null);
+
+        Assert.Equal(Red, viewModel.Blocks[0].Frames[0].State.Color);
+        Assert.Equal(Green, viewModel.Blocks[0].Frames[1].State.Color);
+    }
+
+    [Fact]
+    public async Task Frames_can_be_inserted_and_deleted_inside_a_block()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.PlayheadTime = TimeSpan.FromMilliseconds(1000);
 
         viewModel.InsertFrameAtPlayheadCommand.Execute(null);
 
-        Assert.Equal(4, viewModel.Frames.Count);
+        Assert.Equal(3, viewModel.Blocks[0].Frames.Count);
+        Assert.Contains("插入 1 帧", viewModel.StatusText);
 
-        // 插在 100 毫秒和 200 毫秒之间,状态沿用前一帧(蓝)。
-        var inserted = viewModel.Frames[2];
-        Assert.Equal(TimeSpan.FromMilliseconds(150), inserted.Time);
+        // 删掉刚才插进去的那一帧。
+        viewModel.SelectedFrames = BlockFrameRange.Single(1);
+        viewModel.DeleteSelectedFramesCommand.Execute(null);
 
-        var previous = viewModel.Frames[1];
-        Assert.Equal(TimeSpan.FromMilliseconds(100), previous.Time);
-
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
-        {
-            Assert.Equal(previous.Channels[channel], inserted.Channels[channel]);
-        }
+        Assert.Equal(2, viewModel.Blocks[0].Frames.Count);
+        Assert.Contains("删掉 1 帧", viewModel.StatusText);
     }
 
     [Fact]
-    public async Task Editing_without_a_selection_says_so_instead_of_doing_nothing_silently()
+    public async Task Opening_another_timeline_clears_the_editor_and_the_history()
     {
-        var viewModel = await OpenThreeFramesAsync();
+        var viewModel = await OpenAsync();
 
-        viewModel.SetSelectionColorCommand.Execute(null);
-
-        Assert.True(viewModel.HasError);
-        Assert.Contains("先", viewModel.StatusText);
-        Assert.False(viewModel.CanUndo);
-    }
-
-    [Fact]
-    public async Task The_panel_color_is_applied_to_the_selection()
-    {
-        var viewModel = await OpenThreeFramesAsync();
-
-        viewModel.Selection = FrameSelection.Between(
-            TimeSpan.Zero,
-            TimeSpan.FromMilliseconds(100),
-            ChannelMask.All);
-        viewModel.Color.HexText = "#00FF00";
-
-        viewModel.ApplyEditorColorCommand.Execute(null);
-
-        // 选中的帧按四位值改色(绿 = 0/15/0),选区外的帧一点不动。
-        Assert.Equal(Green, viewModel.Frames[0].Channels[0].Color);
-        Assert.Equal(Green, viewModel.Frames[1].Channels[0].Color);
-        Assert.Equal(Blue, viewModel.Frames[2].Channels[0].Color);
-        Assert.Contains("R0 G15 B0", viewModel.StatusText);
+        viewModel.CreateBlockAt(channel: 3, time: TimeSpan.Zero);
         Assert.True(viewModel.CanUndo);
+        Assert.True(viewModel.HasCurrentBlock);
 
-        viewModel.UndoEditsCommand.Execute(null);
-
-        Assert.Equal(Red, viewModel.Frames[0].Channels[0].Color);
-        Assert.Equal(Blue, viewModel.Frames[1].Channels[0].Color);
-    }
-
-    [Fact]
-    public async Task Opening_another_timeline_clears_the_undo_history()
-    {
-        var viewModel = await OpenThreeFramesAsync();
-        viewModel.SelectAllCommand.Execute(null);
-        viewModel.SetSelectionColorCommand.Execute(null);
-        Assert.True(viewModel.CanUndo);
-
-        await viewModel.LoadAsync(WriteTimeline("另一条.csv", 2));
+        await viewModel.LoadAsync(WriteCsv("另一条.csv", rows: 1));
 
         Assert.False(viewModel.CanUndo);
-        Assert.False(viewModel.CanRedo);
-        Assert.True(viewModel.Selection.IsEmpty);
-        Assert.Equal(0, viewModel.SelectedFrameCount);
+        Assert.False(viewModel.HasCurrentBlock);
+        Assert.Empty(viewModel.SelectedBlocks);
+        Assert.Single(viewModel.Blocks);
     }
 
-    /// <summary>打开一条三帧的时间轴:第一帧红色,后两帧蓝色,每 100 毫秒一帧。</summary>
-    private async Task<MainViewModel> OpenThreeFramesAsync()
+    private async Task<MainViewModel> OpenAsync()
     {
-        var viewModel = new MainViewModel(new StubFilePicker(WriteTimeline("show.csv", 3)));
+        var viewModel = new MainViewModel(new StubFilePicker(WriteCsv("show.csv", rows: 2)));
         await viewModel.OpenCommand.ExecuteAsync(null);
 
-        Assert.Equal(3, viewModel.Frames.Count);
+        Assert.False(viewModel.HasError, viewModel.StatusText);
         return viewModel;
     }
 
-    private string WriteTimeline(string name, int frameCount)
+    /// <summary>写一个只有 CH0 有内容的 CSV:第一帧红,后面几帧蓝。</summary>
+    private string WriteCsv(string name, int rows)
     {
         var lines = new List<string> { Header };
 
-        for (var index = 0; index < frameCount; index++)
+        for (var index = 0; index < rows; index++)
         {
             var color = index == 0 ? Red : Blue;
-            var second = index == 0 ? Green : default;
-
-            lines.Add(
-                $"{index * 100},0,{color.Red},{color.Green},{color.Blue},"
-                + $"0,{second.Red},{second.Green},{second.Blue},");
+            lines.Add($"{index * 2000},0,{color.Red},{color.Green},{color.Blue},0,0,0,0,");
         }
 
         var path = Path.Combine(_directory, name);
@@ -213,5 +282,7 @@ public sealed class TimelineEditingTests : IDisposable
         public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
 
         public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickTimelineSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }

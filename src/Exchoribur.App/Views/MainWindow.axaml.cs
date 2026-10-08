@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Exchoribur.App.Controls;
 using Exchoribur.App.ViewModels;
 
 namespace Exchoribur.App.Views;
@@ -47,6 +48,24 @@ public partial class MainWindow : Window
         };
 
         _settingsWindow.Show(this);
+    }
+
+    /// <summary>双击轨道空白处:在鼠标那个位置建一个新块。</summary>
+    private void OnBlockCreateRequested(object? sender, BlockCreateRequest request)
+    {
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.CreateBlockAt(request.Channel, request.Time);
+        }
+    }
+
+    /// <summary>拖完块:把整组按拖动的偏移搬过去(一步撤销)。</summary>
+    private void OnBlockMoveRequested(object? sender, BlockMoveRequest request)
+    {
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.MoveSelectedBlocks(request.TimeDelta, request.ChannelDelta);
+        }
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)

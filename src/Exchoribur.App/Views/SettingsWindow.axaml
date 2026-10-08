@@ -3,11 +3,11 @@
         xmlns:vm="using:Exchoribur.App.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="300"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="360"
         x:Class="Exchoribur.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="设置"
-        Width="460" Height="300"
+        Width="460" Height="360"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}">
@@ -36,6 +36,19 @@
             <TextBlock Classes="note"
                        Margin="26,0,0,0"
                        Text="触摸板的竖向滑动和鼠标滚轮走同一条缩放路径,竖向方向由上面那一项控制。" />
+
+            <TextBlock Classes="panelTitle" Text="编排块" Margin="0,10,0,0" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="新建块默认长度(毫秒)" VerticalAlignment="Center" />
+                <TextBox Width="90"
+                         Padding="6,2"
+                         FontSize="12"
+                         Text="{Binding DefaultBlockLengthMilliseconds}" />
+            </StackPanel>
+            <TextBlock Classes="note"
+                       Margin="0,0,0,0"
+                       Text="双击轨道空白处新建块时用它;填得不合适会回到 2000 毫秒。" />
         </StackPanel>
     </DockPanel>
 

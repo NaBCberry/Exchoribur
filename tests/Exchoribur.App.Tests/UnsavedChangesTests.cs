@@ -29,7 +29,7 @@ public sealed class UnsavedChangesTests : IDisposable
         Assert.Equal("巡演工程", prompt.ProjectName);
 
         // 停在原地:还是第二版的数据,改动也还在。
-        Assert.Equal(2, viewModel.Frames.Count);
+        Assert.Equal(2, Assert.Single(viewModel.Blocks).Frames.Count);
         Assert.True(viewModel.IsModified);
     }
 
@@ -41,7 +41,7 @@ public sealed class UnsavedChangesTests : IDisposable
         picker.Path = WriteTimeline("第三版.csv", 3);
         await viewModel.OpenCommand.ExecuteAsync(null);
 
-        Assert.Equal(3, viewModel.Frames.Count);
+        Assert.Equal(3, Assert.Single(viewModel.Blocks).Frames.Count);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class UnsavedChangesTests : IDisposable
 
         // 先把旧工程存下来了,再换成新文件。
         Assert.True(File.Exists(project));
-        Assert.Equal(3, viewModel.Frames.Count);
+        Assert.Equal(3, Assert.Single(viewModel.Blocks).Frames.Count);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public sealed class UnsavedChangesTests : IDisposable
 
         // 没存成就不许往下走,否则改动就白丢了。
         Assert.True(viewModel.HasError);
-        Assert.Equal(2, viewModel.Frames.Count);
+        Assert.Equal(2, Assert.Single(viewModel.Blocks).Frames.Count);
         Assert.True(viewModel.IsModified);
     }
 
@@ -91,7 +91,7 @@ public sealed class UnsavedChangesTests : IDisposable
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         Assert.False(prompt.Asked);
-        Assert.Equal(2, viewModel.Frames.Count);
+        Assert.Equal(2, Assert.Single(viewModel.Blocks).Frames.Count);
     }
 
     [Fact]
@@ -175,5 +175,7 @@ public sealed class UnsavedChangesTests : IDisposable
         public Task<string?> PickProjectAsync() => Task.FromResult<string?>(null);
 
         public Task<string?> PickProjectSaveAsync(string suggestedName) => Task.FromResult(ProjectSavePath);
+
+        public Task<string?> PickTimelineSaveAsync(string suggestedName) => Task.FromResult<string?>(null);
     }
 }

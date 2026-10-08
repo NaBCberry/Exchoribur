@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -32,6 +33,9 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>当前工程的编辑栈(撤销、重做)。没有时间轴时是 null。</summary>
     private TimelineEditor? _editor;
 
+    /// <summary>选中集合在"补全链接组"时会回写自己,用这个标记挡住递归。</summary>
+    private bool _syncingSelection;
+
     /// <summary>给 XAML 设计器用的构造函数:预览器里没有窗口,也就没有文件对话框。</summary>
     public MainViewModel()
         : this(filePicker: null)
@@ -48,6 +52,9 @@ public partial class MainViewModel : ViewModelBase
         _clock = clock;
         _namePrompt = namePrompt;
         _unsavedPrompt = unsavedPrompt;
+
+        SelectedBlocks = [];
+        SelectedFrames = BlockFrameRange.Empty;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
         Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
@@ -76,13 +83,79 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsModified { get; set; }
 
-    /// <summary>时间轴上的选区:选中了哪一段时间、哪几个通道。</summary>
+    /// <summary>主时间轴上选中的块。</summary>
     [ObservableProperty]
-    public partial FrameSelection Selection { get; set; }
+    public partial IReadOnlyList<Block> SelectedBlocks { get; set; }
 
-    /// <summary>选区里有多少帧,给编辑面板和状态栏显示。</summary>
+    /// <summary>块编辑器正在编辑的块;没打开编辑器时是 null。</summary>
     [ObservableProperty]
-    public partial int SelectedFrameCount { get; set; }
+    public partial Block? CurrentBlock { get; set; }
+
+    /// <summary>块编辑器里选中的帧范围,按块内容里的下标算。</summary>
+    [ObservableProperty]
+    public partial BlockFrameRange SelectedFrames { get; set; }
+
+    /// <summary>链接图标该显示成什么样子。</summary>
+    [ObservableProperty]
+    public partial LinkIndicator LinkState { get; set; }
+
+    /// <summary>有没有选中的块,界面用它决定按钮能不能点。</summary>
+    public bool HasSelectedBlocks => SelectedBlocks.Count > 0;
+
+    /// <summary>块编辑器正在编辑的块 id,主时间轴用它画强调色边框。</summary>
+    public Guid? CurrentBlockId => CurrentBlock?.Id;
+
+    /// <summary>有没有正在编辑的块,块编辑器面板据此显示或收起。</summary>
+    public bool HasCurrentBlock => CurrentBlock is not null;
+
+    /// <summary>块编辑器标题栏上那行字。</summary>
+    public string CurrentBlockTitle => CurrentBlock is { } block
+        ? $"{block.Name} · CH{block.Channel} · 选中 {SelectedFrames.Count} 帧"
+        : string.Empty;
+
+    /// <summary>块编辑器自己的取景框,和主时间轴互不影响。</summary>
+    public TimelineViewport BlockEditorViewport { get; } = new();
+
+    /// <summary>链接图标的颜色:白(常态)、亮黄(选中的块都已链接)、紫(既有已链接也有没链接的)。</summary>
+    public IBrush LinkIconBrush => LinkState switch
+    {
+        // 这里的 Color 是颜色面板那个属性,类型要写全名才不打架。
+        LinkIndicator.Linked => new SolidColorBrush(Avalonia.Media.Color.Parse("#FFD400")),
+        LinkIndicator.Mixed => new SolidColorBrush(Avalonia.Media.Color.Parse("#B45CFF")),
+        _ => new SolidColorBrush(Avalonia.Media.Colors.White),
+    };
+
+    /// <summary>块编辑器要聚焦的时刻:播放头在块里就跟着播放头,否则用块的开头。</summary>
+    public TimeSpan CurrentBlockFocus
+        => CurrentBlock is { } block && PlayheadTime > block.Start && PlayheadTime < block.End
+            ? PlayheadTime
+            : CurrentBlock?.Start ?? TimeSpan.Zero;
+
+    /// <summary>聚焦那一帧到下一帧的间隔;没有下一帧就用块剩下的长度,再不行给 1 秒。</summary>
+    public TimeSpan CurrentBlockSpacing
+    {
+        get
+        {
+            if (CurrentBlock is not { } block)
+            {
+                return TimeSpan.FromSeconds(1);
+            }
+
+            var focus = CurrentBlockFocus;
+
+            foreach (var frame in block.Frames)
+            {
+                var time = block.Start + frame.Offset;
+                if (time > focus)
+                {
+                    return time - focus;
+                }
+            }
+
+            var rest = block.End - focus;
+            return rest > TimeSpan.Zero ? rest : TimeSpan.FromSeconds(1);
+        }
+    }
 
     /// <summary>能不能撤销/重做,决定菜单项是灰的还是可点的。</summary>
     [ObservableProperty]
@@ -98,8 +171,52 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string RedoLabel { get; set; }
 
-    partial void OnSelectionChanged(FrameSelection value)
-        => SelectedFrameCount = SelectionResolver.CountFrames(Timeline, value);
+    partial void OnSelectedBlocksChanged(IReadOnlyList<Block> value)
+    {
+        if (_syncingSelection)
+        {
+            return;
+        }
+
+        _syncingSelection = true;
+
+        try
+        {
+            // 有链接的块要把同组的一起带上,带上之后再写回属性,界面也一起亮。
+            var expanded = ExpandLinked(value);
+
+            if (!expanded.SequenceEqual(value))
+            {
+                SelectedBlocks = expanded;
+            }
+
+            // 只选了一个块就打开块编辑器;多选时若当前块还在选中里就留着。
+            CurrentBlock = expanded.Count == 1
+                ? expanded[0]
+                : expanded.Contains(CurrentBlock) ? CurrentBlock : null;
+
+            OnPropertyChanged(nameof(HasSelectedBlocks));
+            SyncLinkState();
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    partial void OnCurrentBlockChanged(Block? value)
+    {
+        OnPropertyChanged(nameof(CurrentBlockId));
+        OnPropertyChanged(nameof(CurrentBlockFocus));
+        OnPropertyChanged(nameof(CurrentBlockSpacing));
+        OnPropertyChanged(nameof(HasCurrentBlock));
+        OnPropertyChanged(nameof(CurrentBlockTitle));
+    }
+
+    partial void OnSelectedFramesChanged(BlockFrameRange value)
+        => OnPropertyChanged(nameof(CurrentBlockTitle));
+
+    partial void OnLinkStateChanged(LinkIndicator value) => OnPropertyChanged(nameof(LinkIconBrush));
 
     partial void OnCanUndoChanged(bool value) => UndoEditsCommand.NotifyCanExecuteChanged();
 
@@ -159,20 +276,18 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string WindowTitle { get; set; }
 
-    public IReadOnlyList<Frame> Frames => Timeline.Frames;
+    public IReadOnlyList<Block> Blocks => Timeline.Blocks;
 
     public IReadOnlyList<TimelineMarker> Markers => Timeline.Markers;
 
-    /// <summary>时间轴总长:最后一帧的时间。没有数据时是 0。</summary>
-    public TimeSpan Duration
-        => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[^1].Time;
+    /// <summary>时间轴总长:最晚的块结束时间。没有块时是 0。</summary>
+    public TimeSpan Duration => Timeline.Duration;
 
     /// <summary>
-    /// 时间轴第一个帧的时间。工程里可能有 0 之前的预备片段,所以可能是负数。
-    /// 这些帧显示得出来但播不了(见 TimelineControl 里的灰色蒙版)。
+    /// 最早的块起点。工程里可能有 0 之前的预备片段,所以可能是负数;
+    /// 那一段显示得出来但播不了(见 TimelineControl 里的灰色蒙版)。
     /// </summary>
-    public TimeSpan TimelineStart
-        => Timeline.Frames.Count == 0 ? TimeSpan.Zero : Timeline.Frames[0].Time;
+    public TimeSpan TimelineStart => Timeline.Start;
 
     /// <summary>
     /// 能播多长:有时间轴按时间轴算,只有视频就按视频算,两边都有时取长的那个。
@@ -279,16 +394,16 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnTimelineChanged(Timeline value)
     {
-        // Frames / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。
-        OnPropertyChanged(nameof(Frames));
+        // Blocks / Markers / Duration 都是从 Timeline 算出来的,得顺手通知界面刷新。
+        OnPropertyChanged(nameof(Blocks));
         OnPropertyChanged(nameof(Markers));
         OnPropertyChanged(nameof(Duration));
         OnPropertyChanged(nameof(TimelineStart));
 
-        // 播放头位置没变,但脚下的帧可能换了,得重算一次。
-        CurrentFrame = value.GetFrameAt(PlayheadTime);
+        // 播放头位置没变,但那一刻的灯光可能换了,得重算一次。
+        CurrentFrame = BlockSampler.Sample(value, PlayheadTime);
 
-        // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、选区、撤销历史
+        // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、块选中、撤销历史
         // 都该留在原地;只有换成另一条时间轴(打开、导入、新建)才从头开始。
         if (!ReferenceEquals(_editor?.Timeline, value))
         {
@@ -302,12 +417,14 @@ public partial class MainViewModel : ViewModelBase
     private void StartEditing(Timeline timeline)
     {
         _editor = new TimelineEditor(timeline);
-        Selection = FrameSelection.Empty;
+        SetBlockSelection([]);
+        CurrentBlock = null;
+        SelectedFrames = BlockFrameRange.Empty;
         SyncEditorState();
 
-        // 这里必须显式重算一次当前帧,因为播放头本来就是 0 的时候 setter 不会触发变更回调。
+        // 这里必须显式重算一次,因为播放头本来就是 0 的时候 setter 不会触发变更回调。
         PlayheadTime = TimeSpan.Zero;
-        CurrentFrame = timeline.GetFrameAt(PlayheadTime);
+        CurrentFrame = BlockSampler.Sample(timeline, PlayheadTime);
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
         _playback.Stop();
@@ -330,8 +447,12 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
     {
-        // 用领域里的阶跃语义取帧:播放头落在两帧之间时,沿用前一帧的状态。
-        CurrentFrame = Timeline.GetFrameAt(value);
+        // 按块的取样规则取这一刻的灯光:落在块之间就是黑场。
+        CurrentFrame = BlockSampler.Sample(Timeline, value);
+
+        // 块编辑器跟着播放头聚焦,所以它的取景基准也会变。
+        OnPropertyChanged(nameof(CurrentBlockFocus));
+        OnPropertyChanged(nameof(CurrentBlockSpacing));
 
         // 这个位置不是播放自己推出来的(用户拖动、点时间轴、跳帧),
         // 那么播放状态机和视频都要跟过来:视频永远显示播放头所在的那一帧,
@@ -500,7 +621,7 @@ public partial class MainViewModel : ViewModelBase
             HasError = false;
             HasVideo = document.MediaPath is { } media && OpenVideo(media);
 
-            StatusText = $"已打开工程 {fileName}:{document.Timeline.Frames.Count:N0} 帧,"
+            StatusText = $"已打开工程 {fileName}:{document.Timeline.Blocks.Count:N0} 个块,"
                 + $"{document.Timeline.Markers.Count:N0} 个标记。";
             return true;
         }
@@ -605,6 +726,43 @@ public partial class MainViewModel : ViewModelBase
         return reason is null
             ? $"保存工程 {fileName} 失败:{exception.Message}"
             : $"保存工程 {fileName} 失败:{reason}。";
+    }
+
+    /// <summary>菜单「文件 → 导出时间轴 CSV」:按取样规则展开成扁平 CSV 写出去。</summary>
+    [RelayCommand]
+    private async Task ExportTimelineAsync()
+    {
+        if (Document is null)
+        {
+            Report("还没有工程,没什么可导出的。", error: true);
+            return;
+        }
+
+        if (_filePicker is null)
+        {
+            return;
+        }
+
+        var path = await _filePicker.PickTimelineSaveAsync($"{TimelineName}.csv");
+        if (path is null)
+        {
+            return;
+        }
+
+        var fileName = Path.GetFileName(path);
+
+        try
+        {
+            TimelineCsvFile.Save(path, Timeline);
+
+            HasError = false;
+            StatusText = $"已导出 {fileName}:{Blocks.Count:N0} 个块,"
+                + $"{Markers.Count:N0} 个标记。";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Report($"导出 {fileName} 失败:{exception.Message}", error: true);
+        }
     }
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
@@ -830,142 +988,394 @@ public partial class MainViewModel : ViewModelBase
         Report($"已重做:{_editor.UndoName}。");
     }
 
-    /// <summary>选中整条时间轴的全部通道。</summary>
+    /// <summary>选中全部块。</summary>
     [RelayCommand]
-    private void SelectAll() => Selection = Timeline.Frames.Count == 0
-        ? FrameSelection.Empty
-        : FrameSelection.Between(TimelineStart, Duration, ChannelMask.All);
+    private void SelectAll() => SetBlockSelection(Timeline.Blocks);
 
-    /// <summary>取消选择。</summary>
+    /// <summary>取消选择:块和块编辑器里的帧都清掉。</summary>
     [RelayCommand]
-    private void ClearSelection() => Selection = FrameSelection.Empty;
-
-    /// <summary>
-    /// 把选中帧的颜色设成播放头那一帧的颜色。闪烁模式保持各自的原样,
-    /// 编辑面板做出来之前先用它验证整条"选区 → 编辑 → 撤销"的链路。
-    /// </summary>
-    [RelayCommand]
-    private void SetSelectionColor()
+    private void ClearSelection()
     {
-        if (CurrentFrame is not { } source)
+        SetBlockSelection([]);
+        CurrentBlock = null;
+        SelectedFrames = BlockFrameRange.Empty;
+    }
+
+    /// <summary>双击空白处建块:内容先放一帧,状态沿用那一刻该通道的状态。</summary>
+    public void CreateBlockAt(int channel, TimeSpan time)
+    {
+        if (_editor is null || Document is null)
         {
             return;
         }
 
-        if (PaintSelection(channel => source.Channels[channel].Color, "设置颜色") is { } count)
-        {
-            Report($"已把 {count} 帧的颜色设成播放头所在帧的颜色。");
-        }
+        // 起点吸附到已有的状态变化点上,免得块凭空落在两帧之间。
+        var start = BlockSnap.Snap(time, Timeline.FrameTimes);
+        var state = BlockSampler.SampleChannels(Timeline, start)[channel];
+        var block = new Block(
+            Block.NewId(),
+            TimelineName,
+            channel,
+            start,
+            Settings.DefaultBlockLength,
+            [new BlockFrame(TimeSpan.Zero, state)]);
+
+        ApplyEdit(new BlockSetEdit("新建块", [], [block]));
+        SetBlockSelection([block]);
+        OpenBlockEditor(block);
+        Report($"已在 CH{channel} 的 {Timecode.Format(start)} 建了一个块。");
     }
 
-    /// <summary>把编辑面板里挑好的颜色写进选中的通道。</summary>
+    /// <summary>主时间轴拖动块:整体平移时间,并按上下方向换通道。</summary>
+    public void MoveSelectedBlocks(TimeSpan timeDelta, int channelDelta)
+    {
+        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        {
+            return;
+        }
+
+        var before = new List<Block>();
+        var after = new List<Block>();
+
+        foreach (var block in SelectedBlocks)
+        {
+            var channel = Math.Clamp(block.Channel + channelDelta, 0, Frame.ChannelCount - 1);
+            var moved = block.MovedTo(block.Start + timeDelta, channel);
+
+            if (moved.Start == block.Start && moved.Channel == block.Channel)
+            {
+                continue;
+            }
+
+            before.Add(block);
+            after.Add(moved);
+        }
+
+        if (before.Count == 0)
+        {
+            return;
+        }
+
+        ApplyEdit(new BlockSetEdit("移动块", before, after));
+        SetBlockSelection(after);
+        Report($"已把 {after.Count} 个块移到 {Timecode.Format(after[0].Start)}。");
+    }
+
+    /// <summary>删除选中的块(内容一起删,块外自动回落)。</summary>
+    [RelayCommand]
+    private void DeleteSelectedBlocks()
+    {
+        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        {
+            Report("先在时间轴上选一个块。", error: true);
+            return;
+        }
+
+        var removed = SelectedBlocks.ToList();
+
+        ApplyEdit(new BlockSetEdit("删除块", removed, []));
+        SetBlockSelection([]);
+        CurrentBlock = null;
+        SelectedFrames = BlockFrameRange.Empty;
+        Report($"已删除 {removed.Count} 个块。");
+    }
+
+    /// <summary>给选中的块改名。</summary>
+    [RelayCommand]
+    private async Task RenameSelectedBlockAsync()
+    {
+        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        {
+            Report("先在时间轴上选一个块。", error: true);
+            return;
+        }
+
+        var block = SelectedBlocks[0];
+        var name = _namePrompt is null
+            ? block.Name
+            : await _namePrompt.AskAsync("给这个块起个名字", block.Name);
+
+        if (string.IsNullOrWhiteSpace(name) || name == block.Name)
+        {
+            return;
+        }
+
+        var renamed = block.Renamed(name);
+
+        ApplyEdit(new BlockSetEdit("重命名", [block], [renamed]));
+        SetBlockSelection([renamed]);
+        CurrentBlock = renamed;
+        Report($"块已改名为「{renamed.Name}」。");
+    }
+
+    /// <summary>把选中的块内容复制到其余全部通道。</summary>
+    [RelayCommand]
+    private void CopyBlockToOtherChannels()
+    {
+        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        {
+            Report("先在时间轴上选一个块。", error: true);
+            return;
+        }
+
+        var added = new List<Block>();
+
+        foreach (var block in SelectedBlocks)
+        {
+            for (var channel = 0; channel < Frame.ChannelCount; channel++)
+            {
+                if (channel == block.Channel)
+                {
+                    continue;
+                }
+
+                added.Add(new Block(
+                    Block.NewId(),
+                    block.Name,
+                    channel,
+                    block.Start,
+                    block.Length,
+                    block.Frames));
+            }
+        }
+
+        ApplyEdit(new BlockSetEdit("复制到其他通道", [], added));
+        Report($"已把内容复制到其余 {Frame.ChannelCount - 1} 个通道(共 {added.Count} 个块);"
+            + "和已有块重叠的地方无法播放,画成灰色。");
+    }
+
+    /// <summary>点链接图标:白/紫时把选中的块链成一伙,黄色时解除。</summary>
+    [RelayCommand]
+    private void ToggleLink()
+    {
+        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        {
+            return;
+        }
+
+        if (LinkState == LinkIndicator.Linked)
+        {
+            ApplyLinkGroup(null);
+            Report("已解除这些块的链接。");
+            return;
+        }
+
+        ApplyLinkGroup(Block.NewId());
+        Report($"已把 {SelectedBlocks.Count} 个块链接在一起,拖动任意一个会带着其他一起动。");
+    }
+
+    /// <summary>把选中的块设成同一组;传 null 就是解散。</summary>
+    private void ApplyLinkGroup(Guid? groupId)
+    {
+        var before = new List<Block>();
+        var after = new List<Block>();
+
+        foreach (var block in SelectedBlocks)
+        {
+            if (block.LinkGroupId == groupId)
+            {
+                continue;
+            }
+
+            before.Add(block);
+            after.Add(block.WithLinkGroup(groupId));
+        }
+
+        if (before.Count == 0)
+        {
+            return;
+        }
+
+        ApplyEdit(new BlockSetEdit(groupId is null ? "解除链接" : "链接块", before, after));
+        SetBlockSelection(after);
+    }
+
+    /// <summary>换掉选中的块集合;有链接的块会自动把同组的其他块一起带上。</summary>
+    private void SetBlockSelection(IReadOnlyList<Block> blocks) => SelectedBlocks = ExpandLinked(blocks);
+
+    /// <summary>把链接组补全:只要选中了组里的一个,整组都算选中。</summary>
+    private IReadOnlyList<Block> ExpandLinked(IReadOnlyList<Block> blocks)
+    {
+        var groups = blocks
+            .Where(block => block.LinkGroupId is { })
+            .Select(block => block.LinkGroupId!.Value)
+            .ToHashSet();
+
+        if (groups.Count == 0)
+        {
+            return [.. blocks];
+        }
+
+        return [.. Timeline.Blocks.Where(block =>
+            blocks.Contains(block)
+            || (block.LinkGroupId is { } group && groups.Contains(group)))];
+    }
+
+    /// <summary>链接图标该显示成什么颜色。</summary>
+    private void SyncLinkState()
+    {
+        if (SelectedBlocks.Count == 0)
+        {
+            LinkState = LinkIndicator.Idle;
+            return;
+        }
+
+        var linked = SelectedBlocks.Count(block => block.LinkGroupId is not null);
+
+        LinkState = linked == SelectedBlocks.Count
+            ? LinkIndicator.Linked
+            : linked == 0 ? LinkIndicator.Idle : LinkIndicator.Mixed;
+    }
+
+    /// <summary>单击块:把它打开到下面的块编辑器里。</summary>
+    public void OpenBlockEditor(Block block)
+    {
+        CurrentBlock = block;
+        SelectedFrames = BlockFrameRange.Empty;
+    }
+
+    /// <summary>把编辑面板里挑好的颜色写进块内选中的帧(没选帧就是整块)。</summary>
     [RelayCommand]
     private void ApplyEditorColor()
     {
-        var color = Color.OutputColor;
-
-        if (PaintSelection(_ => color, "设置颜色") is { } count)
+        if (CurrentBlock is not { } block)
         {
-            Report($"已把 {count} 帧的 {Selection.Channels.Count()} 个通道改成 "
-                + $"R{color.Red} G{color.Green} B{color.Blue}。");
+            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            return;
         }
+
+        PaintBlockFrames(block, Color.OutputColor, "设置颜色");
     }
 
-    /// <summary>
-    /// 把选中帧的选中通道换成同一个颜色,闪烁模式保持原样。
-    /// 返回改了多帧;没选东西(或者没有工程)时提示一句并返回 null。
-    /// </summary>
-    private int? PaintSelection(Func<int, LightColor> colorFor, string actionName)
-    {
-        if (_editor is null || Document is null)
-        {
-            return null;
-        }
-
-        var frames = Timeline.Frames;
-        var (first, last) = SelectionResolver.ResolveRange(frames, Selection);
-
-        if (first < 0)
-        {
-            Report("先在时间轴上选一段再改颜色。", error: true);
-            return null;
-        }
-
-        var before = new Frame[last - first + 1];
-        var after = new Frame[before.Length];
-
-        for (var index = 0; index < before.Length; index++)
-        {
-            var frame = frames[first + index];
-            var states = new ChannelState[Frame.ChannelCount];
-
-            for (var channel = 0; channel < Frame.ChannelCount; channel++)
-            {
-                states[channel] = Selection.Channels.Contains(channel)
-                    ? new ChannelState(colorFor(channel), frame.Channels[channel].Mode)
-                    : frame.Channels[channel];
-            }
-
-            before[index] = frame;
-            after[index] = new Frame(frame.Time, states);
-        }
-
-        ApplyEdit(new SpliceFramesEdit(actionName, first, before, after));
-        return before.Length;
-    }
-
-    /// <summary>删除选中的帧。删掉之后,那个位置的灯光自动变成沿用前一帧。</summary>
+    /// <summary>把块内选中的帧设成播放头此刻该通道的颜色。</summary>
     [RelayCommand]
-    private void DeleteSelectedFrames()
+    private void SetSelectionColor()
+    {
+        if (CurrentBlock is not { } block)
+        {
+            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            return;
+        }
+
+        var color = BlockSampler.SampleChannels(Timeline, PlayheadTime)[block.Channel].Color;
+        PaintBlockFrames(block, color, "取播放头颜色");
+    }
+
+    /// <summary>把颜色刷进块里选中的那几帧;一帧都没选就是整块。</summary>
+    private void PaintBlockFrames(Block block, LightColor color, string actionName)
     {
         if (_editor is null || Document is null)
         {
             return;
         }
 
-        var frames = Timeline.Frames;
-        var (first, last) = SelectionResolver.ResolveRange(frames, Selection);
+        var selection = SelectedFrames.IsEmpty
+            ? new BlockFrameRange(0, block.Frames.Count - 1)
+            : SelectedFrames;
 
-        if (first < 0)
+        if (selection.Last >= block.Frames.Count)
         {
-            Report("先在时间轴上选一段再删。", error: true);
             return;
         }
 
-        var removed = new Frame[last - first + 1];
-        for (var index = 0; index < removed.Length; index++)
+        var frames = block.Frames.ToArray();
+
+        for (var index = selection.First; index <= selection.Last; index++)
         {
-            removed[index] = frames[first + index];
+            frames[index] = new BlockFrame(
+                frames[index].Offset,
+                new ChannelState(color, frames[index].State.Mode));
         }
 
-        ApplyEdit(new SpliceFramesEdit("删除帧", first, removed, []));
-        Selection = FrameSelection.Empty;
-        Report($"已删除 {removed.Length} 帧。");
+        ApplyBlockContent(block, frames, actionName);
+        Report($"已把 {selection.Count} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
     }
 
-    /// <summary>在播放头处插入一帧,默认沿用前一帧的状态(插在最前面就用全黑)。</summary>
+    /// <summary>在播放头处往当前块里插一帧,默认沿用那一刻的状态。</summary>
     [RelayCommand]
     private void InsertFrameAtPlayhead()
     {
-        if (_editor is null || Document is null)
+        if (_editor is null || Document is null || CurrentBlock is not { } block)
         {
+            Report("先单击一个块,打开下面的块编辑器。", error: true);
             return;
         }
 
-        var frames = Timeline.Frames;
-        var index = Timeline.GetInsertIndex(PlayheadTime);
-        var source = index > 0 ? frames[index - 1] : null;
+        var offset = PlayheadTime - block.Start;
 
-        var states = new ChannelState[Frame.ChannelCount];
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        if (offset < TimeSpan.Zero || offset >= block.Length)
         {
-            states[channel] = source is null
-                ? new ChannelState(default, FlashMode.Solid)
-                : source.Channels[channel];
+            Report("播放头不在这块里,先把它挪进来。", error: true);
+            return;
         }
 
-        ApplyEdit(new SpliceFramesEdit("插入帧", index, [], [new Frame(PlayheadTime, states)]));
-        Report($"已在 {Timecode.Format(PlayheadTime)} 插入 1 帧。");
+        var frames = block.Frames.ToList();
+        var state = block.GetFrameAt(offset).State;
+        var insertAt = frames.FindIndex(frame => frame.Offset > offset);
+
+        if (insertAt < 0)
+        {
+            frames.Add(new BlockFrame(offset, state));
+        }
+        else
+        {
+            frames.Insert(insertAt, new BlockFrame(offset, state));
+        }
+
+        ApplyBlockContent(block, frames, "插入帧");
+        Report($"已在块内 {Timecode.Format(offset)} 插入 1 帧。");
+    }
+
+    /// <summary>删掉块编辑器里选中的那几帧。</summary>
+    [RelayCommand]
+    private void DeleteSelectedFrames()
+    {
+        if (_editor is null || Document is null || CurrentBlock is not { } block)
+        {
+            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            return;
+        }
+
+        if (SelectedFrames.IsEmpty)
+        {
+            Report("先在块编辑器里选几帧。", error: true);
+            return;
+        }
+
+        var frames = block.Frames.ToList();
+        var last = Math.Min(SelectedFrames.Last, frames.Count - 1);
+        var count = last - SelectedFrames.First + 1;
+
+        // 一个块至少要留一帧,不然它就没有内容了。
+        if (count >= frames.Count)
+        {
+            Report("块里至少要留一帧,不能全删。", error: true);
+            return;
+        }
+
+        frames.RemoveRange(SelectedFrames.First, count);
+
+        ApplyBlockContent(block, frames, "删除帧");
+        SelectedFrames = BlockFrameRange.Empty;
+        Report($"已从块里删掉 {count} 帧。");
+    }
+
+    /// <summary>换掉当前块的内容;新帧超出原长度时自动把块延长到刚好装下。</summary>
+    private void ApplyBlockContent(Block block, IReadOnlyList<BlockFrame> frames, string actionName)
+    {
+        var length = block.Length;
+        var last = frames.Count == 0 ? TimeSpan.Zero : frames.Max(frame => frame.Offset);
+
+        if (last >= length)
+        {
+            length = last + TimeSpan.FromTicks(1);
+        }
+
+        var updated = block.WithContent(frames, length);
+
+        ApplyEdit(new BlockSetEdit(actionName, [block], [updated]));
+        SetBlockSelection([updated]);
+        CurrentBlock = updated;
     }
 
     /// <summary>走一步编辑:先停下播放,再把结果搬回界面。</summary>
@@ -992,7 +1402,17 @@ public partial class MainViewModel : ViewModelBase
         }
 
         Timeline = _editor.Timeline;
-        SelectedFrameCount = SelectionResolver.CountFrames(Timeline, Selection);
+
+        // 撤销/重做之后块都换成了新对象,按 id 把选中集合和当前块重新指过去。
+        var selectedIds = SelectedBlocks.Select(block => block.Id).ToHashSet();
+        SelectedBlocks = [.. Timeline.Blocks.Where(block => selectedIds.Contains(block.Id))];
+
+        CurrentBlock = CurrentBlock is { } current ? Timeline.FindBlock(current.Id) : null;
+
+        if (CurrentBlock is not { } reopened || SelectedFrames.Last >= reopened.Frames.Count)
+        {
+            SelectedFrames = BlockFrameRange.Empty;
+        }
 
         Document?.ReplaceTimeline(Timeline);
         IsModified = Document?.IsModified ?? false;
@@ -1020,17 +1440,17 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            var timeline = await TimelineCsvFile.LoadAsync(path);
-
-            Timeline = timeline;
-
             // 已有工程:这是把里面的时间轴换掉;没有工程:用文件名兜底新建。
             // 用户在命名对话框里起的名字优先。
             var existing = Document;
-            Document = new TimelineDocument(
-                documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName),
-                timeline,
-                existing?.MediaPath);
+            var name = documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName);
+
+            // 导入进来的帧会按通道切成块,块就用工程名命名。
+            var timeline = await TimelineCsvFile.LoadAsync(path, name);
+
+            Timeline = timeline;
+
+            Document = new TimelineDocument(name, timeline, existing?.MediaPath);
 
             // 只有"往已有工程里换数据"才算改动;新建工程不算。
             if (existing is not null && documentName is null)
@@ -1044,10 +1464,11 @@ public partial class MainViewModel : ViewModelBase
             UpdateWindowTitle();
 
             HasError = false;
-            StatusText = timeline.Frames.Count == 0
-                ? $"已载入 {fileName},但里面一帧都没有。"
-                : $"已载入 {fileName}:{timeline.Frames.Count:N0} 帧,"
-                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Frames[^1].Time)}。";
+            StatusText = timeline.Blocks.Count == 0
+                ? $"已载入 {fileName},但里面没有任何灯光内容。"
+                : $"已载入 {fileName}:{timeline.Blocks.Count:N0} 个块,"
+                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Duration)}。";
+
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -1061,21 +1482,12 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>只在设计器里用的假数据,保证预览界面不是一片空白。</summary>
     private static Timeline CreateSampleTimeline()
     {
-        var frames = new List<Frame>();
-
-        for (var index = 0; index < 48; index++)
+        var blocks = new List<Block>
         {
-            var channels = new ChannelState[Frame.ChannelCount];
-            for (var channel = 0; channel < Frame.ChannelCount; channel++)
-            {
-                var red = (byte)((index + channel) % 16);
-                var green = (byte)(((index * 2) + (channel * 3)) % 16);
-                var blue = (byte)(((index * 3) + (channel * 5)) % 16);
-                channels[channel] = new ChannelState(new LightColor(red, green, blue), FlashMode.Solid);
-            }
-
-            frames.Add(new Frame(TimeSpan.FromMilliseconds(index * 180), channels));
-        }
+            SampleBlock("前奏", 0, 0, 3600, (0, new LightColor(15, 0, 0)), (1200, new LightColor(15, 8, 0))),
+            SampleBlock("副歌", 3, 900, 2700, (0, new LightColor(0, 0, 15)), (900, new LightColor(0, 15, 0))),
+            SampleBlock("扫光", 7, 1800, 1800, (0, new LightColor(8, 8, 8)), (600, new LightColor(15, 15, 15))),
+        };
 
         TimelineMarker[] markers =
         [
@@ -1084,6 +1496,23 @@ public partial class MainViewModel : ViewModelBase
             new(TimeSpan.FromMilliseconds(7200), "结尾"),
         ];
 
-        return new Timeline(frames, markers);
+        return new Timeline(blocks, markers);
     }
+
+    /// <summary>造一个样例块:内容就是给出的几个状态变化点。</summary>
+    private static Block SampleBlock(
+        string name,
+        int channel,
+        double startMilliseconds,
+        double lengthMilliseconds,
+        params (double Offset, LightColor Color)[] frames)
+        => new(
+            Block.NewId(),
+            name,
+            channel,
+            TimeSpan.FromMilliseconds(startMilliseconds),
+            TimeSpan.FromMilliseconds(lengthMilliseconds),
+            [.. frames.Select(frame => new BlockFrame(
+                TimeSpan.FromMilliseconds(frame.Offset),
+                new ChannelState(frame.Color, FlashMode.Solid)))]);
 }

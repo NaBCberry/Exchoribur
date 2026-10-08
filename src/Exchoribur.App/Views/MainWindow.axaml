@@ -28,8 +28,10 @@
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoEditsCommand}" />
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoEditsCommand}" />
         <KeyBinding Gesture="Ctrl+A" Command="{Binding SelectAllCommand}" />
+        <KeyBinding Gesture="Ctrl+D" Command="{Binding CopyBlockToOtherChannelsCommand}" />
         <KeyBinding Gesture="Escape" Command="{Binding ClearSelectionCommand}" />
-        <KeyBinding Gesture="Delete" Command="{Binding DeleteSelectedFramesCommand}" />
+        <KeyBinding Gesture="Delete" Command="{Binding DeleteSelectedBlocksCommand}" />
+        <KeyBinding Gesture="Shift+Delete" Command="{Binding DeleteSelectedFramesCommand}" />
         <KeyBinding Gesture="Insert" Command="{Binding InsertFrameAtPlayheadCommand}" />
     </Window.KeyBindings>
 
@@ -65,6 +67,11 @@
                         <Path Classes="icon title" Data="{x:Static controls:Icons.ImportMedia}" />
                     </MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Header="导出时间轴 CSV…" Command="{Binding ExportTimelineCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Export}" />
+                    </MenuItem.Icon>
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="退出" Click="OnExitClick" />
             </MenuItem>
@@ -93,12 +100,25 @@
                           Command="{Binding ClearSelectionCommand}"
                           InputGesture="Escape" />
                 <Separator />
-                <MenuItem Header="把选中帧设为播放头颜色" Command="{Binding SetSelectionColorCommand}">
+                <MenuItem Header="把块复制到其他通道"
+                          Command="{Binding CopyBlockToOtherChannelsCommand}"
+                          InputGesture="Ctrl+D">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Copy}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="给块改名…" Command="{Binding RenameSelectedBlockCommand}">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.SetFunction}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="把块内选中帧设为播放头颜色" Command="{Binding SetSelectionColorCommand}">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="在播放头插入帧"
+                <MenuItem Header="在播放头插入一帧"
                           Command="{Binding InsertFrameAtPlayheadCommand}"
                           InputGesture="Insert">
                     <MenuItem.Icon>
@@ -107,6 +127,13 @@
                 </MenuItem>
                 <MenuItem Header="删除选中帧"
                           Command="{Binding DeleteSelectedFramesCommand}"
+                          InputGesture="Shift+Delete">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="删除选中块"
+                          Command="{Binding DeleteSelectedBlocksCommand}"
                           InputGesture="Delete">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
@@ -205,6 +232,19 @@
                               IsChecked="{Binding IsLooping}">
                     <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
                 </ToggleButton>
+
+                <!-- 链接开关:白色=没选块;亮黄=选中的块都已链接(再点解除);紫色=混合(点一下重新链成一伙) -->
+                <Border Width="1"
+                        Height="20"
+                        Margin="8,0"
+                        Background="{DynamicResource PanelBorderBrush}" />
+                <Button Classes="transport"
+                        ToolTip.Tip="链接选中的块:拖动其中一个,整组按相同偏移一起动"
+                        Command="{Binding ToggleLinkCommand}">
+                    <Path Classes="icon big"
+                          Data="{x:Static controls:Icons.Link}"
+                          Stroke="{Binding LinkIconBrush}" />
+                </Button>
             </StackPanel>
         </Border>
 
@@ -245,8 +285,16 @@
             </Grid>
 
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形,最右边是颜色面板 -->
-            <Grid Grid.Column="1" ColumnDefinitions="*,210" Margin="0,8,8,8">
-                <Grid Grid.Column="0" RowDefinitions="*,110">
+            <DockPanel Grid.Column="1" Margin="0,8,8,8">
+                <!-- 右边这一列是颜色面板:先把它停靠好,剩下的地方留给时间轴 -->
+                <Border DockPanel.Dock="Right"
+                        Classes="panel"
+                        Width="220"
+                        Margin="8,0,0,0">
+                    <views:ColorPanelView />
+                </Border>
+
+                <Grid RowDefinitions="*,Auto,110">
                     <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
                         <DockPanel>
                             <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
@@ -282,20 +330,50 @@
                             <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
                                  免得滚动时各层落在不同的合成帧上对不齐。 -->
                             <Grid ClipToBounds="True">
-                                <controls:TimelineControl
-                                    Frames="{Binding Frames}"
-                                    Markers="{Binding Markers}"
+                            <controls:TimelineControl
+                                Blocks="{Binding Blocks}"
+                                Markers="{Binding Markers}"
                                 Viewport="{Binding Viewport}"
                                 PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
-                                Selection="{Binding Selection, Mode=TwoWay}"
+                                SelectedBlocks="{Binding SelectedBlocks, Mode=TwoWay}"
+                                CurrentBlockId="{Binding CurrentBlockId}"
                                 InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
                                 InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
+                                BlockCreateRequested="OnBlockCreateRequested"
+                                BlockMoveRequested="OnBlockMoveRequested"
                                 Cursor="Hand" />
                             </Grid>
                         </DockPanel>
                     </Border>
     
-                    <Border Grid.Row="1" Classes="panel">
+                <!-- 块编辑器:单击一个块之后出现在时间轴下方 -->
+                <Border Grid.Row="1"
+                        Classes="panel"
+                        Height="184"
+                        Margin="0,0,0,8"
+                        IsVisible="{Binding HasCurrentBlock}">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top"
+                                    Orientation="Horizontal"
+                                    Spacing="6"
+                                    Margin="10,6,0,2">
+                            <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
+                            <TextBlock Classes="panelTitle" Text="块编辑器" />
+                            <TextBlock Classes="panelTitle" Text="{Binding CurrentBlockTitle}" />
+                        </StackPanel>
+
+                        <controls:BlockEditorControl
+                            Blocks="{Binding Blocks}"
+                            CurrentBlock="{Binding CurrentBlock}"
+                            Viewport="{Binding BlockEditorViewport}"
+                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                            SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
+                            FocusTime="{Binding CurrentBlockFocus}"
+                            FocusSpacing="{Binding CurrentBlockSpacing}" />
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Row="2" Classes="panel">
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
@@ -305,11 +383,7 @@
                         </StackPanel>
                     </Border>
                 </Grid>
-
-                <Border Grid.Column="1" Classes="panel" Margin="8,0,0,0">
-                    <views:ColorPanelView />
-                </Border>
-            </Grid>
+            </DockPanel>
         </Grid>
     </DockPanel>
 

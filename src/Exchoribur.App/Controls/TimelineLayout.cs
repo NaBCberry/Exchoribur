@@ -60,30 +60,4 @@ internal static class TimelineLayout
         return TimeSpan.FromSeconds(TickStepsInSeconds[^1]);
     }
 
-    /// <summary>
-    /// 二分查找第一个时间不早于 time 的帧。放大以后只有一小段帧在屏幕上,
-    /// 从这段开始画就够了,不必每帧都算一遍(两万帧时省得明显)。
-    /// 全都早于 time 时返回帧数,表示"一帧都不在可见范围里"。
-    /// </summary>
-    public static int FindFirstFrameAtOrAfter(IReadOnlyList<Frame> frames, TimeSpan time)
-    {
-        var low = 0;
-        var high = frames.Count;
-
-        while (low < high)
-        {
-            var middle = low + ((high - low) / 2);
-
-            if (frames[middle].Time < time)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
-
-        return low;
-    }
 }

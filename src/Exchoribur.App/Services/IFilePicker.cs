@@ -17,4 +17,7 @@ public interface IFilePicker
 
     /// <summary>问工程存到哪儿;取消返回 null。</summary>
     Task<string?> PickProjectSaveAsync(string suggestedName);
+
+    /// <summary>问时间轴 CSV 导出到哪儿;取消返回 null。</summary>
+    Task<string?> PickTimelineSaveAsync(string suggestedName);
 }
