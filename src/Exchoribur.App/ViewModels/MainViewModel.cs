@@ -105,6 +105,12 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>块编辑器正在编辑的块 id,主时间轴用它画强调色边框。</summary>
     public Guid? CurrentBlockId => CurrentBlock?.Id;
 
+    /// <summary>覆盖在轨道上的块编辑器有多高。</summary>
+    public double EditorOverlayHeight => 200;
+
+    /// <summary>当前编辑的块在哪条通道;-1 表示编辑器没开。主时间轴据此把它滚到可见区。</summary>
+    public int CurrentBlockChannel => CurrentBlock?.Channel ?? -1;
+
     /// <summary>有没有正在编辑的块,块编辑器面板据此显示或收起。</summary>
     public bool HasCurrentBlock => CurrentBlock is not null;
 
@@ -190,10 +196,13 @@ public partial class MainViewModel : ViewModelBase
                 SelectedBlocks = expanded;
             }
 
-            // 只选了一个块就打开块编辑器;多选时若当前块还在选中里就留着。
-            CurrentBlock = expanded.Count == 1
-                ? expanded[0]
-                : expanded.Contains(CurrentBlock) ? CurrentBlock : null;
+            // 单击只负责选中;块编辑器要双击块的下半部分才打开(见 OpenBlockEditor)。
+            // 选空了就把编辑器收起来,选到别的块则保持原样,免得点一下就关掉。
+            if (expanded.Count == 0)
+            {
+                CurrentBlock = null;
+                SelectedFrames = BlockFrameRange.Empty;
+            }
 
             OnPropertyChanged(nameof(HasSelectedBlocks));
             SyncLinkState();
@@ -207,6 +216,7 @@ public partial class MainViewModel : ViewModelBase
     partial void OnCurrentBlockChanged(Block? value)
     {
         OnPropertyChanged(nameof(CurrentBlockId));
+        OnPropertyChanged(nameof(CurrentBlockChannel));
         OnPropertyChanged(nameof(CurrentBlockFocus));
         OnPropertyChanged(nameof(CurrentBlockSpacing));
         OnPropertyChanged(nameof(HasCurrentBlock));

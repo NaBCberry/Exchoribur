@@ -96,6 +96,10 @@ public sealed class TimelineControl : Control
     private bool _isBoxSelecting;
     private bool _isDraggingBlocks;
     private double _lastPanX;
+    private double _lastPanY;
+
+    /// <summary>轨道的纵向视图:每行多高、滚了多远。算术都在那个类里,单独测。</summary>
+    private readonly TimelineVerticalView _vertical = new();
 
     private Point _boxStart;
     private Point _boxCurrent;
@@ -137,6 +141,14 @@ public sealed class TimelineControl : Control
     public static readonly StyledProperty<bool> InvertTouchpadScrollProperty =
         AvaloniaProperty.Register<TimelineControl, bool>(nameof(InvertTouchpadScroll));
 
+    /// <summary>底部被覆盖的高度(块编辑器)。</summary>
+    public static readonly StyledProperty<double> BottomOverlayHeightProperty =
+        AvaloniaProperty.Register<TimelineControl, double>(nameof(BottomOverlayHeight));
+
+    /// <summary>把这条通道滚进"没被覆盖的那块区域";-1 表示不用管。</summary>
+    public static readonly StyledProperty<int> EnsureVisibleChannelProperty =
+        AvaloniaProperty.Register<TimelineControl, int>(nameof(EnsureVisibleChannel), -1);
+
     static TimelineControl()
     {
         AffectsRender<TimelineControl>(
@@ -144,7 +156,8 @@ public sealed class TimelineControl : Control
             MarkersProperty,
             PlayheadTimeProperty,
             SelectedBlocksProperty,
-            CurrentBlockIdProperty);
+            CurrentBlockIdProperty,
+            BottomOverlayHeightProperty);
     }
 
     /// <summary>双击空白处要建新块。</summary>
@@ -152,6 +165,9 @@ public sealed class TimelineControl : Control
 
     /// <summary>松开鼠标:把这些块整体平移。</summary>
     public event EventHandler<BlockMoveRequest>? BlockMoveRequested;
+
+    /// <summary>双击块的下半部分:请界面打开块编辑器。</summary>
+    public event EventHandler<Block>? BlockOpenRequested;
 
     public IReadOnlyList<Block>? Blocks
     {
@@ -201,6 +217,26 @@ public sealed class TimelineControl : Control
         set => SetValue(InvertTouchpadScrollProperty, value);
     }
 
+    public double BottomOverlayHeight
+    {
+        get => GetValue(BottomOverlayHeightProperty);
+        set => SetValue(BottomOverlayHeightProperty, value);
+    }
+
+    public int EnsureVisibleChannel
+    {
+        get => GetValue(EnsureVisibleChannelProperty);
+        set => SetValue(EnsureVisibleChannelProperty, value);
+    }
+
+    /// <summary>轨道区的高度(去掉顶部刻度)。</summary>
+    private double TrackHeight => Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight);
+
+    /// <summary>一行的高度;还没定过就按十条铺满算。</summary>
+    private double RowHeight => _vertical.RowHeightFor(TrackHeight);
+
+    private void ClampVerticalOffset() => _vertical.Clamp(TrackHeight);
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -225,10 +261,38 @@ public sealed class TimelineControl : Control
         {
             // 窗口大小变了,视口要知道新的宽度才能正确夹住两端。
             UpdateTrackWidth();
+            _vertical.FitRowsIfNeeded(TrackHeight);
+            ClampVerticalOffset();
+            InvalidateVisual();
+        }
+        else if (change.Property == BottomOverlayHeightProperty)
+        {
+            _vertical.BottomReserved = BottomOverlayHeight;
+            ClampVerticalOffset();
+            InvalidateVisual();
+        }
+        else if (change.Property == EnsureVisibleChannelProperty)
+        {
+            ScrollChannelIntoView(EnsureVisibleChannel);
+        }
+        else if (change.Property == BlocksProperty)
+        {
+            // 换了数据:纵向缩放回到"十条铺满",滚动回到顶部。
+            _vertical.ResetForNewContent(TrackHeight);
+            InvalidateVisual();
         }
     }
 
     private void OnViewportChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+
+    /// <summary>把某条通道滚进"没被块编辑器盖住"的那块区域。</summary>
+    private void ScrollChannelIntoView(int channel)
+    {
+        if (_vertical.ScrollChannelIntoView(channel, TrackHeight))
+        {
+            InvalidateVisual();
+        }
+    }
 
     private void UpdateTrackWidth()
         => Viewport?.SetTrackWidth(TimelineLayout.GetTrackWidth(Bounds.Width));
@@ -243,8 +307,8 @@ public sealed class TimelineControl : Control
         }
 
         var trackWidth = TimelineLayout.GetTrackWidth(width);
-        var trackHeight = Math.Max(0, height - TimelineLayout.RulerHeight);
-        var rowHeight = trackHeight / Frame.ChannelCount;
+        var trackHeight = TrackHeight;
+        var rowHeight = RowHeight;
         var trackRect = new Rect(
             TimelineLayout.TrackLeft,
             TimelineLayout.RulerHeight,
@@ -259,7 +323,14 @@ public sealed class TimelineControl : Control
 
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
-            var y = TimelineLayout.RulerHeight + (channel * rowHeight);
+            var y = TimelineLayout.RulerHeight + (channel * rowHeight) - _vertical.Offset;
+
+            // 滚出去的整行不画。
+            if (y + rowHeight < TimelineLayout.RulerHeight || y > height)
+            {
+                continue;
+            }
+
             context.FillRectangle(
                 RowBackground,
                 new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
@@ -293,7 +364,12 @@ public sealed class TimelineControl : Control
         // 通道名和分隔线最后画,保证永远在最上层。
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
-            var y = TimelineLayout.RulerHeight + (channel * rowHeight);
+            var y = TimelineLayout.RulerHeight + (channel * rowHeight) - _vertical.Offset;
+
+            if (y + rowHeight < TimelineLayout.RulerHeight || y > height)
+            {
+                continue;
+            }
 
             context.DrawText(
                 GetDimText($"CH{channel}", 11.5),
@@ -347,7 +423,7 @@ public sealed class TimelineControl : Control
             // 缩得很小时也得看得见,所以给一个最小宽度。
             var rect = new Rect(
                 x0,
-                TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset,
+                TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset - _vertical.Offset,
                 Math.Max(3, x1 - x0),
                 Math.Max(6, rowHeight - (BlockInset * 2)));
 
@@ -444,7 +520,7 @@ public sealed class TimelineControl : Control
                 continue;
             }
 
-            var top = TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset;
+            var top = TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset - _vertical.Offset;
             var height = Math.Max(6, rowHeight - (BlockInset * 2));
 
             for (var first = 0; first < onChannel.Count; first++)
@@ -643,6 +719,7 @@ public sealed class TimelineControl : Control
         {
             _isPanning = true;
             _lastPanX = point.Position.X;
+            _lastPanY = point.Position.Y;
             e.Pointer.Capture(this);
             e.Handled = true;
             return;
@@ -664,19 +741,30 @@ public sealed class TimelineControl : Control
         }
 
         var hit = HitTestBlock(point.Position);
+        var onBody = hit is { } body && point.Position.Y > BlockTitleBottom(body);
 
-        // 双击空白处 = 新建块。
-        if (e.ClickCount == 2 && hit is null)
+        if (e.ClickCount == 2)
         {
-            BlockCreateRequested?.Invoke(
-                this,
-                new BlockCreateRequest(ChannelAt(point.Position.Y), TimeAt(point.Position.X)));
+            if (hit is null)
+            {
+                // 双击空白处 = 新建块。
+                BlockCreateRequested?.Invoke(
+                    this,
+                    new BlockCreateRequest(ChannelAt(point.Position.Y), TimeAt(point.Position.X)));
+            }
+            else if (onBody)
+            {
+                // 双击块的下半部分 = 打开块编辑器(单击只负责选中)。
+                SelectedBlocks = [hit];
+                BlockOpenRequested?.Invoke(this, hit);
+            }
+
             e.Handled = true;
             return;
         }
 
         // 点在块的下半部分(标题栏以下)= 选中并拖动整块。
-        if (hit is { } block && point.Position.Y > BlockTitleBottom(block))
+        if (hit is { } block && onBody)
         {
             var selected = SelectedBlocks;
             if (selected is null || !selected.Contains(block))
@@ -717,7 +805,10 @@ public sealed class TimelineControl : Control
         if (_isPanning)
         {
             Viewport?.PanByPixels(_lastPanX - position.X);
+            _vertical.ScrollBy(-(position.Y - _lastPanY), TrackHeight);
             _lastPanX = position.X;
+            _lastPanY = position.Y;
+            InvalidateVisual();
             e.Handled = true;
             return;
         }
@@ -798,6 +889,30 @@ public sealed class TimelineControl : Control
 
         // 设置页里的两个开关。鼠标滚轮那一项同时管缩放和 Shift+平移。
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var position = e.GetPosition(this);
+
+        // Ctrl + 滚轮:纵向缩放(一行多高),指针所在的通道尽量不动。
+        if (control && !shift)
+        {
+            ZoomRows(
+                TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
+                position.Y);
+            e.Handled = true;
+            return;
+        }
+
+        // 指针在左边通道名那一列:滚轮用来上下滚动轨道。
+        if (!shift && position.X < TimelineLayout.TrackLeft)
+        {
+            if (_vertical.ScrollBy(-e.Delta.Y * PanPixelsPerWheelStep, TrackHeight))
+            {
+                InvalidateVisual();
+            }
+
+            e.Handled = true;
+            return;
+        }
 
         switch (TimelineWheel.Decide(e.Delta.X, e.Delta.Y, shift))
         {
@@ -821,11 +936,20 @@ public sealed class TimelineControl : Control
                 // 普通滚轮:以指针位置为锚点缩放。
                 viewport.Zoom(
                     TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
-                    e.GetPosition(this).X - TimelineLayout.TrackLeft);
+                    position.X - TimelineLayout.TrackLeft);
                 break;
         }
 
         e.Handled = true;
+    }
+
+    /// <summary>纵向缩放:以指针所在的通道为锚点,让它缩放前后停在原地。</summary>
+    private void ZoomRows(double factor, double anchorY)
+    {
+        if (_vertical.Zoom(factor, anchorY - TimelineLayout.RulerHeight, TrackHeight))
+        {
+            InvalidateVisual();
+        }
     }
 
     // ---- 拖动块 ----
@@ -898,12 +1022,12 @@ public sealed class TimelineControl : Control
         }
 
         var box = BoxRect();
-        var rowHeight = Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight) / Frame.ChannelCount;
+        var rowHeight = RowHeight;
         var selected = new List<Block>();
 
         foreach (var block in blocks)
         {
-            var rect = BlockRect(block, viewport, rowHeight);
+            var rect = BlockRowRect(block, viewport, rowHeight);
 
             if (rect.Intersects(box))
             {
@@ -926,18 +1050,33 @@ public sealed class TimelineControl : Control
             return null;
         }
 
-        var rowHeight = Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight) / Frame.ChannelCount;
+        var rowHeight = RowHeight;
 
         // 后画的在上面,所以从后往前找。
         for (var index = blocks.Count - 1; index >= 0; index--)
         {
-            if (BlockRect(blocks[index], viewport, rowHeight).Contains(position))
+            // 按整行判定:块画面上上下各留了 2 像素空隙,点在空隙里也算点在这块上,
+            // 不然贴着行边界一点就会被当成"点空白",顺手建出一个新块。
+            if (BlockRowRect(blocks[index], viewport, rowHeight).Contains(position))
             {
                 return blocks[index];
             }
         }
 
         return null;
+    }
+
+    /// <summary>块所在的整行矩形:命中判定和框选用它(比画出来的块略高一点)。</summary>
+    private Rect BlockRowRect(Block block, TimelineViewport viewport, double rowHeight)
+    {
+        var x0 = TimelineLayout.TrackLeft + viewport.MapTime(block.Start);
+        var x1 = TimelineLayout.TrackLeft + viewport.MapTime(block.End);
+
+        return new Rect(
+            x0,
+            TimelineLayout.RulerHeight + (block.Channel * rowHeight) - _vertical.Offset,
+            Math.Max(3, x1 - x0),
+            Math.Max(6, rowHeight));
     }
 
     private Rect BlockRect(Block block, TimelineViewport viewport, double rowHeight)
@@ -947,7 +1086,7 @@ public sealed class TimelineControl : Control
 
         return new Rect(
             x0,
-            TimelineLayout.RulerHeight + (block.Channel * rowHeight) + BlockInset,
+            TimelineLayout.RulerHeight + (block.Channel * rowHeight) + BlockInset - _vertical.Offset,
             Math.Max(3, x1 - x0),
             Math.Max(6, rowHeight - (BlockInset * 2)));
     }
@@ -955,9 +1094,13 @@ public sealed class TimelineControl : Control
     /// <summary>块标题栏的下边缘:指针在这条线以下才算"点在下半部分"。</summary>
     private double BlockTitleBottom(Block block)
     {
-        var rowHeight = Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight) / Frame.ChannelCount;
+        var rowHeight = RowHeight;
 
-        return TimelineLayout.RulerHeight + (block.Channel * rowHeight) + BlockInset + BlockTitleHeight;
+        return TimelineLayout.RulerHeight
+            + (block.Channel * rowHeight)
+            + BlockInset
+            + BlockTitleHeight
+            - _vertical.Offset;
     }
 
     /// <summary>横坐标对应的时间,夹在时间轴范围内。</summary>
@@ -983,15 +1126,14 @@ public sealed class TimelineControl : Control
     /// <summary>纵坐标对应的通道行。</summary>
     private int ChannelAt(double y)
     {
-        var trackHeight = Math.Max(0, Bounds.Height - TimelineLayout.RulerHeight);
-        var rowHeight = trackHeight / Frame.ChannelCount;
+        var rowHeight = RowHeight;
 
         if (rowHeight <= 0)
         {
             return 0;
         }
 
-        var index = (int)((y - TimelineLayout.RulerHeight) / rowHeight);
+        var index = (int)((y - TimelineLayout.RulerHeight + _vertical.Offset) / rowHeight);
         return Math.Clamp(index, 0, Frame.ChannelCount - 1);
     }
 

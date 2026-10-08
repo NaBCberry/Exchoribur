@@ -1,9 +1,11 @@
 using Avalonia.Controls;
+using Avalonia;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Exchoribur.App.Controls;
 using Exchoribur.App.ViewModels;
+using Exchoribur.Core.Models;
 
 namespace Exchoribur.App.Views;
 
@@ -65,6 +67,15 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel viewModel)
         {
             viewModel.MoveSelectedBlocks(request.TimeDelta, request.ChannelDelta);
+        }
+    }
+
+    /// <summary>双击块的下半部分:打开块编辑器(单击只负责选中)。</summary>
+    private void OnBlockOpenRequested(object? sender, Block block)
+    {
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.OpenBlockEditor(block);
         }
     }
 

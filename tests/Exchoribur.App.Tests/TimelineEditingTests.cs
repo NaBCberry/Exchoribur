@@ -180,6 +180,7 @@ public sealed class TimelineEditingTests : IDisposable
         var viewModel = await OpenAsync();
 
         viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.OpenBlockEditor(viewModel.Blocks[0]);   // 双击块的下半部分才会打开编辑器
         Assert.True(viewModel.HasCurrentBlock);
 
         viewModel.Color.HexText = "#00FF00";
@@ -201,6 +202,7 @@ public sealed class TimelineEditingTests : IDisposable
         var viewModel = await OpenAsync();
 
         viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.OpenBlockEditor(viewModel.Blocks[0]);
         viewModel.SelectedFrames = BlockFrameRange.Single(1);
 
         viewModel.Color.HexText = "#00FF00";
@@ -216,6 +218,7 @@ public sealed class TimelineEditingTests : IDisposable
         var viewModel = await OpenAsync();
 
         viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.OpenBlockEditor(viewModel.Blocks[0]);
         viewModel.PlayheadTime = TimeSpan.FromMilliseconds(1000);
 
         viewModel.InsertFrameAtPlayheadCommand.Execute(null);
@@ -229,6 +232,39 @@ public sealed class TimelineEditingTests : IDisposable
 
         Assert.Equal(2, viewModel.Blocks[0].Frames.Count);
         Assert.Contains("删掉 1 帧", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task Selecting_a_block_does_not_open_the_editor()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+
+        // 单击只是选中:编辑器要双击块的下半部分才开。
+        Assert.False(viewModel.HasCurrentBlock);
+        Assert.Equal(-1, viewModel.CurrentBlockChannel);
+
+        viewModel.OpenBlockEditor(viewModel.Blocks[0]);
+
+        Assert.True(viewModel.HasCurrentBlock);
+        Assert.Equal(viewModel.Blocks[0].Channel, viewModel.CurrentBlockChannel);
+        Assert.Equal(viewModel.Blocks[0].Start, viewModel.CurrentBlockFocus);
+    }
+
+    [Fact]
+    public async Task Clearing_the_selection_closes_the_editor()
+    {
+        var viewModel = await OpenAsync();
+
+        viewModel.SelectedBlocks = viewModel.Blocks;
+        viewModel.OpenBlockEditor(viewModel.Blocks[0]);
+        Assert.True(viewModel.HasCurrentBlock);
+
+        viewModel.ClearSelectionCommand.Execute(null);
+
+        Assert.False(viewModel.HasCurrentBlock);
+        Assert.True(viewModel.SelectedFrames.IsEmpty);
     }
 
     [Fact]
