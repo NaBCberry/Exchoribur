@@ -1,5 +1,4 @@
 using Exchoribur.App.Controls;
-using Exchoribur.Core.Models;
 
 namespace Exchoribur.App.Tests;
 

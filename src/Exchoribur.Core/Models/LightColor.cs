@@ -1,4 +1,3 @@
-using System;
 namespace Exchoribur.Core.Models;
 
 /// <summary>
@@ -33,4 +32,4 @@ public readonly struct LightColor
     public byte Green { get; }
     public byte Blue { get; }
 
-}                         
+}

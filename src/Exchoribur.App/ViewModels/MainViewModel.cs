@@ -874,7 +874,7 @@ public partial class MainViewModel : ViewModelBase
         if (!_playback.IsPlaying)
         {
             _clock?.Stop();
-        Video.Pause();
+            Video.Pause();
         }
     }
 

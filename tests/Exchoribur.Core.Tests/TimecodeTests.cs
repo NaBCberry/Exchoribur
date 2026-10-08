@@ -1,5 +1,3 @@
-using Exchoribur.Core;
-
 namespace Exchoribur.Core.Tests;
 
 public class TimecodeTests

@@ -1,5 +1,3 @@
-using Exchoribur.Core.Models;
-
 namespace Exchoribur.App.Controls;
 
 /// <summary>
