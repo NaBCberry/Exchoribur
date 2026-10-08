@@ -1,6 +1,7 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
+using Exchoribur.Core.Settings;
 
 namespace Exchoribur.App.Tests;
 
@@ -48,7 +49,10 @@ public sealed class TimelineEditingTests : IDisposable
         var created = viewModel.Blocks.Single(block => block.Channel == 3);
         Assert.Equal("show", created.Name);
         Assert.Equal(TimeSpan.Zero, created.Start);
-        Assert.Equal(TimeSpan.FromSeconds(2), created.Length);
+        // 长度取设置里的回落值(用户可以改,所以别写死秒数)。
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(AppSettings.DefaultBlockLengthFallbackMilliseconds),
+            created.Length);
 
         // CH3 本来什么都没有,所以新块里的第一帧就是黑场。
         Assert.Equal(BlockSampler.Dark, Assert.Single(created.Frames).State);
@@ -286,7 +290,12 @@ public sealed class TimelineEditingTests : IDisposable
 
     private async Task<MainViewModel> OpenAsync()
     {
-        var viewModel = new MainViewModel(new StubFilePicker(WriteCsv("show.csv", rows: 2)));
+        // 设置也换成临时的:不然测试会读用户真实的那份设置文件(比如他改过默认块长度)。
+        var settings = new SettingsViewModel(Path.Combine(_directory, "settings.json"));
+        var viewModel = new MainViewModel(
+            new StubFilePicker(WriteCsv("show.csv", rows: 2)),
+            settings: settings);
+
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.HasError, viewModel.StatusText);

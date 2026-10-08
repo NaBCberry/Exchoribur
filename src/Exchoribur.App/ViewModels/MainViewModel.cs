@@ -46,12 +46,14 @@ public partial class MainViewModel : ViewModelBase
         IFilePicker? filePicker,
         IPlaybackClock? clock = null,
         INamePrompt? namePrompt = null,
-        IUnsavedChangesPrompt? unsavedPrompt = null)
+        IUnsavedChangesPrompt? unsavedPrompt = null,
+        SettingsViewModel? settings = null)
     {
         _filePicker = filePicker;
         _clock = clock;
         _namePrompt = namePrompt;
         _unsavedPrompt = unsavedPrompt;
+        Settings = settings ?? new SettingsViewModel();
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;
@@ -329,8 +331,8 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public TimelineViewport Viewport { get; } = new();
 
-    /// <summary>用户偏好设置(滚轮方向之类),设置窗口改的就是这一份。</summary>
-    public SettingsViewModel Settings { get; } = new();
+    /// <summary>用户偏好设置(滚轮方向、新建块长度之类),设置窗口改的就是这一份。</summary>
+    public SettingsViewModel Settings { get; }
 
     /// <summary>右侧编辑面板里正在挑的颜色。</summary>
     public ColorEditorViewModel Color { get; } = new();
