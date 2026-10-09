@@ -5,10 +5,11 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
+using Exchoribur.App.Controls;
 using Exchoribur.Core;
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>双击空白处建块的请求。</summary>
 public sealed record BlockCreateRequest(int Channel, TimeSpan Time);
@@ -1276,10 +1277,6 @@ public sealed class TimelineControl : Control
 
         return brush;
     }
-
-    /// <summary>四位分量展开成八位:0-15 映射到 0-255。</summary>
-    public static Color ToColor(LightColor color)
-        => Color.FromRgb((byte)(color.Red * 17), (byte)(color.Green * 17), (byte)(color.Blue * 17));
 
     private static Color ToColor(uint colorKey)
         => Color.FromRgb(

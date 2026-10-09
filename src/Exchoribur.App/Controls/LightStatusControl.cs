@@ -54,7 +54,7 @@ public sealed class LightStatusControl : Control
 
             if (frame is not null)
             {
-                var color = TimelineControl.ToColor(frame.Channels[channel].Color);
+                var color = ColorMath.ToColor(frame.Channels[channel].Color);
                 context.FillRectangle(new SolidColorBrush(color), lampRect.Deflate(1));
             }
             else

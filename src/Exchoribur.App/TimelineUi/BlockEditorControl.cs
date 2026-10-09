@@ -6,11 +6,12 @@ using Avalonia.Controls.Documents;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Exchoribur.App.Controls;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core;
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>
 /// 块编辑器:只显示一条通道,用来编辑当前块里的帧。
@@ -790,7 +791,7 @@ public sealed class BlockEditorControl : Control
 
         if (!_brushCache.TryGetValue(key, out var brush))
         {
-            brush = new SolidColorBrush(TimelineControl.ToColor(color));
+            brush = new SolidColorBrush(ColorMath.ToColor(color));
             _brushCache[key] = brush;
         }
 

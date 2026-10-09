@@ -1,3 +1,6 @@
+using Avalonia.Media;
+using Exchoribur.Core.Models;
+
 namespace Exchoribur.App.Controls;
 
 /// <summary>
@@ -100,4 +103,8 @@ internal static class ColorMath
     /// <summary>四位分量换算回八位(0-255)。</summary>
     public static int FromFourBit(double component)
         => (int)Math.Round(Math.Clamp(component, 0, 15) * 17d);
+
+    /// <summary>四位分量展开成八位:0-15 映射到 0-255,给画笔画底色用。</summary>
+    public static Color ToColor(LightColor color)
+        => Color.FromRgb((byte)(color.Red * 17), (byte)(color.Green * 17), (byte)(color.Blue * 17));
 }

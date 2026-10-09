@@ -1,4 +1,4 @@
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>滚轮这一下该干什么。</summary>
 internal enum TimelineWheelAction

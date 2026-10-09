@@ -1,4 +1,4 @@
-using Exchoribur.App.Controls;
+using Exchoribur.App.TimelineUi;
 
 namespace Exchoribur.App.Tests;
 

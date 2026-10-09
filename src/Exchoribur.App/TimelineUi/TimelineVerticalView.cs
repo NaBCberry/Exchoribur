@@ -1,6 +1,6 @@
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>
 /// 轨道的纵向视图:十条通道每行多高、上下滚了多远。

@@ -1,6 +1,6 @@
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>块编辑器里要画的一根帧刻度:横坐标 + 它是第几个状态点。</summary>
 internal readonly record struct FrameTick(double X, int FrameIndex);

@@ -1,6 +1,6 @@
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>
 /// 拖动块时的吸附:把目标时间对齐到"其他块的状态变化点"上。

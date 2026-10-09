@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Exchoribur.App.ViewModels"
         xmlns:controls="using:Exchoribur.App.Controls"
+        xmlns:timeline="using:Exchoribur.App.TimelineUi"
         xmlns:views="using:Exchoribur.App.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -397,7 +398,7 @@
                             <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
                                  免得滚动时各层落在不同的合成帧上对不齐。 -->
                             <Grid ClipToBounds="True">
-                                <controls:TimelineControl
+                                <timeline:TimelineControl
                                     Blocks="{Binding Blocks}"
                                     Markers="{Binding Markers}"
                                     Viewport="{Binding Viewport}"
@@ -431,7 +432,7 @@
                                             <TextBlock Classes="panelTitle" Text="{Binding CurrentBlockTitle}" />
                                         </StackPanel>
 
-                                        <controls:BlockEditorControl
+                                        <timeline:BlockEditorControl
                                             Blocks="{Binding Blocks}"
                                             CurrentBlock="{Binding CurrentBlock}"
                                             Viewport="{Binding BlockEditorViewport}"

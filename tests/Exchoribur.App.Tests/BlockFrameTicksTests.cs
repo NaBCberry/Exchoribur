@@ -1,4 +1,4 @@
-using Exchoribur.App.Controls;
+using Exchoribur.App.TimelineUi;
 using Exchoribur.Core.Models;
 
 namespace Exchoribur.App.Tests;

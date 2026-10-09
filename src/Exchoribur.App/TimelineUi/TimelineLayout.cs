@@ -1,4 +1,4 @@
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>
 /// 时间轴各层共用的尺寸与"挑刻度间隔"这类纯计算。

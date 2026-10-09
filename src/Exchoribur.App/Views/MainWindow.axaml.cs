@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Exchoribur.App.Controls;
+using Exchoribur.App.TimelineUi;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
 

@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>
 /// 时间轴的取景框:现在看的是哪一段时间、放大到什么程度。

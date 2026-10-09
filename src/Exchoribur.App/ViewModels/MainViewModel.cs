@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.Services;
+using Exchoribur.App.TimelineUi;
 using Exchoribur.Core;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Models;

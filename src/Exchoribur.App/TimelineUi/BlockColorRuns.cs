@@ -1,6 +1,6 @@
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.Controls;
+namespace Exchoribur.App.TimelineUi;
 
 /// <summary>块主体上的一段同色像素:从 X 开始连续 Width 个像素都是同一个颜色。</summary>
 internal readonly record struct BlockColorRun(int X, int Width, LightColor Color);
