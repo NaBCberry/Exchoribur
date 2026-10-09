@@ -1,18 +1,20 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Exchoribur.App.ViewModels"
+        xmlns:pages="using:Exchoribur.App.Views.Settings"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="360"
+        mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="540"
         x:Class="Exchoribur.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="设置"
-        Width="460" Height="360"
-        CanResize="False"
+        Width="540" Height="640"
+        MinWidth="400" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}">
 
     <DockPanel>
+        <!-- 底部只有关闭:每一项都是改一下就生效,不需要确定/取消 -->
         <Border DockPanel.Dock="Bottom"
                 Height="48"
                 Background="{DynamicResource ChromeBackgroundBrush}">
@@ -24,32 +26,85 @@
                     Padding="16,4" />
         </Border>
 
-        <StackPanel Margin="18" Spacing="8">
-            <TextBlock Classes="panelTitle" Text="滚轮与触摸板" />
+        <!-- 一级分类:左右顶到窗口边缘的一条长条,每一格宽度等分,选中那格填强调色 -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource ChromeBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Height="100">
+            <ItemsControl Classes="settingsTabs settingsTopBar"
+                          ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <!-- 一行等分:每一格的宽度都是总宽度除以选项数 -->
+                        <UniformGrid Rows="1" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingsGroupItem">
+                        <Button Classes="topTab"
+                                Classes.selected="{Binding IsSelected}"
+                                Command="{Binding SelectCommand}">
+                            <StackPanel Orientation="Vertical"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <Path Classes="tabIcon" Data="{Binding Icon}" />
+                                <TextBlock Classes="topTabTitle" Text="{Binding Title}" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
 
-            <CheckBox Content="反转鼠标滚轮方向" IsChecked="{Binding InvertMouseWheel}" />
-            <TextBlock Classes="note"
-                       Margin="26,0,0,6"
-                       Text="影响滚轮的平移和缩放,带 Shift / Ctrl 的组合键一起翻。" />
+        <!--
+            二级页和内容区是同一个背景形状:上面一条标签、下面一个矩形,
+            标签紧贴矩形,只有最外侧的两个上角是圆的,下面的角都是直角。
+        -->
+        <Border Margin="12,10,12,12"
+                Background="{DynamicResource PanelBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6,6,0,0"
+                ClipToBounds="True">
+            <DockPanel>
+                <ItemsControl DockPanel.Dock="Top"
+                              Classes="settingsTabs settingsSubTabs"
+                              ItemsSource="{Binding SelectedGroup.Pages}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SettingsPageItem">
+                            <Button Classes="subTab"
+                                    Classes.selected="{Binding IsSelected}"
+                                    Command="{Binding SelectCommand}">
+                                <TextBlock Classes="subTabTitle" Text="{Binding Title}" />
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-            <CheckBox Content="反转触摸板横向滑动方向" IsChecked="{Binding InvertTouchpadScroll}" />
-            <TextBlock Classes="note"
-                       Margin="26,0,0,0"
-                       Text="只影响触摸板横向滑动;触摸板的竖向滑动按上面那一项算。" />
-
-            <TextBlock Classes="panelTitle" Text="编排块" Margin="0,10,0,0" />
-
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="新建块默认长度(毫秒)" VerticalAlignment="Center" />
-                <TextBox Width="90"
-                         Padding="6,2"
-                         FontSize="12"
-                         Text="{Binding DefaultBlockLengthMilliseconds}" />
-            </StackPanel>
-            <TextBlock Classes="note"
-                       Margin="0,0,0,0"
-                       Text="双击轨道空白处新建块时用它;填得不合适会回到 2000 毫秒。" />
-        </StackPanel>
+                <!-- 内容区矩形:每页一个控件,靠可见性切换 -->
+                <Border Background="{DynamicResource ChromeBackgroundBrush}">
+                    <ScrollViewer Padding="12">
+                        <Grid>
+                            <pages:InputPage IsVisible="{Binding IsInputPage}" />
+                            <pages:StoragePage IsVisible="{Binding IsStoragePage}" />
+                            <pages:TimelineEditPage IsVisible="{Binding IsTimelineEditPage}" />
+                            <pages:BlocksPage IsVisible="{Binding IsBlocksPage}" />
+                            <pages:AudioPage IsVisible="{Binding IsAudioPage}" />
+                            <pages:ExternalDevicesPage IsVisible="{Binding IsExternalDevicesPage}" />
+                            <pages:UpdatesPage IsVisible="{Binding IsUpdatesPage}" />
+                            <pages:AboutPage IsVisible="{Binding IsAboutPage}" />
+                        </Grid>
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+        </Border>
     </DockPanel>
 
 </Window>

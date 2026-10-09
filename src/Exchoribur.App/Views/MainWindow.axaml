@@ -166,15 +166,33 @@
                            Text="{Binding StatusText}"
                            VerticalAlignment="Center" />
                 <!-- 只在保存时出现的细进度条:打包大素材要等几十秒,没有它看不出还在动 -->
-                <ProgressBar Grid.Column="1"
-                             Width="140"
-                             Height="4"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="{Binding SaveProgress}"
-                             IsVisible="{Binding IsSaving}"
-                             Foreground="{DynamicResource AccentBrush}"
-                             VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                    <ProgressBar Width="140"
+                                 Height="4"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding SaveProgress}"
+                                 IsVisible="{Binding IsSaving}"
+                                 Foreground="{DynamicResource AccentBrush}"
+                                 VerticalAlignment="Center" />
+
+                    <!-- 自动更新的提示:平时不出现,不占地方 -->
+                    <Path Classes="icon"
+                          Data="{x:Static controls:Icons.Download}"
+                          IsVisible="{Binding IsUpdateBannerVisible}" />
+                    <TextBlock Classes="update"
+                               Text="{Binding UpdateBannerText}"
+                               IsVisible="{Binding IsUpdateBannerVisible}" />
+                    <Button Classes="transport"
+                            ToolTip.Tip="重启并安装更新"
+                            Command="{Binding ApplyUpdateCommand}"
+                            IsVisible="{Binding IsUpdateApplyVisible}">
+                        <Path Classes="icon" Data="{x:Static controls:Icons.Refresh}" />
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -70,4 +70,53 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.False(File.Exists(path + ".tmp"));
     }
+
+    [Fact]
+    public void The_newer_settings_can_be_read_back()
+    {
+        var path = Path.Combine(_directory, "settings.json");
+        SettingsStore.Save(path, new AppSettings
+        {
+            UndoDepth = 120,
+            AudioOutputDeviceId = "{0.0.0.00000000}.{abc}",
+            AudioVolume = 35,
+            CheckForUpdatesOnStartup = false,
+            AutoDownloadUpdates = false,
+            IncludePrereleaseVersions = true,
+        });
+
+        var loaded = SettingsStore.Load(path);
+
+        Assert.Equal(120, loaded.UndoDepthOrDefault);
+        Assert.Equal("{0.0.0.00000000}.{abc}", loaded.AudioOutputDeviceId);
+        Assert.Equal(35, loaded.AudioVolumeOrDefault);
+        Assert.False(loaded.CheckForUpdatesOnStartup);
+        Assert.False(loaded.AutoDownloadUpdates);
+        Assert.True(loaded.IncludePrereleaseVersions);
+    }
+
+    [Fact]
+    public void Out_of_range_values_fall_back_into_range()
+    {
+        // 设置文件是可以手改的,写进去的怪值不能直接把程序带偏。
+        var settings = new AppSettings
+        {
+            UndoDepth = 1,
+            AudioVolume = 250,
+        };
+
+        Assert.Equal(AppSettings.MinUndoDepth, settings.UndoDepthOrDefault);
+        Assert.Equal(100, settings.AudioVolumeOrDefault);
+    }
+
+    [Fact]
+    public void Update_settings_default_to_checking_and_downloading()
+    {
+        var defaults = AppSettings.Default;
+
+        Assert.True(defaults.CheckForUpdatesOnStartup);
+        Assert.True(defaults.AutoDownloadUpdates);
+        Assert.False(defaults.IncludePrereleaseVersions);
+        Assert.Null(defaults.AudioOutputDeviceId);
+    }
 }

@@ -15,6 +15,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 关于页要能打开这两份声明,所以随程序一起发出去 -->
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md"
+             Link="THIRD-PARTY-NOTICES.md"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\ACKNOWLEDGEMENTS.md"
+             Link="ACKNOWLEDGEMENTS.md"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.3" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />

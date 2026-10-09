@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -9,7 +10,9 @@ using Exchoribur.Core;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Playback;
+using Exchoribur.Core.Settings;
 using Exchoribur.Core.Storage;
+using Exchoribur.Core.Updates;
 
 namespace Exchoribur.App.ViewModels;
 
@@ -25,6 +28,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly IPlaybackClock? _clock;
     private readonly INamePrompt? _namePrompt;
     private readonly IUnsavedChangesPrompt? _unsavedPrompt;
+    private readonly IAudioDeviceController _audio;
+    private readonly UpdateCoordinator _updates;
 
     /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
     private string? _projectPath;
@@ -47,13 +52,26 @@ public partial class MainViewModel : ViewModelBase
         IPlaybackClock? clock = null,
         INamePrompt? namePrompt = null,
         IUnsavedChangesPrompt? unsavedPrompt = null,
-        SettingsViewModel? settings = null)
+        SettingsViewModel? settings = null,
+        IAudioDeviceController? audio = null,
+        IUpdateFeed? updateFeed = null)
     {
         _filePicker = filePicker;
         _clock = clock;
         _namePrompt = namePrompt;
         _unsavedPrompt = unsavedPrompt;
-        Settings = settings ?? new SettingsViewModel();
+
+        // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
+        _audio = audio ?? new VideoAudioDeviceController(() => _video);
+        _updates = new UpdateCoordinator(
+            updateFeed ?? new VelopackUpdateFeed(),
+            () => Settings!.AutoDownloadUpdates,
+            () => Settings!.IncludePrereleaseVersions);
+        _updates.Changed += (_, _) => RefreshUpdateBanner();
+
+        Settings = settings ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates);
+        Settings.PropertyChanged += OnSettingsChanged;
+        RefreshUpdateBanner();
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;
@@ -341,6 +359,59 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>用户偏好设置(滚轮方向、新建块长度之类),设置窗口改的就是这一份。</summary>
     public SettingsViewModel Settings { get; }
 
+    /// <summary>底部状态条上的更新提示;没有要说的就是空。</summary>
+    [ObservableProperty]
+    public partial string UpdateBannerText { get; set; } = string.Empty;
+
+    /// <summary>有更新提示时,状态条右边多出一块。</summary>
+    public bool IsUpdateBannerVisible => UpdateBannerText.Length > 0;
+
+    /// <summary>更新已经下好了,点一下重启装上。</summary>
+    public bool IsUpdateApplyVisible => _updates.State.Stage == UpdateStage.Ready;
+
+    partial void OnUpdateBannerTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsUpdateBannerVisible));
+        OnPropertyChanged(nameof(IsUpdateApplyVisible));
+    }
+
+    /// <summary>
+    /// 启动后在后台查一次更新。等界面出来之后再调,别让网络把启动拖住;
+    /// 查失败只在设置页里体现,不弹东西打断用户。
+    /// </summary>
+    public void StartBackgroundUpdateCheck()
+    {
+        if (Settings.CheckForUpdatesOnStartup && _updates.IsSupported)
+        {
+            _ = _updates.CheckAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyUpdate() => _updates.ApplyAndRestart();
+
+    private void RefreshUpdateBanner()
+    {
+        var state = _updates.State;
+
+        UpdateBannerText = state.Stage switch
+        {
+            UpdateStage.Available => $"发现新版本 v{state.Version}",
+            UpdateStage.Downloading => $"正在下载 v{state.Version}…{state.ProgressPercent}%",
+            UpdateStage.Ready => $"v{state.Version} 已下载,重启后生效",
+            _ => string.Empty,
+        };
+    }
+
+    /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>
+    private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth) && _editor is not null)
+        {
+            _editor.MaxUndoSteps = Settings.UndoDepthValue;
+        }
+    }
+
     /// <summary>右侧编辑面板里正在挑的颜色。</summary>
     public ColorEditorViewModel Color { get; } = new();
 
@@ -359,6 +430,8 @@ public partial class MainViewModel : ViewModelBase
                 _video = new VideoService();
                 // 每解出一帧抬一次序号;位图是同一个对象,界面靠它知道内容变了。
                 _video.FrameUpdated += (_, _) => VideoFrameVersion++;
+                // 播放器刚建出来,把设置里的音量与输出设备应用上去。
+                _audio.Apply(Settings.AudioOutputDeviceId, Settings.AudioVolume);
             }
 
             return _video;
@@ -435,7 +508,10 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void StartEditing(Timeline timeline)
     {
-        _editor = new TimelineEditor(timeline);
+        _editor = new TimelineEditor(timeline)
+        {
+            MaxUndoSteps = Settings.UndoDepthValue,
+        };
         SetBlockSelection([]);
         CurrentBlock = null;
         SelectedFrames = BlockFrameRange.Empty;

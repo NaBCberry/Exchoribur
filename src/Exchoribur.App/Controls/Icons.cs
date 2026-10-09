@@ -151,4 +151,19 @@ public static class Icons
     /// <summary>界面 · 主题(lucide: sun)</summary>
     public static Geometry Theme { get; } = Geometry.Parse("M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41");
 
+    /// <summary>设置 · 检查更新(lucide: refresh-cw)</summary>
+    public static Geometry Refresh { get; } = Geometry.Parse("M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5");
+
+    /// <summary>设置 · 下载更新(lucide: download)</summary>
+    public static Geometry Download { get; } = Geometry.Parse("M12 15V3 M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5");
+
+    /// <summary>设置 · 打开所在文件夹(lucide: folder-open)</summary>
+    public static Geometry FolderOpen { get; } = Geometry.Parse("M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2");
+
+    /// <summary>设置 · 恢复默认(lucide: rotate-ccw)</summary>
+    public static Geometry RotateCcw { get; } = Geometry.Parse("M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5");
+
+    /// <summary>设置 · 外部链接(lucide: external-link)</summary>
+    public static Geometry ExternalLink { get; } = Geometry.Parse("M15 3h6v6 M10 14 21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
+
 }

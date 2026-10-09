@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             x:Class="Exchoribur.App.Views.Settings.UpdatesPage"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel Spacing="10">
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="当前版本" />
+                    <TextBlock Grid.Column="1"
+                               Classes="rowValue"
+                               Text="{Binding CurrentVersionText}" />
+                </Grid>
+
+                <TextBlock Classes="note"
+                           IsVisible="{Binding !IsUpdateSupported}"
+                           Text="当前是开发运行(没有安装信息),自动更新不可用。装上安装包或解压便携版之后才生效。" />
+
+                <CheckBox Content="启动时检查更新"
+                          IsChecked="{Binding CheckForUpdatesOnStartup}"
+                          IsEnabled="{Binding IsUpdateSupported}" />
+                <CheckBox Content="发现新版本后自动下载"
+                          IsChecked="{Binding AutoDownloadUpdates}"
+                          IsEnabled="{Binding IsUpdateSupported}" />
+                <CheckBox Content="接收预发布版本(-beta 之类)"
+                          IsChecked="{Binding IncludePrereleaseVersions}"
+                          IsEnabled="{Binding IsUpdateSupported}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="状态" />
+                    <TextBlock Grid.Column="1"
+                               Classes="rowValue"
+                               MaxWidth="380"
+                               TextWrapping="Wrap"
+                               Text="{Binding UpdateStatusText}" />
+                </Grid>
+
+                <ProgressBar Height="4"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding UpdateProgress}"
+                             IsVisible="{Binding IsUpdateProgressVisible}"
+                             Foreground="{DynamicResource AccentBrush}" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="立即检查更新"
+                            Command="{Binding CheckForUpdatesCommand}"
+                            IsEnabled="{Binding IsUpdateSupported}"
+                            Padding="12,4" />
+                    <Button Content="下载"
+                            Command="{Binding DownloadUpdateCommand}"
+                            IsEnabled="{Binding CanDownloadUpdate}"
+                            Padding="12,4" />
+                    <Button Content="重启并安装"
+                            Command="{Binding ApplyUpdateCommand}"
+                            IsEnabled="{Binding CanApplyUpdate}"
+                            Padding="12,4" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+
+</UserControl>

@@ -29,6 +29,9 @@ public partial class App : Application
 
             desktop.MainWindow = window;
 
+            // 等窗口出来再查更新:网络慢也不影响启动。
+            window.Opened += (_, _) => viewModel.StartBackgroundUpdateCheck();
+
             // 允许从命令行直接打开一个工程文件(Exchoribur.exe 演出.csv),
             // 以后做文件关联也是走这里。加载失败只在状态栏提示,不拦住启动。
             var path = desktop.Args?.FirstOrDefault(

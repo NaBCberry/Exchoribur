@@ -73,8 +73,87 @@ public sealed class VideoService : IDisposable
 
     public bool IsAvailable => _player is not null;
 
+    /// <summary>预览音量(0-100)。</summary>
+    public double Volume
+    {
+        get => _player?.Volume ?? 0;
+        set
+        {
+            if (_player is { } player)
+            {
+                player.Volume = (int)Math.Round(Math.Clamp(value, 0, 100));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 可选的音频输出设备。"跟随系统默认"不在这张表里,由界面自己补一项。
+    /// 拿不到列表(比如解码器不可用)时返回空表,调用方按"只能用默认设备"处理。
+    /// </summary>
+    public IReadOnlyList<AudioDeviceOption> GetAudioDevices()
+    {
+        if (_libVlc is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            var devices = _libVlc.AudioOutputDevices(DefaultAudioOutputModule);
+
+            // 有些平台上模块名对不上,退回播放器自己枚举当前模块。
+            if (devices.Length == 0 && _player is { } player)
+            {
+                devices = player.AudioOutputDeviceEnum ?? [];
+            }
+
+            return
+            [
+                .. devices
+                    .Where(device => !string.IsNullOrWhiteSpace(device.DeviceIdentifier))
+                    .Select(device => new AudioDeviceOption(
+                        device.DeviceIdentifier,
+                        string.IsNullOrWhiteSpace(device.Description)
+                            ? device.DeviceIdentifier
+                            : device.Description)),
+            ];
+        }
+        catch (Exception)
+        {
+            // 设备枚举失败不算错误:预览照样能出声,只是没法挑设备。
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// 切到指定音频输出设备;id 为空表示跟随系统默认。
+    /// 设备列表里的东西不保证都能用,失败就保持原样。
+    /// </summary>
+    public void ApplyAudioDevice(string? deviceId)
+    {
+        if (_player is not { } player)
+        {
+            return;
+        }
+
+        try
+        {
+            player.SetOutputDevice(deviceId ?? string.Empty);
+        }
+        catch (Exception)
+        {
+            // 忽略:切不过去不影响已经载入的预览。
+        }
+    }
+
     /// <summary>有新一帧画好了(界面线程触发),界面据此重画。</summary>
     public event EventHandler? FrameUpdated;
+
+    /// <summary>各平台的音频输出模块名,枚举设备时要指定一个。</summary>
+    private static string DefaultAudioOutputModule =>
+        OperatingSystem.IsWindows() ? "mmdevice"
+        : OperatingSystem.IsMacOS() ? "auhal"
+        : "pulse";
 
     public TimeSpan Position => TimeSpan.FromMilliseconds(_player?.Time ?? 0);
 
@@ -105,7 +184,6 @@ public sealed class VideoService : IDisposable
         _media = new Media(_libVlc, path, FromType.FromPath);
         _media.AddOption(":start-paused");
 
-        _player.Volume = 80;
         return _player.Play(_media);
     }
 

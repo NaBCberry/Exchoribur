@@ -8,19 +8,30 @@ namespace Exchoribur.Core.Editing;
 /// </summary>
 public sealed class TimelineEditor
 {
-    /// <summary>
-    /// 最多记多少步。一步可能覆盖几万帧,留太多内存会一直涨;
-    /// 超过就丢最老的那一步。
-    /// </summary>
-    private const int MaxUndoSteps = 50;
-
     private readonly List<ITimelineEdit> _done = [];
     private readonly List<ITimelineEdit> _undone = [];
+
+    /// <summary>上限的默认值、上下限。</summary>
+    public const int DefaultMaxUndoSteps = 50;
+    private const int MinMaxUndoSteps = 10;
+    private const int MaxMaxUndoSteps = 500;
+
+    private int _maxUndoSteps = DefaultMaxUndoSteps;
 
     public TimelineEditor(Timeline timeline)
     {
         ArgumentNullException.ThrowIfNull(timeline);
         Timeline = timeline;
+    }
+
+    /// <summary>
+    /// 最多记多少步。一步可能覆盖几万帧,留太多内存会一直涨;超过就丢最老的那一步。
+    /// 调小之后已经在历史里的步骤不会被立刻丢掉,只是之后不会再涨到新上限之上。
+    /// </summary>
+    public int MaxUndoSteps
+    {
+        get => _maxUndoSteps;
+        set => _maxUndoSteps = Math.Clamp(value, MinMaxUndoSteps, MaxMaxUndoSteps);
     }
 
     /// <summary>当前内容。每次编辑、撤销、重做都会换成新对象。</summary>
@@ -47,7 +58,7 @@ public sealed class TimelineEditor
         // 有了新动作,原来的"重做"分支就作废了。
         _undone.Clear();
 
-        if (_done.Count > MaxUndoSteps)
+        if (_done.Count > _maxUndoSteps)
         {
             _done.RemoveAt(0);
         }

@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             x:Class="Exchoribur.App.Views.Settings.TimelineEditPage"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel Spacing="10">
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="撤销步数" />
+                    <TextBox Grid.Column="1"
+                             Width="90"
+                             Padding="6,2"
+                             FontSize="12"
+                             Text="{Binding UndoDepth}" />
+                </Grid>
+                <TextBlock Classes="note"
+                           Text="{Binding UndoDepthHint}" />
+                <TextBlock Classes="note"
+                           Text="一步可能覆盖几万帧,记得太多内存会一直涨;改完立刻生效。" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+
+</UserControl>

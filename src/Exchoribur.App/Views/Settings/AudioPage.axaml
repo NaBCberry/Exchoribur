@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:services="using:Exchoribur.App.Services"
+             x:Class="Exchoribur.App.Views.Settings.AudioPage"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel Spacing="10">
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="输出设备" />
+                    <ComboBox Grid.Column="1"
+                              Width="280"
+                              ItemsSource="{Binding AudioDevices}"
+                              SelectedItem="{Binding SelectedAudioDevice}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:AudioDeviceOption">
+                                <TextBlock Text="{Binding Description}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+                <Button Content="刷新设备列表"
+                        Command="{Binding RefreshAudioDeviceListCommand}"
+                        HorizontalAlignment="Left"
+                        Padding="12,4" />
+                <TextBlock Classes="note"
+                           IsVisible="{Binding HasAudioDeviceHint}"
+                           Text="{Binding AudioDeviceHint}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="预览音量" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Slider Width="240"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="{Binding AudioVolume}" />
+                        <TextBlock Classes="rowValue"
+                                   Width="44"
+                                   Text="{Binding AudioVolumeText}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+
+</UserControl>

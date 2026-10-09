@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             x:Class="Exchoribur.App.Views.Settings.BlocksPage"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel Spacing="10">
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="新建块默认长度(毫秒)" />
+                    <TextBox Grid.Column="1"
+                             Width="110"
+                             Padding="6,2"
+                             FontSize="12"
+                             Text="{Binding DefaultBlockLengthMilliseconds}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+
+</UserControl>
