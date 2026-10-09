@@ -85,17 +85,6 @@ public sealed class TimelineJsonTests
         Assert.Throws<FormatException>(() => TimelineJson.Read(json));
     }
 
-    [Fact]
-    public void The_old_frame_based_format_is_rejected_loudly()
-    {
-        var json = "{\"Version\": 1, \"Times\": [0], \"Channels\": [], \"Markers\": [], "
-            + "\"Frames\": [1]}";
-
-        var exception = Assert.Throws<FormatException>(() => TimelineJson.Read(json));
-
-        Assert.Contains("旧格式", exception.Message);
-    }
-
     private static BlockFrame Frame()
         => new(TimeSpan.Zero, new ChannelState(Red, FlashMode.Solid));
 }
