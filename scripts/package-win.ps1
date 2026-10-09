@@ -37,6 +37,7 @@ $vpkVersion = '1.2.161'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $publishDir = Join-Path $repoRoot (Join-Path $OutputRoot "publish-$Runtime")
 $releaseDir = Join-Path $repoRoot (Join-Path $OutputRoot 'releases')
+$Icon = Join-Path $repoRoot 'src/Exchoribur.App/Assets/icon-symbol.ico'
 
 function Get-VpkCommand {
     $command = Get-Command vpk -ErrorAction SilentlyContinue
@@ -102,7 +103,8 @@ $packArguments = @(
     '--runtime', $Runtime,
     '--packTitle', 'Exchoribur',
     '--packAuthors', 'NaBCberry',
-    '--outputDir', $releaseDir
+    '--outputDir', $releaseDir,
+    '--icon', $Icon
 )
 if ($ReleaseNotes) {
     $packArguments += @('--releaseNotes', $ReleaseNotes)

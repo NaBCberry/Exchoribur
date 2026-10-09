@@ -8,7 +8,7 @@
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="760"
         x:Class="Exchoribur.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/icon-symbol.ico"
         Width="1280" Height="760"
         MinWidth="960" MinHeight="600"
         Background="{DynamicResource WindowBackgroundBrush}"
