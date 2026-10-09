@@ -56,7 +56,7 @@ jobs:
         shell: pwsh
         env:
           TARGET_VERSION: ${{ inputs.version }}
-        run: ./scripts/release.ps1 -Version $env:TARGET_VERSION -Yes
+        run: ./scripts/release.ps1 -Version $env:TARGET_VERSION -Yes -AllowSameVersion
 
   build-and-publish:
     name: Build and publish

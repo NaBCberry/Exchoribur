@@ -9,6 +9,7 @@
   pwsh scripts/release.ps1 -Bump minor          # 0.1.0 -> 0.2.0
   pwsh scripts/release.ps1 -Bump preminor       # 0.1.0 -> 0.2.0-beta.1
   pwsh scripts/release.ps1 -Version 1.0.0
+  pwsh scripts/release.ps1 -Version 0.1.0 -AllowSameVersion   # 版本号不变,直接打标签
   pwsh scripts/release.ps1 -Bump patch -DryRun  # 只打印将要执行的步骤
 #>
 [CmdletBinding()]
@@ -28,6 +29,9 @@ param(
 
     # 只在本地产出提交和标签,由你自己推
     [switch] $NoPush,
+
+    # 目标版本和当前版本相同时,不报错,直接给当前提交打标签
+    [switch] $AllowSameVersion,
 
     [string] $Branch = 'main'
 )
@@ -65,7 +69,11 @@ function Get-NextVersion {
     switch ($Kind) {
         'major' { return "$($v.Major + 1).0.0" }
         'minor' { return "$($v.Major).$($v.Minor + 1).0" }
-        'patch' { return "$($v.Major).$($v.Minor).$($v.Patch + 1)" }
+        'patch' {
+            # 当前是预发布时不往上加:1.2.3-beta.1 的下一版是 1.2.3
+            if ($v.Pre) { return "$($v.Major).$($v.Minor).$($v.Patch)" }
+            return "$($v.Major).$($v.Minor).$($v.Patch + 1)"
+        }
         'premajor' { return "$($v.Major + 1).0.0-beta.1" }
         'preminor' { return "$($v.Major).$($v.Minor + 1).0-beta.1" }
         'prepatch' { return "$($v.Major).$($v.Minor).$($v.Patch + 1)-beta.1" }
@@ -141,8 +149,9 @@ try {
     if ($target -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
         throw "版本号格式不对:$target(应形如 1.2.3 或 1.2.3-beta.1)"
     }
-    if ($target -eq $current) {
-        throw "版本号没有变化,仍是 $current。"
+    $sameVersion = $target -eq $current
+    if ($sameVersion -and -not $AllowSameVersion) {
+        throw "版本号没有变化,仍是 $current。按当前版本直接打标签就加 -AllowSameVersion。"
     }
 
     $branch = (& git rev-parse --abbrev-ref HEAD).Trim()
@@ -169,8 +178,13 @@ try {
 
     $commitMessage = "chore(release): 发布 $tag"
     Write-Host ''
-    Write-Host "==> 版本:$current -> $target"
-    Write-Host "==> 提交:$commitMessage"
+    if ($sameVersion) {
+        Write-Host "==> 版本:$target(与当前一致,不改文件也不提交)"
+    }
+    else {
+        Write-Host "==> 版本:$current -> $target"
+        Write-Host "==> 提交:$commitMessage"
+    }
     Write-Host "==> 标签:$tag"
     Write-Host "==> 推送:$branch 与 $tag$(if ($NoPush) { ' (已跳过)' } else { '' })"
 
@@ -188,11 +202,14 @@ try {
         }
     }
 
-    $updated = [regex]::Replace($props, '<Version>[^<]*</Version>', "<Version>$target</Version>")
-    [System.IO.File]::WriteAllText($propsPath, $updated, (New-Object System.Text.UTF8Encoding($false)))
+    if (-not $sameVersion) {
+        $updated = [regex]::Replace($props, '<Version>[^<]*</Version>', "<Version>$target</Version>")
+        [System.IO.File]::WriteAllText($propsPath, $updated, (New-Object System.Text.UTF8Encoding($false)))
 
-    Invoke-Git @('add', 'Directory.Build.props')
-    Invoke-Git @('commit', '-m', $commitMessage)
+        Invoke-Git @('add', 'Directory.Build.props')
+        Invoke-Git @('commit', '-m', $commitMessage)
+    }
+
     Invoke-Git @('tag', '-a', $tag, '-m', "Exchoribur $tag")
 
     if (-not $NoPush) {

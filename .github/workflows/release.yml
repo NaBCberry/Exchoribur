@@ -220,7 +220,9 @@ jobs:
             '--outputDir', $setup.DirectoryName,
             '--tag', $env:TAG,
             '--releaseName', "Exchoribur $($env:VERSION)",
-            '--publish'
+            '--publish',
+            # 重跑时 Release 已经存在,不加这个会直接失败
+            '--merge'
           )
           if ($env:PRERELEASE -eq 'true') {
             $arguments += '--pre'
@@ -242,7 +244,8 @@ jobs:
             throw '没找到发布说明文件。'
           }
 
-          & gh release edit $env:TAG --notes-file $notes.FullName
+          # 这一步没有 checkout,gh 认不出当前仓库,必须显式指定
+          & gh release edit $env:TAG --repo ${{ github.repository }} --notes-file $notes.FullName
           if ($LASTEXITCODE -ne 0) {
             throw "写入发布说明失败(退出码 $LASTEXITCODE)"
           }

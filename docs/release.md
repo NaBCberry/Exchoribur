@@ -39,6 +39,10 @@ pwsh scripts/release.ps1 -Bump patch -DryRun   # 只看会做什么
 
 不想推送时加 `-NoPush`,只在本地产出提交和标签。
 
+两个细节和 bumpp 保持一致:当前是预发布版本时,"修订"落在对应的正式版上
+(`0.1.1-beta.1` -> `0.1.1`);目标版本和当前版本相同时,加 `-AllowSameVersion`
+就跳过改文件和提交、直接给当前提交打标签,用于发第一个版本或补发。
+
 ## 一键发布(Actions)
 
 `Release (Manual Bump)` 工作流只需要填一个版本号,它会做和本地脚本完全相同的事,
@@ -52,6 +56,9 @@ pwsh scripts/release.ps1 -Bump patch -DryRun   # 只看会做什么
 手动触发 `Release` 工作流时把 `tag` 留空(或勾上 `dry_run`),就只做校验、测试、
 构建、打包,产物作为工作流附件留着,不创建 Release。想随时确认"安装包还打得出来"
 就用这个方式。
+
+发布中途失败可以修完再重跑同一个标签:上传那步带了 `--merge`,不会因为 Release
+已经存在而失败。
 
 ## 产物
 
