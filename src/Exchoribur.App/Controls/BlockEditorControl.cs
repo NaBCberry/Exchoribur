@@ -286,26 +286,23 @@ public sealed class BlockEditorControl : Control
         var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var position = e.GetPosition(this);
 
-        // 编辑器里只有一个通道,滚轮用来横向平移最顺手;缩放交给 Ctrl+滚轮,
-        // 和主时间轴"Ctrl+滚轮 = 缩放、普通滚轮 = 挪动"的分工保持一致。
+        // 编辑器里只有一条通道,上下没有可动的东西:滚轮一律横向平移,
+        // Ctrl + 滚轮横向缩放,和主时间轴的分工一致。
+        var trackpadGesture = !shift && TimelineWheel.IsHorizontalGesture(e.Delta.X, e.Delta.Y);
+        var steps = trackpadGesture
+            ? TimelineWheel.FingerSteps(e.Delta.X)
+            : TimelineWheel.WheelSteps(e.Delta.X, e.Delta.Y);
+        var inverted = trackpadGesture ? InvertTouchpadScroll : InvertMouseWheel;
+
         if (control)
         {
             viewport.Zoom(
-                TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
+                TimelineWheel.ZoomFactor(steps, inverted, ZoomPerWheelStep),
                 position.X - TrackLeft);
-        }
-        else if (shift || Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y))
-        {
-            viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
-                e.Delta.X,
-                e.Delta.Y,
-                InvertMouseWheel,
-                PanPixelsPerWheelStep));
         }
         else
         {
-            // 普通滚轮:横向平移(往上滚 = 看后面)。
-            viewport.PanByPixels(TimelineWheel.ShiftPanPixels(0, e.Delta.Y, InvertMouseWheel, PanPixelsPerWheelStep));
+            viewport.PanByPixels(TimelineWheel.PanPixels(steps, inverted, PanPixelsPerWheelStep));
         }
 
         e.Handled = true;

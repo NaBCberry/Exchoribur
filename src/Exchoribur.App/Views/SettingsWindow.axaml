@@ -30,12 +30,12 @@
             <CheckBox Content="反转鼠标滚轮方向" IsChecked="{Binding InvertMouseWheel}" />
             <TextBlock Classes="note"
                        Margin="26,0,0,6"
-                       Text="影响滚轮的放大缩小,以及 Shift + 滚轮的横向平移。" />
+                       Text="影响滚轮的平移和缩放,带 Shift / Ctrl 的组合键一起翻。" />
 
             <CheckBox Content="反转触摸板横向滑动方向" IsChecked="{Binding InvertTouchpadScroll}" />
             <TextBlock Classes="note"
                        Margin="26,0,0,0"
-                       Text="触摸板的竖向滑动和鼠标滚轮走同一条缩放路径,竖向方向由上面那一项控制。" />
+                       Text="只影响触摸板横向滑动;触摸板的竖向滑动按上面那一项算。" />
 
             <TextBlock Classes="panelTitle" Text="编排块" Margin="0,10,0,0" />
 

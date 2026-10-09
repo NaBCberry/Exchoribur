@@ -3,45 +3,53 @@ namespace Exchoribur.App.Controls;
 /// <summary>滚轮这一下该干什么。</summary>
 internal enum TimelineWheelAction
 {
-    /// <summary>缩放时间轴。</summary>
-    Zoom,
+    /// <summary>左右平移时间轴。</summary>
+    PanLeftRight,
 
-    /// <summary>横向平移时间轴。</summary>
-    Pan,
+    /// <summary>上下平移轨道。</summary>
+    PanUpDown,
+
+    /// <summary>左右缩放时间轴(时间方向)。</summary>
+    ZoomLeftRight,
+
+    /// <summary>上下缩放轨道(每行多高)。</summary>
+    ZoomUpDown,
 }
 
 /// <summary>
-/// 判断一次滚轮/触摸板滑动到底是缩放还是平移,以及换算成多少倍率、多少像素。
-/// 鼠标滚轮只有纵向分量;触摸板常常两个方向一起给,所以要按"哪一边更大"来定,
-/// 否则手指稍微歪一点,想缩放就变成了平移。
+/// 滚轮和触摸板滑动的分工,主时间轴和块编辑器共用这一份规则:
+///   滚轮 = 左右平移,Shift + 滚轮 = 上下平移,
+///   Ctrl + 滚轮 = 左右缩放,Ctrl + Shift + 滚轮 = 上下缩放。
+/// 鼠标滚轮只给纵向增量;触摸板常常两个方向一起给,横向分量更大时按横向处理,
+/// 否则手指稍微歪一点就会走错分支。
 /// </summary>
 internal static class TimelineWheel
 {
-    public static TimelineWheelAction Decide(double deltaX, double deltaY, bool shiftPressed)
-    {
-        if (shiftPressed)
-        {
-            return TimelineWheelAction.Pan;
-        }
+    /// <summary>组合键决定做什么;往哪边、走多远由 Steps 决定。</summary>
+    public static TimelineWheelAction Decide(bool shiftPressed, bool controlPressed)
+        => controlPressed
+            ? (shiftPressed ? TimelineWheelAction.ZoomUpDown : TimelineWheelAction.ZoomLeftRight)
+            : (shiftPressed ? TimelineWheelAction.PanUpDown : TimelineWheelAction.PanLeftRight);
 
-        return Math.Abs(deltaX) > Math.Abs(deltaY)
-            ? TimelineWheelAction.Pan
-            : TimelineWheelAction.Zoom;
-    }
+    /// <summary>这次手势算横向还是纵向:横向分量更大就算横向。</summary>
+    public static bool IsHorizontalGesture(double deltaX, double deltaY)
+        => Math.Abs(deltaX) > Math.Abs(deltaY);
 
-    /// <summary>缩放倍率:滚轮往上放大。inverted 是设置页里的"反转鼠标滚轮"。</summary>
-    public static double ZoomFactor(double deltaY, bool inverted, double stepPerNotch)
-        => Math.Pow(stepPerNotch, (inverted ? -1 : 1) * deltaY);
+    /// <summary>触摸板的横向滑动:方向跟手指一致,往右为正。</summary>
+    public static double FingerSteps(double deltaX) => deltaX;
 
-    /// <summary>Shift + 滚轮的横向平移:滚轮往上 = 往时间轴前段看。</summary>
-    public static double ShiftPanPixels(double deltaX, double deltaY, bool inverted, double pixelsPerStep)
-    {
-        // 有些平台会把 Shift+滚轮直接送成横向事件,那种情况按横向增量算。
-        var step = deltaY != 0 ? deltaY : -deltaX;
-        return (inverted ? -1 : 1) * step * pixelsPerStep;
-    }
+    /// <summary>
+    /// 滚轮折算成格数,正数表示往上滚。有些平台(Windows 上按住 Shift 时)会把滚轮
+    /// 送成横向事件,这种情况 deltaY 是 0,得把横向增量取反折回"往上"。
+    /// </summary>
+    public static double WheelSteps(double deltaX, double deltaY)
+        => deltaY != 0 ? deltaY : -deltaX;
 
-    /// <summary>触摸板的横向滑动:方向要跟手指一致。</summary>
-    public static double TouchpadPanPixels(double deltaX, bool inverted, double pixelsPerStep)
-        => (inverted ? -1 : 1) * deltaX * pixelsPerStep;
+    /// <summary>缩放倍率:往上滚(或手指往右)放大。inverted 是设置页里的方向反转。</summary>
+    public static double ZoomFactor(double steps, bool inverted, double stepPerNotch)
+        => Math.Pow(stepPerNotch, (inverted ? -1 : 1) * steps);
+
+    /// <summary>平移像素:往上滚 = 往时间轴后段看,横向手势里手指往右 = 内容跟着往右。</summary>
+    public static double PanPixels(double steps, bool inverted, double pixelsPerStep)
+        => (inverted ? -1 : 1) * steps * pixelsPerStep;
 }

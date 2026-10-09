@@ -27,7 +27,7 @@ public sealed class TimelineControl : Control
     /// <summary>滚轮一格放大/缩小的比例。</summary>
     private const double ZoomPerWheelStep = 1.25;
 
-    /// <summary>滚轮一格平移多少像素(按住 Shift 或用触控板横扫时)。</summary>
+    /// <summary>滚轮一格平移多少像素。</summary>
     private const double PanPixelsPerWheelStep = 60;
 
     /// <summary>文字缓存的上限,超过就整体清掉,免得长时间平移把它撑大。</summary>
@@ -919,72 +919,59 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 设置页里的两个开关。鼠标滚轮那一项同时管缩放和 Shift+平移。
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var position = e.GetPosition(this);
 
-        // Ctrl + Shift + 滚轮:上下滚动轨道(和把指针放到左边 CH 列上滚等效)。
-        if (control && shift)
-        {
-            if (_vertical.ScrollBy(-e.Delta.Y * PanPixelsPerWheelStep, TrackHeight))
-            {
-                InvalidateVisual();
-            }
+        // 触摸板横向滑动按手指方向算;滚轮(含被平台送成横向事件的 Shift+滚轮)
+        // 按"往上滚为正"算。方向反转因此也分成鼠标和触摸板两个设置。
+        var trackpadGesture = !shift && TimelineWheel.IsHorizontalGesture(e.Delta.X, e.Delta.Y);
+        var steps = trackpadGesture
+            ? TimelineWheel.FingerSteps(e.Delta.X)
+            : TimelineWheel.WheelSteps(e.Delta.X, e.Delta.Y);
+        var inverted = trackpadGesture ? InvertTouchpadScroll : InvertMouseWheel;
 
+        // 指针在左边通道名那一列:普通滚轮改用来上下平移轨道,比横着挪更顺手。
+        if (!shift && !control && position.X < TimelineLayout.TrackLeft)
+        {
+            ScrollTracksBy(-TimelineWheel.PanPixels(steps, inverted, PanPixelsPerWheelStep));
             e.Handled = true;
             return;
         }
 
-        // Ctrl + 滚轮:纵向缩放(一行多高),指针所在的通道尽量不动。
-        if (control && !shift)
+        switch (TimelineWheel.Decide(shift, control))
         {
-            ZoomRows(
-                TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
-                position.Y);
-            e.Handled = true;
-            return;
-        }
-
-        // 指针在左边通道名那一列:滚轮用来上下滚动轨道。
-        if (!shift && position.X < TimelineLayout.TrackLeft)
-        {
-            if (_vertical.ScrollBy(-e.Delta.Y * PanPixelsPerWheelStep, TrackHeight))
-            {
-                InvalidateVisual();
-            }
-
-            e.Handled = true;
-            return;
-        }
-
-        switch (TimelineWheel.Decide(e.Delta.X, e.Delta.Y, shift))
-        {
-            case TimelineWheelAction.Pan when shift:
-                viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
-                    e.Delta.X,
-                    e.Delta.Y,
-                    InvertMouseWheel,
-                    PanPixelsPerWheelStep));
+            case TimelineWheelAction.PanLeftRight:
+                viewport.PanByPixels(TimelineWheel.PanPixels(steps, inverted, PanPixelsPerWheelStep));
                 break;
 
-            case TimelineWheelAction.Pan:
-                // 触摸板的横向滑动。
-                viewport.PanByPixels(TimelineWheel.TouchpadPanPixels(
-                    e.Delta.X,
-                    InvertTouchpadScroll,
-                    PanPixelsPerWheelStep));
+            case TimelineWheelAction.PanUpDown:
+                ScrollTracksBy(-TimelineWheel.PanPixels(steps, inverted, PanPixelsPerWheelStep));
+                break;
+
+            case TimelineWheelAction.ZoomLeftRight:
+                // 指针所在的时间点缩放前后停在原地。
+                viewport.Zoom(
+                    TimelineWheel.ZoomFactor(steps, inverted, ZoomPerWheelStep),
+                    position.X - TimelineLayout.TrackLeft);
                 break;
 
             default:
-                // 普通滚轮:以指针位置为锚点缩放。
-                viewport.Zoom(
-                    TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
-                    position.X - TimelineLayout.TrackLeft);
+                // 指针所在的那条通道缩放前后停在原地。
+                ZoomRows(TimelineWheel.ZoomFactor(steps, inverted, ZoomPerWheelStep), position.Y);
                 break;
         }
 
         e.Handled = true;
+    }
+
+    /// <summary>上下平移轨道。</summary>
+    private void ScrollTracksBy(double deltaPixels)
+    {
+        if (_vertical.ScrollBy(deltaPixels, TrackHeight))
+        {
+            InvalidateVisual();
+        }
     }
 
     /// <summary>纵向缩放:以指针所在的通道为锚点,让它缩放前后停在原地。</summary>

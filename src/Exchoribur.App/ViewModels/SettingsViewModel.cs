@@ -32,7 +32,7 @@ public partial class SettingsViewModel : ViewModelBase
         _initializing = false;
     }
 
-    /// <summary>反转鼠标滚轮方向:放大缩小和 Shift+滚轮的横向平移一起翻。</summary>
+    /// <summary>反转鼠标滚轮方向:平移和缩放一起翻。</summary>
     [ObservableProperty]
     public partial bool InvertMouseWheel { get; set; }
 

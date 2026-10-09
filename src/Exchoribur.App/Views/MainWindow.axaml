@@ -341,27 +341,39 @@
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="0,1,0,0"
                                     CornerRadius="0,0,3,3">
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Center"
-                                            Spacing="2"
-                                            Margin="0,0,6,0">
-                                    <Button Classes="transport"
-                                            ToolTip.Tip="放大(滚轮向上)"
-                                            Command="{Binding ZoomInCommand}">
-                                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
-                                    </Button>
-                                    <Button Classes="transport"
-                                            ToolTip.Tip="缩小(滚轮向下)"
-                                            Command="{Binding ZoomOutCommand}">
-                                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
-                                    </Button>
-                                    <Button Classes="transport"
-                                            ToolTip.Tip="适配全部"
-                                            Command="{Binding FitAllCommand}">
-                                        <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
-                                    </Button>
-                                </StackPanel>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <!-- 滚轮分工提示:窗口窄的时候省略号收尾,不挤走右边的按钮 -->
+                                    <TextBlock Grid.Column="0"
+                                               Margin="8,0"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource DimTextBrush}"
+                                               FontSize="12"
+                                               Text="滚轮:水平平移&#160;&#160;Ctrl+滚轮:水平缩放&#160;&#160;Shift+滚轮:垂直平移&#160;&#160;Ctrl+Shift+滚轮:垂直缩放" />
+
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Spacing="2"
+                                                Margin="0,0,6,0">
+                                        <Button Classes="transport"
+                                                ToolTip.Tip="放大(Ctrl + 滚轮向上)"
+                                                Command="{Binding ZoomInCommand}">
+                                            <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
+                                        </Button>
+                                        <Button Classes="transport"
+                                                ToolTip.Tip="缩小(Ctrl + 滚轮向下)"
+                                                Command="{Binding ZoomOutCommand}">
+                                            <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
+                                        </Button>
+                                        <Button Classes="transport"
+                                                ToolTip.Tip="适配全部"
+                                                Command="{Binding FitAllCommand}">
+                                            <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
     
                             <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
