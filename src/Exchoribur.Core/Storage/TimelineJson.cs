@@ -43,15 +43,6 @@ public static class TimelineJson
     public static Timeline Read(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
-
-        // 早先的版本是按"扁平帧"存的(Frames 数组)。那个形态已经淘汰了,
-        // 与其静静地读成一条空时间轴,不如明确报出来。
-        if (json.Contains("\"Frames\"", StringComparison.Ordinal)
-            && !json.Contains("\"Blocks\"", StringComparison.Ordinal))
-        {
-            throw new FormatException("这个工程是按旧格式(逐帧)存的,现在的版本只认编排块;请重新导入 CSV。");
-        }
-
         TimelineDto? dto;
         try
         {
