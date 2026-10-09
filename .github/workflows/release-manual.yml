@@ -1,0 +1,69 @@
+name: Release (Manual Bump)
+
+# 一键发布:在 Actions 页面填个版本号,自动完成
+# 「改版本号 -> 提交 -> 打标签 -> 构建 -> 发 Release」。
+#
+# 注意:本工作流用 GITHUB_TOKEN 推送提交和标签,而 GITHUB_TOKEN 推送产生的
+# 事件不会触发其他工作流(GitHub 的防递归规则),所以这里必须显式调用
+# release.yml,不能指望推标签去触发它。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "目标版本号,如 0.2.0 或 0.2.0-beta.1(不要带 v 前缀)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-manual
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump and tag
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      # 只在 main 上发布,避免在别的分支上打标签
+      - name: Ensure running on main
+        shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if ($env:REF_NAME -ne 'main') {
+            Write-Host "::error::请在 main 分支上运行本工作流(当前:$($env:REF_NAME))。"
+            exit 1
+          }
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # 与本地发布共用同一个脚本,行为完全一致
+      - name: Bump version, commit and push tag
+        shell: pwsh
+        env:
+          TARGET_VERSION: ${{ inputs.version }}
+        run: ./scripts/release.ps1 -Version $env:TARGET_VERSION -Yes
+
+  build-and-publish:
+    name: Build and publish
+    needs: bump
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+    with:
+      tag: v${{ inputs.version }}
+      dry_run: false

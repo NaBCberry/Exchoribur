@@ -1,0 +1,261 @@
+name: Release
+
+# 两条入口:
+#   1. 推送 v* 标签(本地跑 scripts/release.ps1 之后就会走这条)
+#   2. Actions 页面手动触发:tag 留空表示拿当前提交的版本号干跑一次,不创建 Release
+# release-manual.yml 也会用 workflow_call 复用这里。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已存在的标签(如 v0.1.0);留空表示干跑,只打包不发布"
+        required: false
+        type: string
+      dry_run:
+        description: "只构建并上传工作流产物,不创建 Release"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        description: "要发布的标签"
+        required: true
+        type: string
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+
+# 创建 Release、上传资产都需要写权限;仓库默认是 read,必须显式声明
+permissions:
+  contents: write
+
+# 同一个标签的发布不允许并发,避免重复创建 Release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  AVALONIA_TELEMETRY_OPTOUT: 1
+  # 与 Exchoribur.App.csproj 里的 Velopack 包版本保持一致
+  VPK_VERSION: 1.2.161
+
+jobs:
+  prepare:
+    name: Verify tag and version
+    runs-on: windows-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      dry_run: ${{ steps.meta.outputs.dry_run }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          # 发布说明要按标签区间生成,必须取回完整历史与标签
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # 标签和版本号对不上就直接失败,免得给错的版本创建 Release
+      - name: Resolve tag and version
+        id: meta
+        shell: pwsh
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } elseif ($env:REF_NAME -like 'v*') { $env:REF_NAME } else { '' }
+          $version = (dotnet msbuild src/Exchoribur.App/Exchoribur.App.csproj -getProperty:Version -nologo).Trim()
+
+          # 没拿到标签就只能是干跑,绝不能顺手创建 Release
+          $dryRun = ($env:INPUT_DRY_RUN -eq 'true') -or [string]::IsNullOrEmpty($tag)
+          if (-not $dryRun -and "v$version" -ne $tag) {
+            Write-Host "::error::标签 $tag 与 Directory.Build.props 里的版本 $version 不一致,先改版本号再打标签。"
+            exit 1
+          }
+
+          $isDryRun = if ($dryRun) { 'true' } else { 'false' }
+          $prerelease = if ($version -like '*-*') { 'true' } else { 'false' }
+          Write-Host "标签:$tag 版本:$version 干跑:$isDryRun 预发布:$prerelease"
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "dry_run=$isDryRun" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+
+      - name: Generate release notes
+        shell: pwsh
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          $target = if ($env:TAG) { $env:TAG } else { 'HEAD' }
+          ./scripts/release-notes.ps1 -ToRef $target -OutputPath artifacts/release-notes.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: artifacts/release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+
+  package:
+    name: Build packages
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: artifacts
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # 发布前照跑一遍测试:本地打的标签不一定经过 CI
+      - name: Restore
+        run: dotnet restore Exchoribur.slnx
+      - name: Build
+        run: dotnet build Exchoribur.slnx --configuration Release --no-restore
+      - name: Test
+        run: dotnet test Exchoribur.slnx --configuration Release --no-build
+
+      - name: Install vpk
+        run: dotnet tool install --global vpk --version ${{ env.VPK_VERSION }}
+
+      - name: Package
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: ./scripts/package-win.ps1 -Version $env:VERSION -ReleaseNotes artifacts/release-notes.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: exchoribur-win
+          path: artifacts/releases/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write package summary
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+        run: |
+          $files = Get-ChildItem artifacts/releases -File | Sort-Object Name
+          $lines = New-Object System.Collections.Generic.List[string]
+          $lines.Add("### 打包完成：Exchoribur $($env:VERSION)")
+          $lines.Add('')
+          $lines.Add('| 文件 | 大小 |')
+          $lines.Add('| --- | --- |')
+          foreach ($file in $files) {
+            $lines.Add("| $($file.Name) | $('{0:N1}' -f ($file.Length / 1MB)) MB |")
+          }
+          if ($env:DRY_RUN -eq 'true') {
+            $lines.Add('')
+            $lines.Add('干跑模式：没有创建 Release，产物在上面的工作流附件里。')
+          }
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+  publish:
+    name: Create GitHub Release
+    needs: [prepare, package]
+    if: needs.prepare.outputs.dry_run != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install vpk
+        run: dotnet tool install --global vpk --version ${{ env.VPK_VERSION }}
+
+      # vpk 负责按更新清单该有的样子传资产;它没有发布说明参数,正文随后补
+      - name: Upload assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          # 附件下载下来的目录层级不保证和上传时一致,自己找一遍更稳
+          $setup = Get-ChildItem -Path artifacts -Recurse -File -Filter '*Setup.exe' | Select-Object -First 1
+          if (-not $setup) {
+            throw '没找到安装包,附件可能没传成功。'
+          }
+          Write-Host "资产目录:$($setup.DirectoryName)"
+
+          $arguments = @(
+            'upload', 'github',
+            '--repoUrl', 'https://github.com/${{ github.repository }}',
+            '--token', $env:GH_TOKEN,
+            '--outputDir', $setup.DirectoryName,
+            '--tag', $env:TAG,
+            '--releaseName', "Exchoribur $($env:VERSION)",
+            '--publish'
+          )
+          if ($env:PRERELEASE -eq 'true') {
+            $arguments += '--pre'
+          }
+
+          & vpk @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "vpk upload github 失败(退出码 $LASTEXITCODE)"
+          }
+
+      - name: Attach release notes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          $notes = Get-ChildItem -Path artifacts -Recurse -File -Filter 'release-notes.md' | Select-Object -First 1
+          if (-not $notes) {
+            throw '没找到发布说明文件。'
+          }
+
+          & gh release edit $env:TAG --notes-file $notes.FullName
+          if ($LASTEXITCODE -ne 0) {
+            throw "写入发布说明失败(退出码 $LASTEXITCODE)"
+          }
+
+      - name: Write release summary
+        shell: pwsh
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          @(
+            '### 发布完成 ✅'
+            ''
+            "- 版本：``$($env:VERSION)``"
+            "- Release：https://github.com/${{ github.repository }}/releases/tag/$($env:TAG)"
+          ) -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

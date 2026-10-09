@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Velopack;
 
 namespace Exchoribur.App;
 
@@ -9,8 +10,13 @@ sealed class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        // 安装包在首次启动、升级和卸载时要靠这个钩子做收尾,必须跑在界面初始化之前。
+        VelopackApp.Build().Run();
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()

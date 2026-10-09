@@ -49,6 +49,14 @@ dotnet run --project src/Exchoribur.App   # 启动应用
 
 需要 .NET 10 SDK。CI 在 Windows、Linux、macOS 三个平台分别编译并测试。
 
+## 发布
+
+版本号写在 `Directory.Build.props`,标签形如 `v0.1.0`。本地跑
+`pwsh scripts/release.ps1` 交互选版本号即可完成「改版本号 → 提交 → 打标签 →
+推送」,推送后 CI 自动构建 Windows 安装包并创建 Release;也可以直接在 Actions
+里跑 `Release (Manual Bump)` 填版本号。细节见
+[docs/release.md](docs/release.md)。
+
 ## 许可
 
 尚未决定,当前默认保留所有权利。
