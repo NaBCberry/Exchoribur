@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="ring" x1="160" y1="290" x2="833" y2="834" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a3faff"/>
+      <stop offset=".5" stop-color="#4ed9fa"/>
+      <stop offset="1" stop-color="#40befb"/>
+    </linearGradient>
+    <linearGradient id="upperRing" x1="83" y1="295" x2="250" y2="421" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a8d9ff"/>
+      <stop offset="1" stop-color="#59a8fa"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="449" y1="105" x2="580" y2="660" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset=".43" stop-color="#ecfdff"/>
+      <stop offset="1" stop-color="#b8f7ff"/>
+    </linearGradient>
+    <linearGradient id="centerBlade" x1="500" y1="210" x2="524" y2="656" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#50e5f3"/>
+      <stop offset="1" stop-color="#25aaff"/>
+    </linearGradient>
+    <linearGradient id="fan" x1="198" y1="109" x2="430" y2="383" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8bbfff"/>
+      <stop offset=".55" stop-color="#d8f3ff"/>
+      <stop offset="1" stop-color="#9cd9ff"/>
+    </linearGradient>
+    <linearGradient id="guard" x1="512" y1="652" x2="512" y2="842" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset=".48" stop-color="#eefaff"/>
+      <stop offset="1" stop-color="#acdfff"/>
+    </linearGradient>
+    <radialGradient id="gem" cx="38%" cy="30%" r="75%">
+      <stop stop-color="#a8ffeb"/>
+      <stop offset=".7" stop-color="#71ffe8"/>
+      <stop offset="1" stop-color="#34ddeb"/>
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="smallGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs>
+
+  
+
+  <!-- 主体按内容边界放大到填满画布,参数由 scripts/make-icons.py 量出 -->
+  <g id="foreground" transform="translate(-81.77, -108.82) scale(1.257985)">
+    <path d="M512 115 572 238v375q6 19 46 36l-63 35-43 28-43-28-63-35q40-17 46-36V238Z" fill="#00a9ff" opacity=".65" filter="url(#glow)"/>
+    <circle cx="511" cy="700" r="64" fill="#00aeff" opacity=".55" filter="url(#smallGlow)"/>
+
+    
+    <path d="M457 158c69-10 137 1 197 30l-21 35c-55-27-116-34-184-21 6-15 8-30 8-44Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M676 200c56 33 101 79 136 137l-36 20c-30-50-69-91-121-121Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M824 356c15 28 27 58 34 88l-40 11c-7-28-17-55-30-79Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M864 473c7 31 8 61 4 91l-41-7c3-25 1-50-3-75Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M863 594C831 762 686 884 511 884c-72 0-139-21-196-60l22-36c51 36 111 55 174 55 153 0 279-108 311-258Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M231 320c-27 65-40 131-40 209 0 99 47 187 126 245l-22 34c-91-64-145-165-145-279 0-79 28-153 81-209Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="16"/>
+    <path d="M74 400c27-61 77-106 141-126l35 16c-66 22-116 70-143 139-13-2-25-15-33-29Z" fill="url(#upperRing)" stroke="url(#upperRing)" stroke-width="16"/>
+
+    
+    <path d="M330 235c-25-64 24-125 99-140 30 91-7 143-67 155Z" fill="url(#fan)"/>
+    <path d="M309 234c-14-51-54-70-116-49 4 69 44 103 104 87Z" fill="#94c8ff"/>
+    <path d="M306 276c-50 13-76 57-57 116 66-14 91-52 81-99Z" fill="url(#fan)"/>
+    <path d="M346 278c30-32 76-26 92 38-48 20-83 5-93-26Z" fill="#b9e5ff"/>
+    <circle cx="330" cy="261" r="39" fill="#003477"/>
+    <circle cx="330" cy="261" r="28" fill="url(#gem)"/>
+    <ellipse cx="319" cy="242" rx="7" ry="4" transform="rotate(-30 319 242)" fill="#fff" opacity=".55"/>
+
+    
+    <path d="m512 104 64 130v376c0 18 16 30 45 39l-66 30-43 31-43-31-66-30c29-9 45-21 45-39V234Z" fill="url(#blade)"/>
+    <path d="m512 139 49 101v384l-49 53-49-53V240Z" fill="#edfcff"/>
+    <path d="m463 240 37 13v405l-37-34Z" fill="#b9f7ff"/>
+    <path d="m561 240-38 13v405l38-34Z" fill="#d7fcff"/>
+    <path d="m512 211 11 41v407l-11 18-12-18V252Z" fill="url(#centerBlade)"/>
+    <path d="m463 356 37 36v266l-37-34Z" fill="#a2f2ff" opacity=".65"/>
+    <path d="m561 356-38 36v266l38-34Z" fill="#a7efff" opacity=".55"/>
+    <path d="m463 624-37 25 51 23 23-20Z" fill="#e9fbff"/>
+    <path d="m561 624 37 25-51 23-24-20Z" fill="#e9fbff"/>
+
+    
+    <path d="M330 658c65 5 109 10 139 20 9-17 24-27 43-27s34 10 43 27c30-10 74-15 139-20-15 34-39 53-76 59-53 9-80 37-81 85v40c-17 2-33 2-51 0v-40c-1-48-28-76-81-85-37-6-61-25-75-59Z" fill="url(#guard)"/>
+    <path d="M345 673c60 6 96 17 123 38l5 36c-17-31-39-45-72-50-26-4-43-11-56-24Z" fill="#a5d5f5" opacity=".55"/>
+    <path d="M679 673c-60 6-96 17-123 38l-5 36c17-31 39-45 72-50 26-4 43-11 56-24Z" fill="#a5d5f5" opacity=".55"/>
+    <path d="M473 788c8 16 12 33 13 53l-13-2Z" fill="#0064bb" opacity=".45"/>
+    <path d="M551 788c-8 16-12 33-14 53l14-2Z" fill="#0064bb" opacity=".45"/>
+    <path d="M486 802q26 2 51 0v13q-26 2-51 0Zm0 27q26 2 51 0v13q-26 3-51 0Z" fill="#e0faff"/>
+
+    
+    <circle cx="512" cy="700" r="47" fill="#003e86"/>
+    <circle cx="512" cy="700" r="34" fill="url(#gem)"/>
+    <circle cx="512" cy="700" r="24" fill="#2ce0d8" opacity=".7"/>
+    <ellipse cx="525" cy="684" rx="6" ry="8" transform="rotate(-28 525 684)" fill="#fff" opacity=".9"/>
+  </g>
+</svg>
