@@ -10,7 +10,7 @@ using Exchoribur.Core.Updates;
 namespace Exchoribur.App.ViewModels;
 
 /// <summary>
-/// 设置页的数据。结构照 Studio Pro:上面一排一级分类(带图标),
+/// 设置页的数据。
 /// 下面一排二级页,内容按分组摆。改一项就写回文件,所以没有确定/取消。
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase
