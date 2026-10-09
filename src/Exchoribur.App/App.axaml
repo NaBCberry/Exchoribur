@@ -12,6 +12,9 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- 顺序有意义:先颜色,再全局样式,最后设置页自己的样式 -->
+        <StyleInclude Source="avares://Exchoribur/Styles/Colors.axaml" />
         <StyleInclude Source="avares://Exchoribur/Styles/Theme.axaml" />
+        <StyleInclude Source="avares://Exchoribur/Styles/Settings.axaml" />
     </Application.Styles>
 </Application>

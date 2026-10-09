@@ -2,19 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        配色参考 DaVinci Resolve 的深色界面:大面积中性深灰、低饱和,
-        只在播放头和高亮上用一点暖色。数值都可以直接改,改完重跑就能看到。
+        全程序通用的样式:文字、图标、面板、播放条上的按钮。
+        颜色在 Styles/Colors.axaml,设置窗口自己的样式在 Styles/Settings.axaml,
+        三个文件都在 App.axaml 里按顺序挂上去。
     -->
-    <Styles.Resources>
-        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#1B1B1B" />
-        <SolidColorBrush x:Key="ChromeBackgroundBrush" Color="#202020" />
-        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#262626" />
-        <SolidColorBrush x:Key="PanelBorderBrush" Color="#3A3A3A" />
-        <SolidColorBrush x:Key="TextBrush" Color="#C8C8C8" />
-        <SolidColorBrush x:Key="DimTextBrush" Color="#8A8A8A" />
-        <!-- 强调色,和播放头同色:保存进度条这类"还在动"的提示用它 -->
-        <SolidColorBrush x:Key="AccentBrush" Color="#FF5A36" />
-    </Styles.Resources>
 
     <!--
         界面字体:拉丁字母和数字用随程序打包的 Inter(设计类软件里最常见的选择),
@@ -88,155 +79,11 @@
         <Setter Property="Height" Value="28" />
     </Style>
 
-    <!-- 设置页里挂在开关下面的说明文字 -->
+    <!-- 挂在控件下面的说明文字:小一号、暗色、会自动换行 -->
     <Style Selector="TextBlock.note">
         <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="TextWrapping" Value="Wrap" />
-    </Style>
-
-    <!--
-        设置窗口的导航:
-        一级分类是铺满窗口的一条,每一格等宽,选中那格填强调色、带圆角;
-        二级页紧贴在内容区上边,和内容区共用同一个背景形状,只有最外侧两个上角是圆的。
-        高亮由 ViewModel 的 IsSelected 决定(selected 这个类),不依赖列表控件的选中状态。
-    -->
-    <Style Selector="ItemsControl.settingsTabs">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-
-    <!-- 一级:每一格等宽,内容居中,选中整格填强调色 -->
-    <Style Selector="Button.topTab">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="4" />
-        <!--
-            Fluent 的按钮主题把 HorizontalAlignment 定成了 Left,不覆盖的话按钮
-            只占内容宽度、还贴在等分格的左边,整格高亮就成了左偏的一小块。
-        -->
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="VerticalAlignment" Value="Stretch" />
-        <!-- 不留外边距:每一格都顶到自己的边界,最左最右就正好是窗口两边 -->
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Button.topTab /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Padding" Value="6,8" />
-        <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Background" Value="Transparent" />
-    </Style>
-
-    <Style Selector="Button.topTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#26FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.topTab:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#40FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.topTab.selected /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    </Style>
-
-    <Style Selector="TextBlock.topTabTitle">
-        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="HorizontalAlignment" Value="Center" />
-    </Style>
-
-    <!-- 选中之后文字和图标转白,免得压在强调色上看不清 -->
-    <Style Selector="Button.topTab.selected TextBlock.topTabTitle">
-        <Setter Property="Foreground" Value="#FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.topTab.selected Path.tabIcon">
-        <Setter Property="Stroke" Value="#FFFFFF" />
-    </Style>
-
-    <!--
-        二级:一个个紧挨的标签,像文件夹标签那样。
-        选中的那个填强调色、上面两角是圆的、底边和内容区严丝合缝地连在一起;
-        未选中的只有暗色文字,相邻标签之间用一条细线分开。
-    -->
-    <Style Selector="Button.subTab">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0,0,1,0" />
-        <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Button.subTab /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Padding" Value="14,7" />
-        <Setter Property="CornerRadius" Value="6,6,0,0" />
-        <Setter Property="Background" Value="Transparent" />
-    </Style>
-
-    <Style Selector="Button.subTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#26FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.subTab.selected /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    </Style>
-
-    <Style Selector="TextBlock.subTabTitle">
-        <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
-        <Setter Property="FontSize" Value="12" />
-    </Style>
-
-    <Style Selector="Button.subTab:pointerover TextBlock.subTabTitle">
-        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-    </Style>
-
-    <Style Selector="Button.subTab.selected TextBlock.subTabTitle">
-        <Setter Property="Foreground" Value="#FFFFFF" />
-    </Style>
-
-    <!-- 内容区里的分组块和一行一项 -->
-    <Style Selector="Border.settingsGroup">
-        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Padding" Value="12,10" />
-    </Style>
-
-    <Style Selector="TextBlock.rowLabel">
-        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="TextBlock.rowValue">
-        <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <!-- 分组块里的一行:左标签右控件,行之间留一点间距 -->
-    <Style Selector="Grid.settingsRow">
-        <Setter Property="Margin" Value="0,4" />
-    </Style>
-
-    <!-- 分类方块里的图标:比按钮图标大一点 -->
-    <Style Selector="Path.tabIcon">
-        <Setter Property="Fill" Value="{x:Null}" />
-        <Setter Property="Stroke" Value="{DynamicResource TextBrush}" />
-        <Setter Property="StrokeThickness" Value="1.6" />
-        <Setter Property="StrokeLineCap" Value="Round" />
-        <Setter Property="StrokeJoin" Value="Round" />
-        <Setter Property="Stretch" Value="Uniform" />
-        <Setter Property="Width" Value="24" />
-        <Setter Property="Height" Value="24" />
-        <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
 
     <!--
