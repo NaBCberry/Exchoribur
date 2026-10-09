@@ -219,7 +219,7 @@ jobs:
             '--token', $env:GH_TOKEN,
             '--outputDir', $setup.DirectoryName,
             '--tag', $env:TAG,
-            '--releaseName', "Exchoribur $($env:VERSION)",
+            '--releaseName', "Release v$($env:VERSION)",
             '--publish',
             # 重跑时 Release 已经存在,不加这个会直接失败
             '--merge'

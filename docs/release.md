@@ -60,6 +60,20 @@ pwsh scripts/release.ps1 -Bump patch -DryRun   # 只看会做什么
 发布中途失败可以修完再重跑同一个标签:上传那步带了 `--merge`,不会因为 Release
 已经存在而失败。
 
+## 发布说明
+
+说明由 `scripts/release-notes.ps1` 按标签区间生成,格式和 termground 的 Release
+一致(那边用 changelogen 生成):
+
+- 按类型分节,标题为 `🚀 Enhancements`、`🔥 Performance`、`🩹 Fixes`、
+  `💅 Refactors`、`📖 Documentation`、`📦 Build`、`🌊 Types`、`🏡 Chore`、
+  `🏀 Examples`、`✅ Tests`、`🎨 Styles`、`🤖 CI`,顺序固定,空节不输出。
+- 带 `!` 的提交单独进 `🚨 Breaking Changes`,排在所有分节之前。
+- 条目形如 `- **scope:** 摘要 ([短哈希](提交链接))`,没有 scope 时省略加粗前缀。
+- 末尾是 `❤️ Contributors`,按提交作者去重。
+
+Release 标题统一写成 `Release vX.Y.Z`。
+
 ## 产物
 
 | 文件 | 用途 |
