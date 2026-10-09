@@ -28,7 +28,8 @@ public sealed class BlockEditorControl : Control
     private const double TrackRightPadding = 10;
     private const double BlockCornerRadius = 5;
     private const double BlockTitleHeight = 16;
-    private const double FrameMarkerWidth = 2;
+    /// <summary>帧刻度的宽度,也是"挤到什么程度就不再逐帧画"的阈值。</summary>
+    internal const double FrameMarkerWidth = 2;
     private const int TextCacheLimit = 256;
 
     /// <summary>滚轮一格放大/缩小的比例。</summary>
@@ -61,6 +62,10 @@ public sealed class BlockEditorControl : Control
     private static readonly IPen DividerPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")), 1);
 
     private readonly Dictionary<uint, IBrush> _brushCache = [];
+    /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
+    private readonly List<BlockColorRun> _colorRuns = [];
+    /// <summary>一帧里要画的帧刻度,同上,复用列表。</summary>
+    private readonly List<FrameTick> _frameTicks = [];
     private readonly Dictionary<(string Text, double Size, IBrush Brush), FormattedText> _textCache = [];
 
     private FontFamily? _cachedFontFamily;
@@ -341,8 +346,8 @@ public sealed class BlockEditorControl : Control
 
         using (context.PushClip(new Rect(TrackLeft, bodyTop, trackWidth, bodyHeight)))
         {
-            DrawOtherBlocks(context, current, viewport, bodyTop, bodyHeight);
-            DrawCurrentBlock(context, current, viewport, bodyTop, bodyHeight);
+            DrawOtherBlocks(context, current, viewport, bodyTop, bodyHeight, trackWidth);
+            DrawCurrentBlock(context, current, viewport, bodyTop, bodyHeight, trackWidth);
             DrawFrameSelection(context, current, viewport, bodyTop, bodyHeight);
         }
 
@@ -357,7 +362,8 @@ public sealed class BlockEditorControl : Control
         Block current,
         TimelineViewport viewport,
         double bodyTop,
-        double bodyHeight)
+        double bodyHeight,
+        double trackWidth)
     {
         var blocks = Blocks;
         if (blocks is null)
@@ -377,7 +383,7 @@ public sealed class BlockEditorControl : Control
             context.FillRectangle(DimBlockFill, rect);
 
             // 把这一块自己的灯光也画出来,只是盖一层灰表示"现在不能改它"。
-            DrawBlockColors(context, block, viewport, rect);
+            DrawBlockColors(context, block, viewport, rect, trackWidth);
             context.FillRectangle(DimScrim, rect);
 
             context.FillRectangle(
@@ -402,7 +408,8 @@ public sealed class BlockEditorControl : Control
         Block block,
         TimelineViewport viewport,
         double bodyTop,
-        double bodyHeight)
+        double bodyHeight,
+        double trackWidth)
     {
         var rect = BlockRect(block.Start, block.End, viewport, bodyTop, bodyHeight);
 
@@ -424,13 +431,23 @@ public sealed class BlockEditorControl : Control
         var tickHeight = Math.Max(0, rect.Bottom - tickTop);
 
         // 每一帧:一根竖线 + 底部一个该帧颜色的小方块。
-        for (var index = 0; index < frames.Count; index++)
+        // 只画可见范围里的,并且挤到不足一根刻度宽时只画其中一根。
+        _frameTicks.Clear();
+        BlockFrameTicks.Append(
+            _frameTicks,
+            block,
+            viewport,
+            TrackLeft,
+            TrackLeft + trackWidth,
+            FrameMarkerWidth);
+
+        foreach (var tick in _frameTicks)
         {
-            var x = TrackLeft + viewport.MapTime(block.Start + frames[index].Offset);
+            var x = tick.X;
 
             context.FillRectangle(FrameTick, new Rect(x, tickTop, FrameMarkerWidth, tickHeight));
             context.FillRectangle(
-                BrushFor(frames[index].State.Color),
+                BrushFor(frames[tick.FrameIndex].State.Color),
                 new Rect(x, rect.Bottom - 9, Math.Max(FrameMarkerWidth, 9), 8));
         }
 
@@ -442,7 +459,8 @@ public sealed class BlockEditorControl : Control
         DrawingContext context,
         Block block,
         TimelineViewport viewport,
-        Rect rect)
+        Rect rect,
+        double trackWidth)
     {
         var frames = block.Frames;
         if (frames.Count == 0)
@@ -457,26 +475,15 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        var frameIndex = 0;
-        var from = (int)Math.Floor(rect.X);
-        var to = (int)Math.Ceiling(rect.Right);
+        // 只画落在可视区里的列,并把相邻同色像素合成一段,长块才不会拖垮一帧。
+        _colorRuns.Clear();
+        BlockColorRuns.Append(_colorRuns, block, viewport, TrackLeft, TrackLeft + trackWidth);
 
-        for (var x = from; x < to; x++)
+        foreach (var run in _colorRuns)
         {
-            var offset = viewport.MapX(x - TrackLeft) - block.Start;
-            if (offset < TimeSpan.Zero)
-            {
-                offset = TimeSpan.Zero;
-            }
-
-            while (frameIndex + 1 < frames.Count && frames[frameIndex + 1].Offset <= offset)
-            {
-                frameIndex++;
-            }
-
             context.FillRectangle(
-                BrushFor(frames[frameIndex].State.Color),
-                new Rect(x, bodyTop, 1, bodyHeight));
+                BrushFor(run.Color),
+                new Rect(run.X, bodyTop, run.Width, bodyHeight));
         }
     }
 

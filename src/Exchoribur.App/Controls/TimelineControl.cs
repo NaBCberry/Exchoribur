@@ -83,6 +83,8 @@ public sealed class TimelineControl : Control
 
     // 每次重画都要用、但值不会变的东西缓存起来少做重复功。
     private readonly Dictionary<uint, IBrush> _brushCache = [];
+    /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
+    private readonly List<BlockColorRun> _colorRuns = [];
     private readonly Dictionary<(string Text, double Size), FormattedText> _dimTextCache = [];
     private readonly Dictionary<(string Text, double Size), FormattedText> _blockTextCache = [];
     private readonly Dictionary<string, FormattedText> _markerTextCache = [];
@@ -438,7 +440,7 @@ public sealed class TimelineControl : Control
                 Math.Max(3, x1 - x0),
                 Math.Max(6, rowHeight - (BlockInset * 2)));
 
-            DrawBlockBody(context, block, viewport, rect);
+            DrawBlockBody(context, block, viewport, rect, trackWidth);
             DrawBlockTitle(context, block, rect);
 
             var pen = SelectedBlockPen;
@@ -460,7 +462,8 @@ public sealed class TimelineControl : Control
         DrawingContext context,
         Block block,
         TimelineViewport viewport,
-        Rect rect)
+        Rect rect,
+        double trackWidth)
     {
         var bodyTop = rect.Y + BlockTitleHeight;
         var bodyHeight = rect.Height - BlockTitleHeight;
@@ -471,26 +474,20 @@ public sealed class TimelineControl : Control
 
         context.FillRectangle(BlockFill, new Rect(rect.X, bodyTop, rect.Width, bodyHeight));
 
-        var frames = block.Frames;
-        var frameIndex = 0;
-        var from = (int)Math.Floor(rect.X);
-        var to = (int)Math.Ceiling(rect.Right);
+        // 只画落在轨道区里的列:块可能长达几小时,整块逐像素画会拖垮一帧。
+        _colorRuns.Clear();
+        BlockColorRuns.Append(
+            _colorRuns,
+            block,
+            viewport,
+            TimelineLayout.TrackLeft,
+            TimelineLayout.TrackLeft + trackWidth);
 
-        for (var x = from; x < to; x++)
+        foreach (var run in _colorRuns)
         {
-            var offset = viewport.MapX(x - TimelineLayout.TrackLeft) - block.Start;
-            if (offset < TimeSpan.Zero)
-            {
-                offset = TimeSpan.Zero;
-            }
-
-            while (frameIndex + 1 < frames.Count && frames[frameIndex + 1].Offset <= offset)
-            {
-                frameIndex++;
-            }
-
-            var color = frames[frameIndex].State.Color;
-            context.FillRectangle(BrushFor(ColorKey(color)), new Rect(x, bodyTop, 1, bodyHeight));
+            context.FillRectangle(
+                BrushFor(ColorKey(run.Color)),
+                new Rect(run.X, bodyTop, run.Width, bodyHeight));
         }
     }
 
