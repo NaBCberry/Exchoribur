@@ -55,6 +55,32 @@
         <Setter Property="Foreground" Value="#E0705C" />
     </Style>
 
+    <!--
+        播放条左边的走带时间:等宽字体,数字宽度一致,播放时不会左右跳;
+        固定写满 hh:mm:ss.mmm,所以宽度也稳定。
+    -->
+    <Style Selector="TextBlock.clock">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, JetBrains Mono, Menlo, DejaVu Sans Mono" />
+        <!--
+            字号 26 是为了视觉高度和播放条上 20 像素的大图标齐平:图标那个 20 是
+            方框边长,字形 26 的数字笔画高度才大致是 20。
+        -->
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+
+    <!--
+        播放条上的读数框(走带时间、以后的各种显示面板):只负责占位和对齐,
+        不画底色,直接落在播放条背景上;高度统一,这样一排东西摆在一起是齐的。
+    -->
+    <Style Selector="Border.readout">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="10,0" />
+        <!-- 数字按 26 号字排,高度够它完整放下,不会被上下切掉 -->
+        <Setter Property="Height" Value="28" />
+    </Style>
+
     <!-- 设置页里挂在开关下面的说明文字 -->
     <Style Selector="TextBlock.note">
         <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />

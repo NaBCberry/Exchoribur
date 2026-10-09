@@ -184,10 +184,37 @@
                 Background="{DynamicResource ChromeBackgroundBrush}"
                 BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="8">
+            <!--
+                两侧列必须等宽(都是星号列),中间那组控件才会正好落在窗口正中;
+                写成 Auto 的话左列宽度就等于读数框本身,右对齐也就无从谈起。
+            -->
+            <Grid ColumnDefinitions="*,Auto,*" Margin="12,0">
+                <!--
+                    播放条按"槽位"排:中间那组控件固定居中,左右各一个槽位放显示面板。
+                    两侧列都是星号列、宽度相等,所以左右面板宽窄怎么变都不会推走中间。
+                    槽位内的顺序就是离中心的远近,越靠后越靠外;面板绑自己的 IsVisible,
+                    隐藏的项不占位,后面的自动顶上。
+                -->
+                <StackPanel x:Name="LeftSlot"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,12,0"
+                            Spacing="8">
+                    <!-- 走带光标所在处的时间,紧贴中间按钮组的左边 -->
+                    <Border Classes="readout">
+                        <TextBlock Classes="clock"
+                                   Text="{Binding PlayheadText}"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
                 <Button Classes="transport"
                         ToolTip.Tip="回到开头"
                         Command="{Binding GoToStartCommand}">
@@ -245,7 +272,17 @@
                           Data="{x:Static controls:Icons.Link}"
                           Stroke="{Binding LinkIconBrush}" />
                 </Button>
-            </StackPanel>
+                </StackPanel>
+
+                <!-- 右槽位:以后摆在按钮组右边的显示面板加在这里 -->
+                <StackPanel x:Name="RightSlot"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="12,0,0,0"
+                            Spacing="8" />
+            </Grid>
         </Border>
 
         <Grid ColumnDefinitions="340,*">

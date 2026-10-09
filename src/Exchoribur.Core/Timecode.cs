@@ -37,6 +37,26 @@ public static class Timecode
     public static string Format(TimeSpan time)
         => Format((long)Math.Round(time.TotalMilliseconds, MidpointRounding.AwayFromZero));
 
+    /// <summary>
+    /// 走带时间那种固定宽度的时间码:两位小时:两位分钟:两位秒.三位毫秒。
+    /// 不满一小时也照样写满 <c>hh:mm:ss.mmm</c>,这样数字宽度不变、播放时不会左右跳。
+    /// </summary>
+    public static string FormatClock(TimeSpan time)
+    {
+        var milliseconds = (long)Math.Round(time.TotalMilliseconds, MidpointRounding.AwayFromZero);
+        var sign = milliseconds < 0 ? "-" : string.Empty;
+        var total = Math.Abs(milliseconds);
+
+        var millisecondsPart = total % 1000;
+        var totalSeconds = total / 1000;
+        var seconds = totalSeconds % 60;
+        var totalMinutes = totalSeconds / 60;
+        var minutes = totalMinutes % 60;
+        var hours = totalMinutes / 60;
+
+        return $"{sign}{hours:00}:{minutes:00}:{seconds:00}.{millisecondsPart:000}";
+    }
+
     /// <summary>解析时间码文本,失败时返回 false 并把结果置零。</summary>
     public static bool TryParse(string? text, out long milliseconds)
     {

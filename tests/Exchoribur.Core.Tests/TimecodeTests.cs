@@ -32,6 +32,22 @@ public class TimecodeTests
     }
 
     [Theory]
+    [InlineData(0L, "00:00:00.000")]
+    [InlineData(1500L, "00:00:01.500")]
+    [InlineData(61_000L, "00:01:01.000")]
+    [InlineData(3_600_000L, "01:00:00.000")]
+    [InlineData(3_723_456L, "01:02:03.456")]
+    [InlineData(360_000_000L, "100:00:00.000")]
+    [InlineData(-1500L, "-00:00:01.500")]
+    public void FormatClock_always_writes_hours_minutes_seconds_and_milliseconds(
+        long milliseconds,
+        string expected)
+    {
+        // 播放条上的走带时间:不满一小时也写满 hh:mm:ss.mmm,数字宽度固定不跳。
+        Assert.Equal(expected, Timecode.FormatClock(TimeSpan.FromMilliseconds(milliseconds)));
+    }
+
+    [Theory]
     [InlineData("00:03.500", 3500L)]
     [InlineData("00:03,500", 3500L)]
     [InlineData("00:03.5", 3500L)]

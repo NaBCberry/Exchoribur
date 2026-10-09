@@ -279,6 +279,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial TimeSpan PlayheadTime { get; set; }
 
+    /// <summary>播放条左边那块走带时间,固定写成 hh:mm:ss.mmm。</summary>
+    public string PlayheadText => Timecode.FormatClock(PlayheadTime);
+
     [ObservableProperty]
     public partial Frame? CurrentFrame { get; set; }
 
@@ -465,6 +468,8 @@ public partial class MainViewModel : ViewModelBase
     {
         // 按块的取样规则取这一刻的灯光:落在块之间就是黑场。
         CurrentFrame = BlockSampler.Sample(Timeline, value);
+
+        OnPropertyChanged(nameof(PlayheadText));
 
         // 块编辑器跟着播放头走:播放时和主时间轴一样整页翻,拖动时只保证露出来就行。
         if (IsPlaying)
