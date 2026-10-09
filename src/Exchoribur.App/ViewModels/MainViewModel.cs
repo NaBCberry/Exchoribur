@@ -134,10 +134,14 @@ public partial class MainViewModel : ViewModelBase
     };
 
     /// <summary>
-    /// 块编辑器打开时聚焦的时刻:用块的开头。
-    /// 不跟播放头走是有意的——跟着走的话播放头一动编辑器就重新对焦,用户的缩放平移会被冲掉。
+    /// 块编辑器打开时聚焦的时刻:播放头已经在块里就跟着播放头,否则用块的开头。
+    /// 这个值只在"换块"时通知一次,播放头移动不会让它变化——否则编辑器会不停重新对焦,
+    /// 用户刚做的缩放平移就被冲掉了(播放时的跟随由 PageTo 负责)。
     /// </summary>
-    public TimeSpan CurrentBlockFocus => CurrentBlock?.Start ?? TimeSpan.Zero;
+    public TimeSpan CurrentBlockFocus
+        => CurrentBlock is { } block && PlayheadTime > block.Start && PlayheadTime < block.End
+            ? PlayheadTime
+            : CurrentBlock?.Start ?? TimeSpan.Zero;
 
     /// <summary>聚焦那一帧到下一帧的间隔;没有下一帧就用块剩下的长度,再不行给 1 秒。</summary>
     public TimeSpan CurrentBlockSpacing
@@ -461,6 +465,16 @@ public partial class MainViewModel : ViewModelBase
     {
         // 按块的取样规则取这一刻的灯光:落在块之间就是黑场。
         CurrentFrame = BlockSampler.Sample(Timeline, value);
+
+        // 块编辑器跟着播放头走:播放时和主时间轴一样整页翻,拖动时只保证露出来就行。
+        if (IsPlaying)
+        {
+            BlockEditorViewport.PageTo(value);
+        }
+        else
+        {
+            BlockEditorViewport.EnsureVisible(value);
+        }
 
         // 这个位置不是播放自己推出来的(用户拖动、点时间轴、跳帧),
         // 那么播放状态机和视频都要跟过来:视频永远显示播放头所在的那一帧,
@@ -867,8 +881,8 @@ public partial class MainViewModel : ViewModelBase
         PlayheadTime = _playback.Position;
         SyncPlaybackFlags();
 
-        // 播放时让播放头一直留在画面里:跑到右边会自动翻页。
-        Viewport.EnsureVisible(PlayheadTime);
+        // 播放时让播放头一直留在画面里:跑出画面就整页翻过去,落点在视口左边靠右一点。
+        Viewport.PageTo(PlayheadTime);
         KeepVideoInSync();
 
         if (!_playback.IsPlaying)

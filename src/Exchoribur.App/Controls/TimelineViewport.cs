@@ -16,6 +16,12 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     /// <summary>放大上限:每秒钟占 2000 像素(1 像素 ≈ 0.5 毫秒),再放大也没有信息可看。</summary>
     private const double MaxPixelsPerSecond = 2000;
 
+    /// <summary>
+    /// 播放时自动翻页后,播放头落在视口左侧这个比例的位置。
+    /// 取小值 = 每次翻一整页;取大值 = 每次只往前挪一点点。
+    /// </summary>
+    private const double PageLeadingRatio = 0.1;
+
     private TimeSpan _duration;
     private TimeSpan _contentStart;
     private TimeSpan _start;
@@ -101,6 +107,24 @@ public sealed class TimelineViewport : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 让画面正好显示 [start, start + length) 这一段(内容和总长不变)。
+    /// 块编辑器打开时用它:内容仍是整条轴,只是先把镜头对到要编辑的那一小段。
+    /// </summary>
+    public void ShowRange(TimeSpan start, TimeSpan length)
+    {
+        if (_duration <= TimeSpan.Zero || _trackWidth <= 0 || length <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _isFitToWidth = false;
+        _scale = Math.Clamp(_trackWidth / length.TotalSeconds, MinScale, MaxPixelsPerSecond);
+        _start = start;
+        ClampStart();
+        RaiseChanged();
+    }
+
+    /// <summary>
     /// 以某个像素位置为锚点缩放:锚点下面的那一瞬间在屏幕上不动,
     /// 这是"用滚轮放大想看某处"时最符合直觉的行为。
     /// </summary>
@@ -176,6 +200,28 @@ public sealed class TimelineViewport : INotifyPropertyChanged
             return;
         }
 
+        ClampStart();
+        RaiseChanged();
+    }
+
+    /// <summary>
+    /// 播放时用:播放头跑出画面就整页翻过去,翻完它落在视口左边靠右一点的位置
+    /// (而不是留在右边只往前挪一点点)。还在画面里就什么都不做。
+    /// </summary>
+    public void PageTo(TimeSpan time)
+    {
+        if (_duration <= TimeSpan.Zero || _trackWidth <= 0 || _scale <= 0)
+        {
+            return;
+        }
+
+        var visible = VisibleDuration;
+        if (time >= _start && time < _start + visible)
+        {
+            return;
+        }
+
+        _start = time - TimeSpan.FromSeconds(visible.TotalSeconds * PageLeadingRatio);
         ClampStart();
         RaiseChanged();
     }

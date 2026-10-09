@@ -193,6 +193,7 @@ public sealed class BlockEditorControl : Control
             }
 
             UpdateTrackWidth();
+            ResetContent();
             ApplyFocus();
             InvalidateVisual();
         }
@@ -205,6 +206,14 @@ public sealed class BlockEditorControl : Control
         else if (change.Property == FocusTimeProperty || change.Property == FocusSpacingProperty)
         {
             // 换了一个块:重新对焦。之后视口就交给用户,缩放平移不再被冲掉。
+            _focusApplied = false;
+            ApplyFocus();
+            InvalidateVisual();
+        }
+        else if (change.Property == BlocksProperty)
+        {
+            // 换了数据:内容(整条轴)和取景都重来。
+            ResetContent();
             _focusApplied = false;
             ApplyFocus();
             InvalidateVisual();
@@ -235,9 +244,33 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        viewport.SetContent(FocusTime - (spacing / 2), spacing * 2);
-        viewport.FitAll();
+        // 只换镜头,不动内容:内容始终是整条轴,这样光标走到哪都跟得上。
+        viewport.ShowRange(FocusTime - (spacing / 2), spacing * 2);
         _focusApplied = true;
+    }
+
+    /// <summary>把视口的内容设成整条轴(所有块合起来的时间范围)。</summary>
+    private void ResetContent()
+    {
+        var viewport = Viewport;
+
+        if (viewport is null)
+        {
+            return;
+        }
+
+        var blocks = Blocks;
+
+        if (blocks is not { Count: > 0 })
+        {
+            viewport.SetContent(TimeSpan.Zero);
+            return;
+        }
+
+        var start = blocks.Min(block => block.Start);
+        var end = blocks.Max(block => block.End);
+
+        viewport.SetContent(start, end - start);
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -250,29 +283,29 @@ public sealed class BlockEditorControl : Control
         }
 
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var position = e.GetPosition(this);
 
-        switch (TimelineWheel.Decide(e.Delta.X, e.Delta.Y, shift))
+        // 编辑器里只有一个通道,滚轮用来横向平移最顺手;缩放交给 Ctrl+滚轮,
+        // 和主时间轴"Ctrl+滚轮 = 缩放、普通滚轮 = 挪动"的分工保持一致。
+        if (control)
         {
-            case TimelineWheelAction.Pan when shift:
-                viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
-                    e.Delta.X,
-                    e.Delta.Y,
-                    InvertMouseWheel,
-                    PanPixelsPerWheelStep));
-                break;
-
-            case TimelineWheelAction.Pan:
-                viewport.PanByPixels(TimelineWheel.TouchpadPanPixels(
-                    e.Delta.X,
-                    InvertTouchpadScroll,
-                    PanPixelsPerWheelStep));
-                break;
-
-            default:
-                viewport.Zoom(
-                    TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
-                    e.GetPosition(this).X - TrackLeft);
-                break;
+            viewport.Zoom(
+                TimelineWheel.ZoomFactor(e.Delta.Y, InvertMouseWheel, ZoomPerWheelStep),
+                position.X - TrackLeft);
+        }
+        else if (shift || Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y))
+        {
+            viewport.PanByPixels(TimelineWheel.ShiftPanPixels(
+                e.Delta.X,
+                e.Delta.Y,
+                InvertMouseWheel,
+                PanPixelsPerWheelStep));
+        }
+        else
+        {
+            // 普通滚轮:横向平移(往上滚 = 看后面)。
+            viewport.PanByPixels(TimelineWheel.ShiftPanPixels(0, e.Delta.Y, InvertMouseWheel, PanPixelsPerWheelStep));
         }
 
         e.Handled = true;
@@ -551,7 +584,7 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        if (CurrentBlock is null || Viewport is null)
+        if (CurrentBlock is not { } block || Viewport is not { } viewport)
         {
             return;
         }
@@ -566,6 +599,11 @@ public sealed class BlockEditorControl : Control
 
         _isSelectingFrames = true;
         e.Pointer.Capture(this);
+
+        // 点哪一帧就把播放头挪到那一帧:选中它,播放也从这里开始(写入的是同一套播放状态)。
+        var frame = block.Frames[FrameIndexAt(block, viewport, point.Position.X)];
+        PlayheadTime = block.Start + frame.Offset;
+
         SelectFrameAt(point.Position.X, extend: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         e.Handled = true;
     }
