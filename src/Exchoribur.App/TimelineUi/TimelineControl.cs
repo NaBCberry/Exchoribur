@@ -10,12 +10,6 @@ using Exchoribur.Core.Models;
 
 namespace Exchoribur.App.TimelineUi;
 
-/// <summary>双击空白处建块的请求。</summary>
-public sealed record BlockCreateRequest(int Channel, TimeSpan Time);
-
-/// <summary>拖动块之后要把它们整体平移多少。</summary>
-public sealed record BlockMoveRequest(TimeSpan TimeDelta, int ChannelDelta);
-
 /// <summary>
 /// 主时间轴:左侧通道名列、顶部刻度与标记、十条通道行、块、播放头。
 /// 这里只画块、只操作块——灯光内容装在块里,帧级别的编辑在块编辑器里做。
