@@ -20,19 +20,15 @@ namespace Exchoribur.App.ViewModels;
 /// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
 /// 界面只管把这些属性画出来,不直接读文件。
 /// </summary>
-public partial class MainViewModel : ViewModelBase, IDisposable
+public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 {
     private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
 
-    private readonly IFilePicker? _filePicker;
     private readonly INamePrompt? _namePrompt;
-    private readonly IUnsavedChangesPrompt? _unsavedPrompt;
     private readonly IAudioDeviceController _audio;
     private readonly UpdateCoordinator _updates;
     private readonly PlaybackController _playback;
-
-    /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
-    private string? _projectPath;
+    private readonly ProjectSession _projects;
 
     /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
     private bool _disposed;
@@ -85,9 +81,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         IExternalLauncher? externalLauncher,
         Func<IVideoService>? videoFactory)
     {
-        _filePicker = filePicker;
         _namePrompt = namePrompt;
-        _unsavedPrompt = unsavedPrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
         _videoFactory = videoFactory ?? (() => new VideoService());
@@ -110,6 +104,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
         _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
+
+        // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
+        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt);
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;
@@ -331,27 +328,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     partial void OnIsModifiedChanged(bool value) => UpdateWindowTitle();
 
-    /// <summary>新建一个空工程,用它承载接下来的导入。</summary>
-    private void CreateDocument(string name, string? mediaPath = null)
-    {
-        Document = new TimelineDocument(name, Timeline.Empty, mediaPath);
-        TimelineName = Document.Name;
-        IsModified = false;
-
-        OnPropertyChanged(nameof(Document));
-        UpdateWindowTitle();
-    }
-
     private void UpdateWindowTitle()
         => WindowTitle = Document is null
             ? "Exchoribur"
             : $"{(IsModified ? "*" : string.Empty)}{TimelineName} — Exchoribur";
-
-    /// <summary>问一个名字;测试或命令行模式下没有对话框,直接沿用建议名。</summary>
-    private async Task<string?> AskForTimelineNameAsync(string suggestedName)
-        => _namePrompt is null
-            ? suggestedName
-            : await _namePrompt.AskAsync("新建时间线", suggestedName);
 
     /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
     [ObservableProperty]
@@ -633,339 +613,38 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
     [RelayCommand]
-    private async Task OpenAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        if (!await ConfirmDiscardChangesAsync())
-        {
-            return; // 用户决定停下来处理当前工程
-        }
-
-        var path = await _filePicker.PickTimelineAsync();
-        if (path is null)
-        {
-            return; // 用户点了取消
-        }
-
-        // 已经有工程:这是改里面的数据,不新建也不问名字。
-        if (Document is not null)
-        {
-            await LoadAsync(path);
-            return;
-        }
-
-        // 导入前先问工程名;取消就什么都不做,主窗口保持原样。
-        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
-        if (name is null)
-        {
-            return;
-        }
-
-        await LoadAsync(path, name);
-    }
+    private Task OpenAsync() => _projects.OpenAsync();
 
     /// <summary>菜单「文件 → 打开工程」:读一个 .exb,连参考媒体一起挂上。</summary>
     [RelayCommand]
-    private async Task OpenProjectAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        if (!await ConfirmDiscardChangesAsync())
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickProjectAsync();
-        if (path is null)
-        {
-            return;
-        }
-
-        await LoadProjectAsync(path);
-    }
+    private Task OpenProjectAsync() => _projects.OpenProjectAsync();
 
     /// <summary>
     /// 换文件、关窗口之前的确认。返回 true 表示可以继续;
     /// 用户选了取消,或者选了保存却没存成,都返回 false,调用方就停在原地。
     /// </summary>
-    public async Task<bool> ConfirmDiscardChangesAsync()
-    {
-        // 没有对话框可用时(设计器、命令行)按原来的行为继续,不拦。
-        if (_unsavedPrompt is null || !IsModified || Document is null)
-        {
-            return true;
-        }
-
-        var choice = await _unsavedPrompt.AskAsync(TimelineName) ?? UnsavedChangesChoice.Cancel;
-
-        switch (choice)
-        {
-            case UnsavedChangesChoice.Save:
-                await SaveProjectAsync();
-
-                // 没存成(保存失败,或者另存为被取消)时工程还是脏的,继续下去就丢改动了。
-                return !IsModified;
-
-            case UnsavedChangesChoice.Discard:
-                return true;
-
-            default:
-                return false;
-        }
-    }
+    public Task<bool> ConfirmDiscardChangesAsync() => _projects.ConfirmDiscardChangesAsync();
 
     /// <summary>拖进窗口的 CSV 按"打开"处理:同样先拦未保存的改动。</summary>
-    public async Task OpenDroppedAsync(string path)
-    {
-        if (await ConfirmDiscardChangesAsync())
-        {
-            await LoadAsync(path);
-        }
-    }
+    public Task OpenDroppedAsync(string path) => _projects.OpenDroppedAsync(path);
 
     /// <summary>保存工程。没存过就当作另存为。</summary>
     [RelayCommand]
-    private async Task SaveProjectAsync()
-    {
-        if (Document is null)
-        {
-            HasError = true;
-            StatusText = "还没有工程可保存，先打开工程或导入 CSV 或 视频。";
-            return;
-        }
-
-        if (_projectPath is null)
-        {
-            await SaveProjectAsAsync();
-            return;
-        }
-
-        await SaveProjectToAsync(_projectPath);
-    }
+    private Task SaveProjectAsync() => _projects.SaveAsync();
 
     [RelayCommand]
-    private async Task SaveProjectAsAsync()
-    {
-        if (Document is null || _filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickProjectSaveAsync($"{TimelineName}{ProjectFileFormat.Extension}");
-        if (path is null)
-        {
-            return;
-        }
-
-        await SaveProjectToAsync(path);
-    }
+    private Task SaveProjectAsAsync() => _projects.SaveAsAsync();
 
     /// <summary>打开工程文件。失败只改状态栏,不动已经打开的内容。</summary>
-    public async Task<bool> LoadProjectAsync(string path)
-    {
-        var fileName = Path.GetFileName(path);
-
-        try
-        {
-            // 读容器和解压媒体都不该卡住界面。
-            var document = await Task.Run(() => ProjectFile.Load(path));
-
-            _projectPath = path;
-            Document = document;
-            Timeline = document.Timeline;
-            TimelineName = document.Name;
-            IsModified = document.IsModified;
-            OnPropertyChanged(nameof(Document));
-            UpdateWindowTitle();
-
-            HasError = false;
-            HasVideo = document.MediaPath is { } media && OpenVideo(media);
-
-            StatusText = $"已打开工程 {fileName}:{document.Timeline.Blocks.Count:N0} 个块,"
-                + $"{document.Timeline.Markers.Count:N0} 个标记。";
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or FormatException
-            or InvalidDataException)
-        {
-            HasError = true;
-            StatusText = $"打开工程 {fileName} 失败:{exception.Message}";
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 保存工程。打包要原样复制整个参考视频,放在界面线程上做窗口会整段卡住,
-    /// 所以丢给后台跑,进度显示在状态栏上。
-    /// </summary>
-    private async Task SaveProjectToAsync(string path)
-    {
-        if (Document is null || IsSaving)
-        {
-            return;
-        }
-
-        var document = Document;
-        var fileName = Path.GetFileName(path);
-
-        IsSaving = true;
-        SaveProgress = 0;
-        HasError = false;
-        StatusText = $"正在保存工程 {fileName}…";
-
-        try
-        {
-            // Progress 是在界面线程上建的,后台线程报上来的进度会自动回到界面线程。
-            var progress = new Progress<ProjectSaveProgress>(report =>
-            {
-                // 保存已经收尾就不再改状态栏,免得最后一步的进度把结果盖掉。
-                if (!IsSaving)
-                {
-                    return;
-                }
-
-                StatusText = DescribeSaveProgress(fileName, report);
-                SaveProgress = report.Fraction * 100;
-            });
-
-            var result = await ProjectFile.SaveAsync(path, document, progress);
-
-            _projectPath = path;
-            document.MarkSaved();
-            IsModified = false;
-            UpdateWindowTitle();
-
-            // 参考视频不在了的话,这次只存下了时间轴。用报错样式说,免得用户以为存全了。
-            HasError = result.MissingMediaName is not null;
-            StatusText = result.MissingMediaName is null
-                ? $"工程 {fileName}已保存。"
-                : $"工程 {fileName}已保存,但参考视频 {result.MissingMediaName} 丢失,"
-                    + "视频未打包。";
-        }
-        catch (Exception exception)
-        {
-            // 这条链路最后落在 async void 上,漏出去的异常没人接得住,会直接把进程带走。
-            // 所以保存出任何问题都在这里收住,只写状态栏。
-            HasError = true;
-            StatusText = DescribeSaveFailure(fileName, exception);
-        }
-        finally
-        {
-            IsSaving = false;
-            SaveProgress = 0;
-        }
-    }
-
-    /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
-    internal static string DescribeSaveProgress(string fileName, ProjectSaveProgress progress)
-        => progress.Stage switch
-        {
-            ProjectSaveStage.Media =>
-                $"正在保存工程 {fileName}…打包参考视频 {progress.Fraction * 100:F0}%",
-            _ => $"正在保存工程 {fileName}…整理时间轴数据",
-        };
-
-    /// <summary>
-    /// 保存失败时状态栏那句话。系统给的是英文原文,而且只说"被占用",
-    /// 不会告诉用户该去关什么,所以能认出来的原因换成能照着做的说法。
-    /// </summary>
-    internal static string DescribeSaveFailure(string fileName, Exception exception)
-    {
-        var reason = FileFailure.Classify(exception) switch
-        {
-            FileFailureReason.InUse =>
-                "文件正被其他程序占用,关掉占用程序再试",
-            FileFailureReason.AccessDenied =>
-                "文件无法写入,文件可能只读/被占用",
-            FileFailureReason.DiskFull => "磁盘空间不够",
-            _ => null,
-        };
-
-        return reason is null
-            ? $"保存工程 {fileName} 失败:{exception.Message}"
-            : $"保存工程 {fileName} 失败:{reason}。";
-    }
+    public Task<bool> LoadProjectAsync(string path) => _projects.LoadProjectAsync(path);
 
     /// <summary>菜单「文件 → 导出时间轴 CSV」:按取样规则展开成扁平 CSV 写出去。</summary>
     [RelayCommand]
-    private async Task ExportTimelineAsync()
-    {
-        if (Document is null)
-        {
-            Report("还没有工程,没什么可导出的。", error: true);
-            return;
-        }
-
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickTimelineSaveAsync($"{TimelineName}{ProjectFileExtensions.Csv}");
-        if (path is null)
-        {
-            return;
-        }
-
-        var fileName = Path.GetFileName(path);
-
-        try
-        {
-            TimelineCsvFile.Save(path, Timeline);
-
-            HasError = false;
-            StatusText = $"已导出 {fileName}:{Blocks.Count:N0} 个块,"
-                + $"{Markers.Count:N0} 个标记。";
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            Report($"导出 {fileName} 失败:{exception.Message}", error: true);
-        }
-    }
+    private Task ExportTimelineAsync() => _projects.ExportTimelineAsync();
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
     [RelayCommand]
-    private async Task ImportVideoAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickVideoAsync();
-        if (path is null)
-        {
-            return; // 用户点了取消
-        }
-
-        // 已经有工程:只是换掉参考媒体。
-        if (Document is not null)
-        {
-            OpenVideo(path);
-            Document.AttachMedia(path);
-            IsModified = Document.IsModified;
-            return;
-        }
-
-        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
-        if (name is null)
-        {
-            return;
-        }
-
-        // 只导入视频也是新工程:参考媒体记在工程上,灯光数据等之后再导入。
-        CreateDocument(name, path);
-        OpenVideo(path);
-    }
+    private Task ImportVideoAsync() => _projects.ImportVideoAsync();
 
     [RelayCommand]
     private void GoToStart() => Seek(TimeSpan.Zero);
@@ -1535,56 +1214,39 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;
-    /// 出错只改状态栏,已经打开的内容保持不动。
-    /// </summary>
-    /// <summary>
     /// 读一个 CSV。documentName 是刚在命名对话框里起的新工程名;
     /// 不传就是"往已有工程里换数据"或者"用文件名兜底新建"。
     /// </summary>
-    public async Task LoadAsync(string path, string? documentName = null)
+    public Task LoadAsync(string path, string? documentName = null)
+        => _projects.LoadAsync(path, documentName);
+
+    // ---- 工程文件流程要用的界面状态 ----
+
+    /// <summary>工程对象换了,通知界面重新读它。</summary>
+    void IProjectHost.NotifyDocumentChanged() => OnPropertyChanged(nameof(Document));
+
+    /// <summary>重算窗口标题。</summary>
+    void IProjectHost.RefreshWindowTitle() => UpdateWindowTitle();
+
+    /// <summary>文件流程写状态栏:error 为 null 表示保持当前的报错标记不变。</summary>
+    void IProjectHost.Report(string text, bool? error)
     {
-        var fileName = Path.GetFileName(path);
-
-        try
+        if (error is { } flag)
         {
-            // 已有工程:这是把里面的时间轴换掉;没有工程:用文件名兜底新建。
-            // 用户在命名对话框里起的名字优先。
-            var existing = Document;
-            var name = documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName);
-
-            // 导入进来的帧会按通道切成块,块就用工程名命名。
-            var timeline = await TimelineCsvFile.LoadAsync(path, name);
-
-            Timeline = timeline;
-
-            Document = new TimelineDocument(name, timeline, existing?.MediaPath);
-
-            // 只有"往已有工程里换数据"才算改动;新建工程不算。
-            if (existing is not null && documentName is null)
-            {
-                Document.MarkModified();
-            }
-
-            TimelineName = Document.Name;
-            IsModified = Document.IsModified;
-            OnPropertyChanged(nameof(Document));
-            UpdateWindowTitle();
-
-            HasError = false;
-            StatusText = timeline.Blocks.Count == 0
-                ? $"已载入 {fileName},但里面没有任何灯光内容。"
-                : $"已载入 {fileName}:{timeline.Blocks.Count:N0} 个块,"
-                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Duration)}。";
-
+            Report(text, flag);
+            return;
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or FormatException)
-        {
-            HasError = true;
-            StatusText = $"打开 {fileName} 失败:{exception.Message}";
-        }
+
+        // 只换文字,不碰"是不是报错"——打开工程时状态栏要显示正文,
+        // 同时保留参考视频打不开留下的报错标记。
+        StatusText = text;
+    }
+
+    /// <summary>文件流程按路径读写工程,工程对象只能由它换。</summary>
+    TimelineDocument? IProjectHost.Document
+    {
+        get => Document;
+        set => Document = value;
     }
 
 }
