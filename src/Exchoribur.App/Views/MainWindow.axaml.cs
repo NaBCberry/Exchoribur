@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Exchoribur.App.Controls;
+using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
@@ -133,7 +134,8 @@ public partial class MainWindow : Window
         foreach (var file in e.DataTransfer.TryGetFiles() ?? [])
         {
             var path = file.TryGetLocalPath();
-            if (path is not null && path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            if (path is not null
+                && path.EndsWith(ProjectFileExtensions.Csv, StringComparison.OrdinalIgnoreCase))
             {
                 return path;
             }

@@ -894,7 +894,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var path = await _filePicker.PickTimelineSaveAsync($"{TimelineName}.csv");
+        var path = await _filePicker.PickTimelineSaveAsync($"{TimelineName}{ProjectFileExtensions.Csv}");
         if (path is null)
         {
             return;
