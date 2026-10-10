@@ -21,12 +21,12 @@ namespace Exchoribur.App.TimelineUi;
 public sealed class BlockEditorControl : Control
 {
     /// <summary>顶部那条刻度带的高度。</summary>
-    private const double RulerHeight = 18;
+    private const double RulerHeight = TimelineLayout.TimecodeBandHeight;
 
     /// <summary>左侧留白,和主时间轴对齐。</summary>
-    private const double TrackLeft = 48;
+    private const double TrackLeft = TimelineLayout.TrackLeft;
 
-    private const double TrackRightPadding = 10;
+    private const double TrackRightPadding = TimelineLayout.TrackRightPadding;
     private const double BlockCornerRadius = 5;
     private const double BlockTitleHeight = 16;
     /// <summary>帧刻度的宽度,也是"挤到什么程度就不再逐帧画"的阈值。</summary>
@@ -39,12 +39,6 @@ public sealed class BlockEditorControl : Control
     /// <summary>滚轮一格平移多少像素。</summary>
     private const double PanPixelsPerWheelStep = 60;
 
-    private static readonly IBrush Background = new SolidColorBrush(Color.Parse("#151515"));
-    private static readonly IBrush RowBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
-    private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
-    private static readonly IBrush BlockFill = new SolidColorBrush(Color.Parse("#2E2E2E"));
-    private static readonly IBrush BlockTitleFill = new SolidColorBrush(Color.Parse("#3A3A3A"));
-    private static readonly IBrush BlockText = new SolidColorBrush(Color.Parse("#D0D0D0"));
     private static readonly IBrush DimBlockFill = new SolidColorBrush(Color.Parse("#242424"));
     private static readonly IBrush DimBlockText = new SolidColorBrush(Color.Parse("#7A7A7A"));
 
@@ -53,24 +47,15 @@ public sealed class BlockEditorControl : Control
 
     private static readonly IBrush FrameTick = new SolidColorBrush(Color.Parse("#B0FFFFFF"));
     private static readonly IBrush SelectionFill = new SolidColorBrush(Color.Parse("#40FFFFFF"));
-    private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
 
-    private static readonly IPen BlockPen = new Pen(new SolidColorBrush(Color.Parse("#3F3F3F")), 1);
-    private static readonly IPen CurrentBlockPen = new Pen(new SolidColorBrush(Color.Parse("#FF5A36")), 2);
     private static readonly IPen SelectionPen = new Pen(new SolidColorBrush(Colors.White), 1.5);
-    private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
-    private static readonly IPen TickPen = new Pen(new SolidColorBrush(Color.Parse("#2A2A2A")), 1);
-    private static readonly IPen DividerPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")), 1);
 
-    private readonly Dictionary<uint, IBrush> _brushCache = [];
+    private readonly TimelineBrushCache _brushes = new();
     /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
     private readonly List<BlockColorRun> _colorRuns = [];
     /// <summary>一帧里要画的帧刻度,同上,复用列表。</summary>
     private readonly List<FrameTick> _frameTicks = [];
-    private readonly Dictionary<(string Text, double Size, IBrush Brush), FormattedText> _textCache = [];
-
-    private FontFamily? _cachedFontFamily;
-    private Typeface _uiTypeface = Typeface.Default;
+    private readonly TimelineTextCache _text = new(TextCacheLimit);
 
     private bool _isScrubbing;
     private bool _isSelectingFrames;
@@ -229,7 +214,7 @@ public sealed class BlockEditorControl : Control
     private void OnViewportChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
 
     private void UpdateTrackWidth()
-        => Viewport?.SetTrackWidth(Math.Max(0, Bounds.Width - TrackLeft - TrackRightPadding));
+        => Viewport?.SetTrackWidth(TimelineLayout.GetTrackWidth(Bounds.Width));
 
     /// <summary>
     /// 把取景对到 FocusTime 上:让"一帧到下一帧"的间隔占面板一半宽度,
@@ -245,7 +230,7 @@ public sealed class BlockEditorControl : Control
         var viewport = Viewport;
         var spacing = FocusSpacing > TimeSpan.Zero ? FocusSpacing : TimeSpan.FromSeconds(1);
 
-        if (viewport is null || Math.Max(0, Bounds.Width - TrackLeft - TrackRightPadding) <= 0)
+        if (viewport is null || TimelineLayout.GetTrackWidth(Bounds.Width) <= 0)
         {
             return;
         }
@@ -273,8 +258,7 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        var start = blocks.Min(block => block.Start);
-        var end = blocks.Max(block => block.End);
+        var (start, end) = TimelineGeometry.ContentRange(blocks);
 
         viewport.SetContent(start, end - start);
     }
@@ -326,12 +310,14 @@ public sealed class BlockEditorControl : Control
 
         UpdateTypeface();
 
-        var trackWidth = Math.Max(0, width - TrackLeft - TrackRightPadding);
+        var trackWidth = TimelineLayout.GetTrackWidth(width);
         var bodyTop = RulerHeight;
         var bodyHeight = Math.Max(0, height - RulerHeight);
 
-        context.FillRectangle(Background, new Rect(0, 0, width, height));
-        context.FillRectangle(RowBackground, new Rect(TrackLeft, bodyTop, trackWidth, bodyHeight));
+        context.FillRectangle(TimelinePalette.TrackBackground, new Rect(0, 0, width, height));
+        context.FillRectangle(
+            TimelinePalette.RowBackground,
+            new Rect(TrackLeft, bodyTop, trackWidth, bodyHeight));
 
         var viewport = Viewport;
         if (viewport is not { Scale: > 0 } || CurrentBlock is not { } current)
@@ -388,7 +374,7 @@ public sealed class BlockEditorControl : Control
             context.FillRectangle(DimScrim, rect);
 
             context.FillRectangle(
-                BlockTitleFill,
+                TimelinePalette.BlockTitleFill,
                 new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height)));
 
             if (rect.Width > 30)
@@ -399,7 +385,7 @@ public sealed class BlockEditorControl : Control
                 }
             }
 
-            context.DrawRectangle(null, BlockPen, rect, BlockCornerRadius, BlockCornerRadius);
+            context.DrawRectangle(null, TimelinePalette.BlockPen, rect, BlockCornerRadius, BlockCornerRadius);
         }
     }
 
@@ -414,9 +400,9 @@ public sealed class BlockEditorControl : Control
     {
         var rect = BlockRect(block.Start, block.End, viewport, bodyTop, bodyHeight);
 
-        context.FillRectangle(BlockFill, rect);
+        context.FillRectangle(TimelinePalette.BlockFill, rect);
         context.FillRectangle(
-            BlockTitleFill,
+            TimelinePalette.BlockTitleFill,
             new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height)));
 
         if (rect.Width > 30)
@@ -448,11 +434,11 @@ public sealed class BlockEditorControl : Control
 
             context.FillRectangle(FrameTick, new Rect(x, tickTop, FrameMarkerWidth, tickHeight));
             context.FillRectangle(
-                BrushFor(frames[tick.FrameIndex].State.Color),
+                _brushes.For(frames[tick.FrameIndex].State.Color),
                 new Rect(x, rect.Bottom - 9, Math.Max(FrameMarkerWidth, 9), 8));
         }
 
-        context.DrawRectangle(null, CurrentBlockPen, rect, BlockCornerRadius, BlockCornerRadius);
+        context.DrawRectangle(null, TimelinePalette.CurrentBlockPen, rect, BlockCornerRadius, BlockCornerRadius);
     }
 
     /// <summary>按像素列取色,把一个块自己的内容画出来。</summary>
@@ -483,7 +469,7 @@ public sealed class BlockEditorControl : Control
         foreach (var run in _colorRuns)
         {
             context.FillRectangle(
-                BrushFor(run.Color),
+                _brushes.For(run.Color),
                 new Rect(run.X, bodyTop, run.Width, bodyHeight));
         }
     }
@@ -504,16 +490,13 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        var start = block.Start + frames[selection.First].Offset;
-        var end = selection.Last + 1 < frames.Count
-            ? block.Start + frames[selection.Last + 1].Offset
-            : block.End;
-
-        var rect = new Rect(
-            TrackLeft + viewport.MapTime(start),
-            bodyTop + 1,
-            Math.Max(2, viewport.MapTime(end) - viewport.MapTime(start)),
-            Math.Max(0, bodyHeight - 2));
+        var rect = TimelineGeometry.EditorSelectionRect(
+            block,
+            selection.First,
+            selection.Last,
+            viewport,
+            bodyTop,
+            bodyHeight);
 
         context.DrawRectangle(SelectionFill, SelectionPen, rect);
     }
@@ -539,7 +522,10 @@ public sealed class BlockEditorControl : Control
             var time = TimeSpan.FromTicks(tick);
             var x = TrackLeft + viewport.MapTime(time);
 
-            context.DrawLine(TickPen, new Point(x, RulerHeight - 4), new Point(x, RulerHeight));
+            context.DrawLine(
+                TimelinePalette.RowSeparatorPen,
+                new Point(x, RulerHeight - 4),
+                new Point(x, RulerHeight));
             context.DrawText(GetDimText(Timecode.Format(time), 10.5), new Point(x + 3, 1));
 
             tick += step;
@@ -554,7 +540,7 @@ public sealed class BlockEditorControl : Control
         }
 
         var x = TrackLeft + viewport.MapTime(PlayheadTime);
-        context.DrawLine(PlayheadPen, new Point(x, 0), new Point(x, height));
+        context.DrawLine(TimelinePalette.PlayheadPen, new Point(x, 0), new Point(x, height));
     }
 
     private void DrawChannelLabel(DrawingContext context, Block block, double bodyTop, double bodyHeight)
@@ -566,7 +552,10 @@ public sealed class BlockEditorControl : Control
 
     private void DrawDivider(DrawingContext context, double height)
     {
-        context.DrawLine(DividerPen, new Point(TrackLeft, 0), new Point(TrackLeft, height));
+        context.DrawLine(
+            TimelinePalette.GutterDividerPen,
+            new Point(TrackLeft, 0),
+            new Point(TrackLeft, height));
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -670,24 +659,7 @@ public sealed class BlockEditorControl : Control
 
     /// <summary>指针横坐标落在第几帧上:取"开始时间不超过它的最后一帧"。</summary>
     private static int FrameIndexAt(Block block, TimelineViewport viewport, double x)
-    {
-        var time = viewport.MapX(x - TrackLeft);
-        var index = 0;
-
-        for (var candidate = 0; candidate < block.Frames.Count; candidate++)
-        {
-            if (block.Start + block.Frames[candidate].Offset <= time)
-            {
-                index = candidate;
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        return index;
-    }
+        => TimelineGeometry.FrameIndexAt(block, viewport, x);
 
     /// <summary>指针是不是压在同一条通道上别的块上。</summary>
     private Block? HitTestOtherBlock(Point position)
@@ -733,68 +705,19 @@ public sealed class BlockEditorControl : Control
         TimelineViewport viewport,
         double bodyTop,
         double bodyHeight)
-        => new(
-            TrackLeft + viewport.MapTime(start),
-            bodyTop + 2,
-            Math.Max(3, viewport.MapTime(end) - viewport.MapTime(start)),
-            Math.Max(8, bodyHeight - 4));
+        => TimelineGeometry.EditorBlockRect(start, end, viewport, bodyTop, bodyHeight);
 
     private FormattedText GetDimText(string text, double size)
-        => GetText(text, size, DimText);
+        => GetText(text, size, TimelinePalette.DimText);
 
     private FormattedText GetBlockText(string text)
-        => GetText(text, 11, BlockText);
+        => GetText(text, 11, TimelinePalette.BlockText);
 
     private FormattedText GetDimBlockText(string text)
         => GetText(text, 11, DimBlockText);
 
     private FormattedText GetText(string text, double size, IBrush brush)
-    {
-        if (_textCache.TryGetValue((text, size, brush), out var formatted))
-        {
-            return formatted;
-        }
+        => _text.Get(text, size, brush);
 
-        if (_textCache.Count >= TextCacheLimit)
-        {
-            _textCache.Clear();
-        }
-
-        formatted = new FormattedText(
-            text,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            _uiTypeface,
-            size,
-            brush);
-
-        _textCache[(text, size, brush)] = formatted;
-        return formatted;
-    }
-
-    private void UpdateTypeface()
-    {
-        var family = TextElement.GetFontFamily(this);
-        if (ReferenceEquals(family, _cachedFontFamily))
-        {
-            return;
-        }
-
-        _cachedFontFamily = family;
-        _uiTypeface = new Typeface(family);
-        _textCache.Clear();
-    }
-
-    private IBrush BrushFor(LightColor color)
-    {
-        var key = (uint)((color.Red << 8) | (color.Green << 4) | color.Blue);
-
-        if (!_brushCache.TryGetValue(key, out var brush))
-        {
-            brush = new SolidColorBrush(ColorMath.ToColor(color));
-            _brushCache[key] = brush;
-        }
-
-        return brush;
-    }
+    private void UpdateTypeface() => _text.UseTypeface(TextElement.GetFontFamily(this));
 }
