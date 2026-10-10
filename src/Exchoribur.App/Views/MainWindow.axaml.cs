@@ -24,7 +24,12 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
         Closing += OnClosing;
+        Closed += OnClosed;
     }
+
+    /// <summary>窗口关了就放掉懒创建的播放器,别把解码线程和固定住的内存留着。</summary>
+    private void OnClosed(object? sender, EventArgs e)
+        => (DataContext as MainViewModel)?.Dispose();
 
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
 

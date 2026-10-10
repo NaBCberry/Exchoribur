@@ -1,16 +1,15 @@
 using System.ComponentModel;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
+using Exchoribur.App.DesignTime;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.Core;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Playback;
 using Exchoribur.Core.Settings;
 using Exchoribur.Core.Storage;
 using Exchoribur.Core.Updates;
@@ -21,20 +20,22 @@ namespace Exchoribur.App.ViewModels;
 /// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
 /// 界面只管把这些属性画出来,不直接读文件。
 /// </summary>
-public partial class MainViewModel : ViewModelBase
+public partial class MainViewModel : ViewModelBase, IDisposable
 {
     private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
 
     private readonly IFilePicker? _filePicker;
-    private readonly IPlaybackClock? _clock;
     private readonly INamePrompt? _namePrompt;
     private readonly IUnsavedChangesPrompt? _unsavedPrompt;
     private readonly IAudioDeviceController _audio;
     private readonly UpdateCoordinator _updates;
+    private readonly PlaybackController _playback;
 
     /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
     private string? _projectPath;
-    private readonly PlaybackState _playback = new();
+
+    /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
+    private bool _disposed;
 
     /// <summary>当前工程的编辑栈(撤销、重做)。没有时间轴时是 null。</summary>
     private TimelineEditor? _editor;
@@ -58,32 +59,64 @@ public partial class MainViewModel : ViewModelBase
         IUpdateFeed? updateFeed = null)
     {
         _filePicker = filePicker;
-        _clock = clock;
         _namePrompt = namePrompt;
         _unsavedPrompt = unsavedPrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
         _audio = audio ?? new VideoAudioDeviceController(() => _video);
+
+        // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
+        // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
+        SettingsViewModel? currentSettings = null;
         _updates = new UpdateCoordinator(
             updateFeed ?? new VelopackUpdateFeed(),
-            () => Settings!.AutoDownloadUpdates,
-            () => Settings!.IncludePrereleaseVersions);
-        _updates.Changed += (_, _) => RefreshUpdateBanner();
+            () => currentSettings?.AutoDownloadUpdates ?? false,
+            () => currentSettings?.IncludePrereleaseVersions ?? false);
+        _updates.Changed += OnUpdatesChanged;
 
         Settings = settings ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates);
+        currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();
+
+        // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
+        _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
-        Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
+        Timeline = DesignTimeTimeline.Current;
         StatusText = EmptyStatusText;
         WindowTitle = "Exchoribur";
         UndoLabel = "撤销";
         RedoLabel = "重做";
 
+    }
+
+    /// <summary>更新状态变了,状态条上的提示跟着换。</summary>
+    private void OnUpdatesChanged(object? sender, EventArgs e) => RefreshUpdateBanner();
+
+    /// <summary>
+    /// 关窗时把懒创建的播放器放掉:它挂着 libvlc 的解码线程和一块固定住的内存,
+    /// 窗口都关了没必要留着。重复调用没有副作用。
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _updates.Changed -= OnUpdatesChanged;
+        Settings.PropertyChanged -= OnSettingsChanged;
+
+        _video?.Dispose();
+        _video = null;
+
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>预览用的当前帧画面。</summary>
@@ -523,10 +556,9 @@ public partial class MainViewModel : ViewModelBase
         CurrentFrame = BlockSampler.Sample(timeline, PlayheadTime);
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
-        _playback.Stop();
-        _playback.SetDuration(PlaybackLength);
-        SyncPlaybackFlags();
-        _clock?.Stop();
+        // 视频不动:新数据可能紧接着就要挂上自己的参考媒体。
+        _playback.Reset();
+        _playback.SetLength(PlaybackLength);
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
         Viewport.SetContent(TimelineStart, Duration - TimelineStart);
@@ -563,8 +595,8 @@ public partial class MainViewModel : ViewModelBase
         // 播放也从这里继续。相等时不动,免得播放中每帧都去 seek 把画面弄卡。
         if (value != _playback.Position)
         {
-            _playback.Seek(value);
-            KeepVideoAtPlayhead();
+            _playback.SeekTo(value);
+            _playback.FollowPosition(value);
         }
     }
 
@@ -928,9 +960,6 @@ public partial class MainViewModel : ViewModelBase
     private void StopPlayback()
     {
         _playback.Stop();
-        _clock?.Stop();
-        Video.Stop();
-        SyncPlaybackFlags();
         PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
     }
@@ -965,93 +994,37 @@ public partial class MainViewModel : ViewModelBase
 
         // 播放时让播放头一直留在画面里:跑出画面就整页翻过去,落点在视口左边靠右一点。
         Viewport.PageTo(PlayheadTime);
-        KeepVideoInSync();
-
-        if (!_playback.IsPlaying)
-        {
-            _clock?.Stop();
-            Video.Pause();
-        }
+        _playback.CorrectDrift();
     }
 
     private void StartPlayback()
     {
-        _playback.SetDuration(PlaybackLength);
-        _playback.Play();
+        _playback.SetLength(PlaybackLength);
+        _playback.Play(AdvancePlayback);
 
         if (!_playback.IsPlaying)
         {
             return; // 没有内容可播
         }
 
-        SyncPlaybackFlags();
         PlayheadTime = _playback.Position;
-        _clock?.Start(AdvancePlayback);
-
-        if (HasVideo)
-        {
-            Video.Play();
-            Video.Seek(PlayheadTime);
-        }
     }
 
-    private void PausePlayback()
-    {
-        if (!_playback.IsPlaying)
-        {
-            return;
-        }
-
-        _playback.Pause();
-        _clock?.Stop();
-        Video.Pause();
-        SyncPlaybackFlags();
-    }
+    private void PausePlayback() => _playback.Pause();
 
     /// <summary>把播放头挪到指定位置:暂停状态下用,位置、视口、视频一起跟上。</summary>
     private void Seek(TimeSpan position)
     {
         PausePlayback();
-        _playback.SetDuration(PlaybackLength);
-        _playback.Seek(position);
+        _playback.SetLength(PlaybackLength);
+        _playback.SeekTo(position);
 
         PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
-        KeepVideoAtPlayhead();
+        _playback.FollowPosition(PlayheadTime);
     }
 
     private void SyncPlaybackFlags() => IsPlaying = _playback.IsPlaying;
-
-    /// <summary>把视频挪到播放头所在的位置(暂停着看某一帧时用)。</summary>
-    private void KeepVideoAtPlayhead()
-    {
-        if (HasVideo)
-        {
-            Video.Seek(PlayheadTime);
-        }
-    }
-
-    /// <summary>
-    /// 视频是跟着播放头走的,但它是独立解码的,时间长了会飘。
-    /// 偏得不多就不动它(频繁 seek 会卡),超过容差才拉回来一次。
-    /// </summary>
-    private void KeepVideoInSync()
-    {
-        // 容差给得大是故意的:libvlc 报的时间本身有几百毫秒的粒度,
-        // 容差太小就会一直去 seek,每 seek 一次画面就顿一下,看着就是"卡一下动一下"。
-        // 两个时钟都按真实时间走,长期飘移不大,偶尔纠正一次就够。
-        const double toleranceMilliseconds = 2000;
-
-        if (!_playback.IsPlaying || !HasVideo)
-        {
-            return;
-        }
-
-        if (Math.Abs((Video.Position - PlayheadTime).TotalMilliseconds) > toleranceMilliseconds)
-        {
-            Video.Seek(PlayheadTime);
-        }
-    }
 
     [RelayCommand]
     private void ZoomIn() => Viewport.ZoomBy(1.4);
@@ -1583,40 +1556,4 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    /// <summary>只在设计器里用的假数据,保证预览界面不是一片空白。</summary>
-    private static Timeline CreateSampleTimeline()
-    {
-        var blocks = new List<Block>
-        {
-            SampleBlock("前奏", 0, 0, 3600, (0, new LightColor(15, 0, 0)), (1200, new LightColor(15, 8, 0))),
-            SampleBlock("副歌", 3, 900, 2700, (0, new LightColor(0, 0, 15)), (900, new LightColor(0, 15, 0))),
-            SampleBlock("扫光", 7, 1800, 1800, (0, new LightColor(8, 8, 8)), (600, new LightColor(15, 15, 15))),
-        };
-
-        TimelineMarker[] markers =
-        [
-            new(TimeSpan.FromMilliseconds(900), "前奏"),
-            new(TimeSpan.FromMilliseconds(3600), "副歌"),
-            new(TimeSpan.FromMilliseconds(7200), "结尾"),
-        ];
-
-        return new Timeline(blocks, markers);
-    }
-
-    /// <summary>造一个样例块:内容就是给出的几个状态变化点。</summary>
-    private static Block SampleBlock(
-        string name,
-        int channel,
-        double startMilliseconds,
-        double lengthMilliseconds,
-        params (double Offset, LightColor Color)[] frames)
-        => new(
-            Block.NewId(),
-            name,
-            channel,
-            TimeSpan.FromMilliseconds(startMilliseconds),
-            TimeSpan.FromMilliseconds(lengthMilliseconds),
-            [.. frames.Select(frame => new BlockFrame(
-                TimeSpan.FromMilliseconds(frame.Offset),
-                new ChannelState(frame.Color, FlashMode.Solid)))]);
 }
