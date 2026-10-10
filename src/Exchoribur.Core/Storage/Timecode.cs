@@ -1,4 +1,4 @@
-namespace Exchoribur.Core;
+namespace Exchoribur.Core.Storage;
 
 /// <summary>
 /// 时间轴使用的时间码转换。内部一律以毫秒表示时间点,仅在显示与输入时

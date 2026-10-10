@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using Exchoribur.Core;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Services;
 

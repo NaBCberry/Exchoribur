@@ -8,8 +8,8 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Exchoribur.App.Controls;
 using Exchoribur.App.ViewModels;
-using Exchoribur.Core;
 using Exchoribur.Core.Models;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.TimelineUi;
 
