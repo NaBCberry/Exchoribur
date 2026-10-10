@@ -57,6 +57,20 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         SettingsViewModel? settings = null,
         IAudioDeviceController? audio = null,
         IUpdateFeed? updateFeed = null)
+        : this(filePicker, clock, namePrompt, unsavedPrompt, settings, audio, updateFeed, externalLauncher: null)
+    {
+    }
+
+    /// <summary>多了"用系统程序打开链接/文件夹"的能力,设置页要用它。</summary>
+    public MainViewModel(
+        IFilePicker? filePicker,
+        IPlaybackClock? clock,
+        INamePrompt? namePrompt,
+        IUnsavedChangesPrompt? unsavedPrompt,
+        SettingsViewModel? settings,
+        IAudioDeviceController? audio,
+        IUpdateFeed? updateFeed,
+        IExternalLauncher? externalLauncher)
     {
         _filePicker = filePicker;
         _namePrompt = namePrompt;
@@ -74,7 +88,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             () => currentSettings?.IncludePrereleaseVersions ?? false);
         _updates.Changed += OnUpdatesChanged;
 
-        Settings = settings ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates);
+        Settings = settings
+            ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates, externalLauncher);
         currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();

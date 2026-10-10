@@ -18,6 +18,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly string _path;
     private readonly IAudioDeviceController? _audio;
     private readonly UpdateCoordinator? _updates;
+    private readonly IExternalLauncher? _externalLauncher;
 
     /// <summary>构造函数里给属性赋初值不算"用户改过",这段时间不要写文件。</summary>
     private bool _initializing = true;
@@ -38,10 +39,21 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     public SettingsViewModel(string path, IAudioDeviceController? audio, UpdateCoordinator? updates)
+        : this(path, audio, updates, externalLauncher: null)
+    {
+    }
+
+    /// <summary>多了"用系统程序打开链接/文件夹"的能力,由 App 启动时传进来。</summary>
+    public SettingsViewModel(
+        string path,
+        IAudioDeviceController? audio,
+        UpdateCoordinator? updates,
+        IExternalLauncher? externalLauncher)
     {
         _path = path;
         _audio = audio;
         _updates = updates;
+        _externalLauncher = externalLauncher;
 
         Groups = BuildGroups();
         SelectGroup(Groups[0]);
@@ -340,6 +352,17 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>设置文件的位置,界面上照实显示。</summary>
     public string SettingsFilePath => _path;
 
+    /// <summary>打开设置文件所在的文件夹,方便备份或者手改。</summary>
+    [RelayCommand]
+    private async Task OpenSettingsFolderAsync()
+    {
+        if (_externalLauncher is { } launcher
+            && Path.GetDirectoryName(_path) is { Length: > 0 } directory)
+        {
+            await launcher.OpenFolderAsync(directory);
+        }
+    }
+
     /// <summary>"恢复默认设置"按钮上的字:第一次点完换成确认。</summary>
     public string ResetButtonText => _resetConfirmPending ? "再点一次确认恢复" : "恢复默认设置";
 
@@ -380,6 +403,26 @@ public partial class SettingsViewModel : ViewModelBase
     public string BuildConfigurationText => AppVersion.Configuration;
     public string ProjectUrl => VelopackUpdateFeed.RepositoryUrl;
     public string LicenseText => "尚未决定";
+
+    /// <summary>打开项目主页。</summary>
+    [RelayCommand]
+    private async Task OpenProjectUrlAsync()
+    {
+        if (_externalLauncher is { } launcher)
+        {
+            await launcher.OpenUrlAsync(ProjectUrl);
+        }
+    }
+
+    /// <summary>用系统默认程序打开随程序发布的第三方组件声明。</summary>
+    [RelayCommand]
+    private async Task OpenNoticesAsync()
+    {
+        if (_externalLauncher is { } launcher)
+        {
+            await launcher.OpenFileAsync(Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md"));
+        }
+    }
 
     // ---- 保存 ----
 

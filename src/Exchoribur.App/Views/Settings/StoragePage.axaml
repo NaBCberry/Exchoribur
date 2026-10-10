@@ -12,7 +12,7 @@
                            Text="{Binding SettingsFilePath}"
                            TextWrapping="Wrap" />
                 <Button Content="打开所在文件夹"
-                        Click="OnOpenSettingsFolderClick"
+                        Command="{Binding OpenSettingsFolderCommand}"
                         HorizontalAlignment="Left"
                         Padding="12,4" />
             </StackPanel>

@@ -24,7 +24,11 @@ public partial class App : Application
                 new StorageProviderFilePicker(window),
                 new DispatcherPlaybackClock(),
                 new WindowNamePrompt(window),
-                new WindowUnsavedChangesPrompt(window));
+                new WindowUnsavedChangesPrompt(window),
+                settings: null,
+                audio: null,
+                updateFeed: null,
+                externalLauncher: new TopLevelExternalLauncher(window));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;
