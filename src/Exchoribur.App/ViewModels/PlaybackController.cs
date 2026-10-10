@@ -14,7 +14,7 @@ namespace Exchoribur.App.ViewModels;
 internal sealed class PlaybackController(
     IPlaybackClock? clock,
     Func<bool> hasVideo,
-    Func<VideoService?> video,
+    Func<IVideoService?> video,
     Action publishPlayingState)
 {
     /// <summary>

@@ -6,9 +6,9 @@ namespace Exchoribur.App.Services;
 /// </summary>
 public sealed class VideoAudioDeviceController : IAudioDeviceController
 {
-    private readonly Func<VideoService?> _video;
+    private readonly Func<IVideoService?> _video;
 
-    public VideoAudioDeviceController(Func<VideoService?> video)
+    public VideoAudioDeviceController(Func<IVideoService?> video)
     {
         _video = video;
     }

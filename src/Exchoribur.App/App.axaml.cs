@@ -28,7 +28,8 @@ public partial class App : Application
                 settings: null,
                 audio: null,
                 updateFeed: null,
-                externalLauncher: new TopLevelExternalLauncher(window));
+                externalLauncher: new TopLevelExternalLauncher(window),
+                videoFactory: null);
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;

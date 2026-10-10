@@ -57,11 +57,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         SettingsViewModel? settings = null,
         IAudioDeviceController? audio = null,
         IUpdateFeed? updateFeed = null)
-        : this(filePicker, clock, namePrompt, unsavedPrompt, settings, audio, updateFeed, externalLauncher: null)
+        : this(
+            filePicker,
+            clock,
+            namePrompt,
+            unsavedPrompt,
+            settings,
+            audio,
+            updateFeed,
+            externalLauncher: null,
+            videoFactory: null)
     {
     }
 
-    /// <summary>多了"用系统程序打开链接/文件夹"的能力,设置页要用它。</summary>
+    /// <summary>
+    /// 启动装配用的构造函数:多了"用系统程序打开链接/文件夹"的能力,以及自定义播放器的入口。
+    /// 测试里可以塞一个假的播放器,免得为了跑一个用例把 libvlc 拉起来。
+    /// </summary>
     public MainViewModel(
         IFilePicker? filePicker,
         IPlaybackClock? clock,
@@ -70,13 +82,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         SettingsViewModel? settings,
         IAudioDeviceController? audio,
         IUpdateFeed? updateFeed,
-        IExternalLauncher? externalLauncher)
+        IExternalLauncher? externalLauncher,
+        Func<IVideoService>? videoFactory)
     {
         _filePicker = filePicker;
         _namePrompt = namePrompt;
         _unsavedPrompt = unsavedPrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
+        _videoFactory = videoFactory ?? (() => new VideoService());
         _audio = audio ?? new VideoAudioDeviceController(() => _video);
 
         // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
@@ -464,19 +478,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>右侧编辑面板里正在挑的颜色。</summary>
     public ColorEditorViewModel Color { get; } = new();
 
-    private VideoService? _video;
+    private readonly Func<IVideoService> _videoFactory;
+
+    private IVideoService? _video;
 
     /// <summary>
     /// 视频预览用的播放器。第一次真正用到时才创建:它会加载 libvlc(重、会起线程),
     /// 没导入视频的场合没必要付这个代价。
     /// </summary>
-    public VideoService Video
+    public IVideoService Video
     {
         get
         {
             if (_video is null)
             {
-                _video = new VideoService();
+                _video = _videoFactory();
                 // 每解出一帧抬一次序号;位图是同一个对象,界面靠它知道内容变了。
                 _video.FrameUpdated += (_, _) => VideoFrameVersion++;
                 // 播放器刚建出来,把设置里的音量与输出设备应用上去。

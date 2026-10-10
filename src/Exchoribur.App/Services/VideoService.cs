@@ -13,7 +13,7 @@ namespace Exchoribur.App.Services;
 /// 不用它的原生窗口控件,所以不会弹独立窗口、没有 airspace 限制,
 /// 也能精确做到"载入后停在第一帧"。代价是每帧多一次内存拷贝。
 /// </summary>
-public sealed class VideoService : IDisposable
+public sealed class VideoService : IVideoService
 {
     private const int FrameWidth = 1280;
     private const int FrameHeight = 720;
