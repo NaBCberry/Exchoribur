@@ -142,25 +142,25 @@ public partial class SettingsViewModel : ViewModelBase
 
     private IReadOnlyList<SettingsGroupItem> BuildGroups() =>
     [
-        new("常规", Icons.Settings,
+        new("常规", IconShape.Settings,
         [
             new(SettingsPageKind.Input, "输入", SelectPage),
             new(SettingsPageKind.Storage, "存储", SelectPage),
         ], SelectGroup),
-        new("时间轴", Icons.Channels,
+        new("时间轴", IconShape.Channels,
         [
             new(SettingsPageKind.TimelineEdit, "编辑", SelectPage),
             new(SettingsPageKind.Blocks, "块", SelectPage),
         ], SelectGroup),
-        new("音频", Icons.Volume,
+        new("音频", IconShape.Volume,
         [
             new(SettingsPageKind.Audio, "输出设备", SelectPage),
         ], SelectGroup),
-        new("外部设备", Icons.SerialPort,
+        new("外部设备", IconShape.SerialPort,
         [
             new(SettingsPageKind.ExternalDevices, "串口", SelectPage),
         ], SelectGroup),
-        new("更新", Icons.Refresh,
+        new("更新", IconShape.Refresh,
         [
             new(SettingsPageKind.Updates, "更新", SelectPage),
             new(SettingsPageKind.About, "关于", SelectPage),

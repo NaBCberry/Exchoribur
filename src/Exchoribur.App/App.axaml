@@ -2,9 +2,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Exchoribur.App.App"
              xmlns:local="using:Exchoribur.App"
+             xmlns:converters="using:Exchoribur.App.Converters"
              RequestedThemeVariant="Dark">
              <!-- 配色是照深色界面调的,所以固定用 Dark,避免系统是浅色主题时菜单、
                   滚动条跟自绘控件对不上。以后要做主题切换再改成可配置。 -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- 视图模型只给图标标识,图形在绑定时才解析成 Geometry -->
+            <converters:IconShapeConverter x:Key="IconShapeConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.DataTemplates>
         <local:ViewLocator />
