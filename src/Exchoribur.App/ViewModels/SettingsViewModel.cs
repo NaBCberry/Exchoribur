@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
@@ -16,9 +17,9 @@ namespace Exchoribur.App.ViewModels;
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly string _path;
-    private readonly IAudioDeviceController? _audio;
-    private readonly UpdateCoordinator? _updates;
     private readonly IExternalLauncher? _externalLauncher;
+    private readonly AudioDeviceSection _audioSection;
+    private readonly UpdateSection _updateSection;
 
     /// <summary>构造函数里给属性赋初值不算"用户改过",这段时间不要写文件。</summary>
     private bool _initializing = true;
@@ -51,9 +52,12 @@ public partial class SettingsViewModel : ViewModelBase
         IExternalLauncher? externalLauncher)
     {
         _path = path;
-        _audio = audio;
-        _updates = updates;
         _externalLauncher = externalLauncher;
+        _audioSection = new AudioDeviceSection(audio);
+
+        // 更新那一块自己管状态:它一变就把通知转发给界面,不用在这里逐个搬字段。
+        _updateSection = new UpdateSection(updates);
+        _updateSection.PropertyChanged += OnUpdateSectionChanged;
 
         Groups = BuildGroups();
         SelectGroup(Groups[0]);
@@ -71,17 +75,11 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshAudioDevices(settings.AudioOutputDeviceId);
 
         _initializing = false;
-
-        if (_updates is not null)
-        {
-            _updates.Changed += (_, _) => RefreshUpdateState();
-            RefreshUpdateState();
-        }
-        else
-        {
-            RefreshUpdateState();
-        }
     }
+
+    /// <summary>更新那一块算完了,把它改过的属性名照搬给界面。</summary>
+    private void OnUpdateSectionChanged(object? sender, PropertyChangedEventArgs e)
+        => OnPropertyChanged(e.PropertyName);
 
     // ---- 导航 ----
 
@@ -218,7 +216,8 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ---- 音频 ----
 
-    public ObservableCollection<AudioDeviceOption> AudioDevices { get; } = [];
+    /// <summary>可选设备(第一项是"跟随系统默认")。</summary>
+    public ObservableCollection<AudioDeviceOption> AudioDevices => _audioSection.Devices;
 
     [ObservableProperty]
     public partial AudioDeviceOption? SelectedAudioDevice { get; set; }
@@ -233,11 +232,7 @@ public partial class SettingsViewModel : ViewModelBase
     public string AudioVolumeText => $"{Math.Round(AudioVolume)}%";
 
     /// <summary>设备列表拿不到时给一句解释,能拿到就留空。</summary>
-    public string AudioDeviceHint => _audio is null || !_audio.IsAvailable
-        ? "解码器不可用,预览音量和输出设备都不能改。"
-        : AudioDevices.Count == 0
-            ? "没有枚举到可选设备,预览会用系统默认设备。"
-            : string.Empty;
+    public string AudioDeviceHint => _audioSection.Hint;
 
     public bool HasAudioDeviceHint => AudioDeviceHint.Length > 0;
 
@@ -247,18 +242,8 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void RefreshAudioDevices(string? deviceId)
     {
-        var devices = _audio?.GetDevices() ?? [];
-
-        AudioDevices.Clear();
-        // 第一项是"跟随系统默认",Id 为 null。
-        AudioDevices.Add(new AudioDeviceOption(null, "跟随系统默认"));
-        foreach (var device in devices)
-        {
-            AudioDevices.Add(device);
-        }
-
         // 存着的设备可能已经拔掉了,那就回落到系统默认。
-        SelectedAudioDevice = AudioDevices.FirstOrDefault(option => option.Id == deviceId) ?? AudioDevices[0];
+        SelectedAudioDevice = _audioSection.Refresh(deviceId);
 
         OnPropertyChanged(nameof(AudioDeviceHint));
         OnPropertyChanged(nameof(HasAudioDeviceHint));
@@ -267,28 +252,23 @@ public partial class SettingsViewModel : ViewModelBase
     // ---- 更新 ----
 
     /// <summary>当前版本,写不上 Velopack 信息时用编译进程序集的那个。</summary>
-    public string CurrentVersionText => _updates?.CurrentVersion ?? AppVersion.Current;
+    public string CurrentVersionText => _updateSection.CurrentVersionText;
 
     /// <summary>这个运行环境支不支持自动更新(开发运行不支持)。</summary>
-    public bool IsUpdateSupported => _updates?.IsSupported == true;
+    public bool IsUpdateSupported => _updateSection.IsUpdateSupported;
 
-    [ObservableProperty]
-    public partial string UpdateStatusText { get; set; } = string.Empty;
+    /// <summary>更新状态那句话,由更新区算好。</summary>
+    public string UpdateStatusText => _updateSection.UpdateStatusText;
 
-    [ObservableProperty]
-    public partial bool IsUpdateBusy { get; set; }
+    public bool IsUpdateBusy => _updateSection.IsUpdateBusy;
 
-    [ObservableProperty]
-    public partial bool CanDownloadUpdate { get; set; }
+    public bool CanDownloadUpdate => _updateSection.CanDownloadUpdate;
 
-    [ObservableProperty]
-    public partial bool CanApplyUpdate { get; set; }
+    public bool CanApplyUpdate => _updateSection.CanApplyUpdate;
 
-    [ObservableProperty]
-    public partial int UpdateProgress { get; set; }
+    public int UpdateProgress => _updateSection.UpdateProgress;
 
-    [ObservableProperty]
-    public partial bool IsUpdateProgressVisible { get; set; }
+    public bool IsUpdateProgressVisible => _updateSection.IsUpdateProgressVisible;
 
     [ObservableProperty]
     public partial bool CheckForUpdatesOnStartup { get; set; }
@@ -300,52 +280,13 @@ public partial class SettingsViewModel : ViewModelBase
     public partial bool IncludePrereleaseVersions { get; set; }
 
     [RelayCommand]
-    private async Task CheckForUpdatesAsync()
-    {
-        if (_updates is not null)
-        {
-            await _updates.CheckAsync();
-        }
-    }
+    private Task CheckForUpdatesAsync() => _updateSection.CheckAsync();
 
     [RelayCommand]
-    private async Task DownloadUpdateAsync()
-    {
-        if (_updates is not null)
-        {
-            await _updates.DownloadAsync();
-        }
-    }
+    private Task DownloadUpdateAsync() => _updateSection.DownloadAsync();
 
     [RelayCommand]
-    private void ApplyUpdate() => _updates?.ApplyAndRestart();
-
-    private void RefreshUpdateState()
-    {
-        var state = _updates?.State ?? new UpdateState(UpdateStage.Unsupported);
-
-        UpdateStatusText = state.Stage switch
-        {
-            UpdateStage.Unsupported => "当前是开发运行(没有安装信息),不检查更新。",
-            UpdateStage.Idle => "还没有检查过。",
-            UpdateStage.Checking => "正在检查…",
-            UpdateStage.UpToDate => "已经是最新版本。",
-            UpdateStage.Available => $"发现新版本 v{state.Version},可以下载。",
-            UpdateStage.Downloading => $"正在下载 v{state.Version}…{state.ProgressPercent}%",
-            UpdateStage.Ready => $"v{state.Version} 已经下载好,重启后生效。",
-            UpdateStage.Failed => $"更新失败:{state.Error}",
-            _ => string.Empty,
-        };
-
-        IsUpdateBusy = state.IsBusy;
-        CanDownloadUpdate = state.Stage == UpdateStage.Available;
-        CanApplyUpdate = state.Stage == UpdateStage.Ready;
-        UpdateProgress = state.ProgressPercent;
-        IsUpdateProgressVisible = state.Stage == UpdateStage.Downloading;
-
-        OnPropertyChanged(nameof(CurrentVersionText));
-        OnPropertyChanged(nameof(IsUpdateSupported));
-    }
+    private void ApplyUpdate() => _updateSection.ApplyAndRestart();
 
     // ---- 存储 ----
 
@@ -447,7 +388,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAutoDownloadUpdatesChanged(bool value) => Save();
     partial void OnIncludePrereleaseVersionsChanged(bool value) => Save();
 
-    private void ApplyAudioSettings() => _audio?.Apply(SelectedAudioDevice?.Id, AudioVolume);
+    private void ApplyAudioSettings() => _audioSection.Apply(SelectedAudioDevice?.Id, AudioVolume);
 
     private void Save()
     {
