@@ -510,27 +510,31 @@ public sealed class TimelineControl : Control
         TimelineViewport viewport,
         double rowHeight)
     {
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        // 一次按通道分组,而不是每条通道都把整表重扫一遍——块多的时候那是平方级的。
+        foreach (var onChannel in blocks.GroupBy(block => block.Channel))
         {
-            var onChannel = blocks.Where(block => block.Channel == channel).ToList();
-            if (onChannel.Count < 2)
+            var overlapping = onChannel.ToArray();
+            if (overlapping.Length < 2)
             {
                 continue;
             }
 
-            var top = TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset - _vertical.Offset;
+            var top = TimelineLayout.RulerHeight
+                + (onChannel.Key * rowHeight)
+                + BlockInset
+                - _vertical.Offset;
             var height = Math.Max(6, rowHeight - (BlockInset * 2));
 
-            for (var first = 0; first < onChannel.Count; first++)
+            for (var first = 0; first < overlapping.Length; first++)
             {
-                for (var second = first + 1; second < onChannel.Count; second++)
+                for (var second = first + 1; second < overlapping.Length; second++)
                 {
-                    var start = onChannel[first].Start > onChannel[second].Start
-                        ? onChannel[first].Start
-                        : onChannel[second].Start;
-                    var end = onChannel[first].End < onChannel[second].End
-                        ? onChannel[first].End
-                        : onChannel[second].End;
+                    var start = overlapping[first].Start > overlapping[second].Start
+                        ? overlapping[first].Start
+                        : overlapping[second].Start;
+                    var end = overlapping[first].End < overlapping[second].End
+                        ? overlapping[first].End
+                        : overlapping[second].End;
 
                     if (end <= start)
                     {

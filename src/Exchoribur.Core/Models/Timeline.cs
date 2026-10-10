@@ -9,6 +9,12 @@ public sealed class Timeline
     private readonly Block[] _blocks;
     private readonly TimelineMarker[] _markers;
 
+    /// <summary>
+    /// 按通道分好的块。桶里的顺序跟着 _blocks 走(按起点排),所以按通道查的时候
+    /// 不用每次把整条轴扫一遍——自绘控件每帧都要问一次"这条通道上有哪些块"。
+    /// </summary>
+    private readonly Dictionary<int, Block[]> _blocksByChannel;
+
     /// <summary>所有状态变化点的绝对时间(含每个块的结束时刻),按时间排好,懒算一次。</summary>
     private TimeSpan[]? _frameTimes;
 
@@ -24,6 +30,10 @@ public sealed class Timeline
         {
             throw new ArgumentException("同一条时间轴里出现了重复的块 id。", nameof(blocks));
         }
+
+        _blocksByChannel = _blocks
+            .GroupBy(block => block.Channel)
+            .ToDictionary(group => group.Key, group => group.ToArray());
     }
 
     public static Timeline Empty { get; } = new([], []);
@@ -72,20 +82,20 @@ public sealed class Timeline
 
     /// <summary>这条通道上的块,按起点顺序。</summary>
     public IReadOnlyList<Block> BlocksOnChannel(int channel)
-        => [.. _blocks.Where(block => block.Channel == channel)];
+        => _blocksByChannel.TryGetValue(channel, out var blocks) ? blocks : [];
 
     /// <summary>某一刻盖住这条通道的块;没有就是空,重叠时会有多个。</summary>
     public IReadOnlyList<Block> BlocksAt(int channel, TimeSpan time)
-        => [.. _blocks.Where(block => block.Channel == channel && block.Contains(time))];
+        => [.. BlocksOnChannel(channel).Where(block => block.Contains(time))];
 
     /// <summary>这条通道这一刻是不是被多个块盖住(重叠 = 无法播放)。</summary>
     public bool IsOverlapping(int channel, TimeSpan time)
     {
         var count = 0;
 
-        foreach (var block in _blocks)
+        foreach (var block in BlocksOnChannel(channel))
         {
-            if (block.Channel == channel && block.Contains(time) && ++count > 1)
+            if (block.Contains(time) && ++count > 1)
             {
                 return true;
             }
@@ -99,11 +109,9 @@ public sealed class Timeline
     {
         get
         {
-            for (var channel = 0; channel < Frame.ChannelCount; channel++)
+            foreach (var blocks in _blocksByChannel.Values)
             {
-                var blocks = BlocksOnChannel(channel);
-
-                for (var index = 1; index < blocks.Count; index++)
+                for (var index = 1; index < blocks.Length; index++)
                 {
                     if (blocks[index].Start < blocks[index - 1].End)
                     {
@@ -119,37 +127,23 @@ public sealed class Timeline
     /// <summary>严格晚于 time 的最近一个状态变化点,没有就返回 null。</summary>
     public TimeSpan? GetNextFrameTime(TimeSpan time)
     {
-        var index = FindFirstAfter(time);
+        var index = FindFirst(time, strict: true);
         return index < FrameTimes.Count ? FrameTimes[index] : null;
     }
 
     /// <summary>严格早于 time 的最近一个状态变化点,没有就返回 null。</summary>
     public TimeSpan? GetPreviousFrameTime(TimeSpan time)
     {
-        var times = FrameTimes;
-        var low = 0;
-        var high = times.Count - 1;
-        var found = -1;
-
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-
-            if (times[middle] < time)
-            {
-                found = middle;
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return found < 0 ? null : times[found];
+        var index = FindFirst(time, strict: false) - 1;
+        return index >= 0 ? FrameTimes[index] : null;
     }
 
-    private int FindFirstAfter(TimeSpan time)
+    /// <summary>
+    /// 二分查找第一个"不算早于 time"的状态变化点的下标。
+    /// strict 为 true 时找严格晚于 time 的(往后跳帧),为 false 时找大于等于 time 的
+    /// (往前跳帧要用它的前一个)。全都比 time 早就返回 Count。
+    /// </summary>
+    private int FindFirst(TimeSpan time, bool strict)
     {
         var times = FrameTimes;
         var low = 0;
@@ -158,8 +152,9 @@ public sealed class Timeline
         while (low < high)
         {
             var middle = low + ((high - low) / 2);
+            var before = strict ? times[middle] <= time : times[middle] < time;
 
-            if (times[middle] <= time)
+            if (before)
             {
                 low = middle + 1;
             }
