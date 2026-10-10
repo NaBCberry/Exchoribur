@@ -33,8 +33,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
     private bool _disposed;
 
-    /// <summary>当前工程的编辑栈(撤销、重做)。没有时间轴时是 null。</summary>
-    private TimelineEditor? _editor;
+    /// <summary>块编辑的会话:撤销栈和几条"编辑之后界面怎么变"的规则。</summary>
+    private readonly BlockEditingSession _editing = new();
 
     /// <summary>选中集合在"补全链接组"时会回写自己,用这个标记挡住递归。</summary>
     private bool _syncingSelection;
@@ -273,7 +273,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         try
         {
             // 有链接的块要把同组的一起带上,带上之后再写回属性,界面也一起亮。
-            var expanded = ExpandLinked(value);
+            var expanded = BlockEditingSession.ExpandLinked(Timeline, value);
 
             if (!expanded.SequenceEqual(value))
             {
@@ -449,9 +449,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth) && _editor is not null)
+        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth))
         {
-            _editor.MaxUndoSteps = Settings.UndoDepthValue;
+            _editing.SetMaxUndoSteps(Settings.UndoDepthValue);
         }
     }
 
@@ -542,7 +542,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
         // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、块选中、撤销历史
         // 都该留在原地;只有换成另一条时间轴(打开、导入、新建)才从头开始。
-        if (!ReferenceEquals(_editor?.Timeline, value))
+        if (!ReferenceEquals(_editing.Timeline, value))
         {
             StartEditing(value);
         }
@@ -553,10 +553,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// </summary>
     private void StartEditing(Timeline timeline)
     {
-        _editor = new TimelineEditor(timeline)
-        {
-            MaxUndoSteps = Settings.UndoDepthValue,
-        };
+        _editing.Start(timeline, Settings.UndoDepthValue);
+
         SetBlockSelection([]);
         CurrentBlock = null;
         SelectedFrames = BlockFrameRange.Empty;
@@ -578,10 +576,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>把编辑栈的状态搬到界面上:撤销/重做能不能点、菜单显示什么字。</summary>
     private void SyncEditorState()
     {
-        CanUndo = _editor?.CanUndo ?? false;
-        CanRedo = _editor?.CanRedo ?? false;
-        UndoLabel = _editor?.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
-        RedoLabel = _editor?.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
+        CanUndo = _editing.CanUndo;
+        CanRedo = _editing.CanRedo;
+        UndoLabel = _editing.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
+        RedoLabel = _editing.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
@@ -749,30 +747,30 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void UndoEdits()
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
 
         PausePlayback();
-        _editor.Undo();
+        _editing.Undo();
         PublishEditorTimeline();
-        Report($"已撤销:{_editor.RedoName}。");
+        Report($"已撤销:{_editing.RedoName}。");
     }
 
     /// <summary>重做上一步被撤销的编辑。</summary>
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private void RedoEdits()
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
 
         PausePlayback();
-        _editor.Redo();
+        _editing.Redo();
         PublishEditorTimeline();
-        Report($"已重做:{_editor.UndoName}。");
+        Report($"已重做:{_editing.UndoName}。");
     }
 
     /// <summary>选中全部块。</summary>
@@ -791,7 +789,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>双击空白处建块:内容先放一帧,状态沿用那一刻该通道的状态。</summary>
     public void CreateBlockAt(int channel, TimeSpan time)
     {
-        if (_editor is null || Document is null)
+        if (!_editing.IsActive || Document is null)
         {
             return;
         }
@@ -816,7 +814,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>主时间轴拖动块:整体平移时间,并按上下方向换通道。</summary>
     public void MoveSelectedBlocks(TimeSpan timeDelta, int channelDelta)
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             return;
         }
@@ -852,7 +850,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand]
     private void DeleteSelectedBlocks()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -871,7 +869,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand]
     private async Task RenameSelectedBlockAsync()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -899,7 +897,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand]
     private void CopyBlockToOtherChannels()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -935,7 +933,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand]
     private void ToggleLink()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             return;
         }
@@ -978,41 +976,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     }
 
     /// <summary>换掉选中的块集合;有链接的块会自动把同组的其他块一起带上。</summary>
-    private void SetBlockSelection(IReadOnlyList<Block> blocks) => SelectedBlocks = ExpandLinked(blocks);
-
-    /// <summary>把链接组补全:只要选中了组里的一个,整组都算选中。</summary>
-    private IReadOnlyList<Block> ExpandLinked(IReadOnlyList<Block> blocks)
-    {
-        var groups = blocks
-            .Where(block => block.LinkGroupId is { })
-            .Select(block => block.LinkGroupId!.Value)
-            .ToHashSet();
-
-        if (groups.Count == 0)
-        {
-            return [.. blocks];
-        }
-
-        return [.. Timeline.Blocks.Where(block =>
-            blocks.Contains(block)
-            || (block.LinkGroupId is { } group && groups.Contains(group)))];
-    }
+    private void SetBlockSelection(IReadOnlyList<Block> blocks)
+        => SelectedBlocks = BlockEditingSession.ExpandLinked(Timeline, blocks);
 
     /// <summary>链接图标该显示成什么颜色。</summary>
-    private void SyncLinkState()
-    {
-        if (SelectedBlocks.Count == 0)
-        {
-            LinkState = LinkIndicator.Idle;
-            return;
-        }
-
-        var linked = SelectedBlocks.Count(block => block.LinkGroupId is not null);
-
-        LinkState = linked == SelectedBlocks.Count
-            ? LinkIndicator.Linked
-            : linked == 0 ? LinkIndicator.Idle : LinkIndicator.Mixed;
-    }
+    private void SyncLinkState() => LinkState = BlockEditingSession.LinkStateOf(SelectedBlocks);
 
     /// <summary>单击块:把它打开到下面的块编辑器里。</summary>
     public void OpenBlockEditor(Block block)
@@ -1051,38 +1019,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>把颜色刷进块里选中的那几帧;一帧都没选就是整块。</summary>
     private void PaintBlockFrames(Block block, LightColor color, string actionName)
     {
-        if (_editor is null || Document is null)
+        if (!_editing.IsActive || Document is null)
         {
             return;
         }
 
-        var selection = SelectedFrames.IsEmpty
-            ? new BlockFrameRange(0, block.Frames.Count - 1)
-            : SelectedFrames;
-
-        if (selection.Last >= block.Frames.Count)
+        // 范围越界时什么都不做(和以前一样:先算好的选区才动手)。
+        if (BlockEditingSession.PaintFrames(block, SelectedFrames, color) is not { } painted)
         {
             return;
         }
 
-        var frames = block.Frames.ToArray();
-
-        for (var index = selection.First; index <= selection.Last; index++)
-        {
-            frames[index] = new BlockFrame(
-                frames[index].Offset,
-                new ChannelState(color, frames[index].State.Mode));
-        }
-
-        ApplyBlockContent(block, frames, actionName);
-        Report($"已把 {selection.Count} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
+        ApplyBlockContent(block, painted.Frames, actionName);
+        Report($"已把 {painted.PaintedCount} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
     }
 
     /// <summary>在播放头处往当前块里插一帧,默认沿用那一刻的状态。</summary>
     [RelayCommand]
     private void InsertFrameAtPlayhead()
     {
-        if (_editor is null || Document is null || CurrentBlock is not { } block)
+        if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
             Report("先单击一个块,打开下面的块编辑器。", error: true);
             return;
@@ -1117,7 +1073,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [RelayCommand]
     private void DeleteSelectedFrames()
     {
-        if (_editor is null || Document is null || CurrentBlock is not { } block)
+        if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
             Report("先单击一个块,打开下面的块编辑器。", error: true);
             return;
@@ -1150,15 +1106,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>换掉当前块的内容;新帧超出原长度时自动把块延长到刚好装下。</summary>
     private void ApplyBlockContent(Block block, IReadOnlyList<BlockFrame> frames, string actionName)
     {
-        var length = block.Length;
-        var last = frames.Count == 0 ? TimeSpan.Zero : frames.Max(frame => frame.Offset);
-
-        if (last >= length)
-        {
-            length = last + TimeSpan.FromTicks(1);
-        }
-
-        var updated = block.WithContent(frames, length);
+        var (fitted, length) = BlockEditingSession.FitContent(block, frames);
+        var updated = block.WithContent(fitted, length);
 
         ApplyEdit(new BlockSetEdit(actionName, [block], [updated]));
         SetBlockSelection([updated]);
@@ -1168,7 +1117,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>走一步编辑:先停下播放,再把结果搬回界面。</summary>
     private void ApplyEdit(ITimelineEdit edit)
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
@@ -1176,23 +1125,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         // 边播边改会让人看不出改的是哪一帧,先停下来。
         PausePlayback();
 
-        _editor.Apply(edit);
+        _editing.Apply(edit);
         PublishEditorTimeline();
     }
 
     /// <summary>编辑栈换了内容之后,把结果搬回界面:时间轴对象、脏标记、撤销菜单。</summary>
     private void PublishEditorTimeline()
     {
-        if (_editor is null)
+        if (_editing.Timeline is not { } edited)
         {
             return;
         }
 
-        Timeline = _editor.Timeline;
+        Timeline = edited;
 
         // 撤销/重做之后块都换成了新对象,按 id 把选中集合和当前块重新指过去。
-        var selectedIds = SelectedBlocks.Select(block => block.Id).ToHashSet();
-        SelectedBlocks = [.. Timeline.Blocks.Where(block => selectedIds.Contains(block.Id))];
+        SelectedBlocks = BlockEditingSession.RebindSelected(Timeline, SelectedBlocks);
 
         CurrentBlock = CurrentBlock is { } current ? Timeline.FindBlock(current.Id) : null;
 
