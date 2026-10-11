@@ -61,6 +61,9 @@ internal static class Strings
     public static string ProjectStatusNothingToExport => Get(nameof(ProjectStatusNothingToExport));
     public static string ProjectStatusOpenedFormat => Get(nameof(ProjectStatusOpenedFormat));
     public static string ProjectStatusOpenFailedFormat => Get(nameof(ProjectStatusOpenFailedFormat));
+    public static string ProjectStatusOpeningFormat => Get(nameof(ProjectStatusOpeningFormat));
+    public static string ProjectLoadProgressTimelineFormat => Get(nameof(ProjectLoadProgressTimelineFormat));
+    public static string ProjectLoadProgressMediaFormat => Get(nameof(ProjectLoadProgressMediaFormat));
     public static string ProjectStatusSavingFormat => Get(nameof(ProjectStatusSavingFormat));
     public static string ProjectStatusSavedFormat => Get(nameof(ProjectStatusSavedFormat));
     public static string ProjectStatusSavedMissingMediaFormat => Get(nameof(ProjectStatusSavedMissingMediaFormat));

@@ -325,6 +325,35 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     [ObservableProperty]
     public partial double SaveProgress { get; set; }
 
+    /// <summary>正在打开工程。解参考视频要等一会儿,状态栏靠它显示进度条。</summary>
+    [ObservableProperty]
+    public partial bool IsLoading { get; set; }
+
+    /// <summary>打开进度 0-100,和保存共用状态栏那根进度条。</summary>
+    [ObservableProperty]
+    public partial double LoadProgress { get; set; }
+
+    /// <summary>正在保存或正在打开:状态栏那根进度条按它显示或收起。</summary>
+    public bool IsBusy => IsSaving || IsLoading;
+
+    /// <summary>状态栏进度条的当前值(0-100)。保存和打开同时只会有一个在跑。</summary>
+    public double BusyProgress => IsSaving ? SaveProgress : LoadProgress;
+
+    partial void OnIsSavingChanged(bool value) => NotifyBusyStateChanged();
+
+    partial void OnIsLoadingChanged(bool value) => NotifyBusyStateChanged();
+
+    partial void OnSaveProgressChanged(double value) => OnPropertyChanged(nameof(BusyProgress));
+
+    partial void OnLoadProgressChanged(double value) => OnPropertyChanged(nameof(BusyProgress));
+
+    /// <summary>忙碌状态变了:要不要显示进度条、显示到哪儿,都得让界面知道。</summary>
+    private void NotifyBusyStateChanged()
+    {
+        OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(BusyProgress));
+    }
+
     partial void OnTimelineNameChanged(string value) => UpdateWindowTitle();
 
     partial void OnIsModifiedChanged(bool value) => UpdateWindowTitle();

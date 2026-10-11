@@ -156,10 +156,27 @@ internal sealed class ProjectSession(
     {
         var fileName = Path.GetFileName(path);
 
+        host.IsLoading = true;
+        host.LoadProgress = 0;
+        host.Report(string.Format(Strings.ProjectStatusOpeningFormat, fileName));
+
         try
         {
-            // 读容器和解压媒体都不该卡住界面。
-            var document = await Task.Run(() => ProjectFile.Load(path));
+            // 读容器和解压媒体都不该卡住界面;进度报回来就走状态栏那根细进度条。
+            // Progress 是在界面线程上建的,后台线程报上来的进度会自动回到界面线程。
+            var progress = new Progress<ProjectLoadProgress>(report =>
+            {
+                // 已经收尾就不再改状态栏,免得最后一步的进度把结果盖掉。
+                if (!host.IsLoading)
+                {
+                    return;
+                }
+
+                host.Report(DescribeLoadProgress(fileName, report));
+                host.LoadProgress = report.Fraction * 100;
+            });
+
+            var document = await ProjectFile.LoadAsync(path, progress);
 
             _projectPath = path;
             host.Document = document;
@@ -188,6 +205,11 @@ internal sealed class ProjectSession(
         {
             host.Report(string.Format(Strings.ProjectStatusOpenFailedFormat, fileName, exception.Message), error: true);
             return false;
+        }
+        finally
+        {
+            host.IsLoading = false;
+            host.LoadProgress = 0;
         }
     }
 
@@ -390,6 +412,15 @@ internal sealed class ProjectSession(
         => namePrompt is null
             ? suggestedName
             : await namePrompt.AskAsync(Strings.ProjectPromptNewTimeline, suggestedName);
+
+    /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
+    internal static string DescribeLoadProgress(string fileName, ProjectLoadProgress progress)
+        => progress.Stage switch
+        {
+            ProjectLoadStage.Media =>
+                string.Format(Strings.ProjectLoadProgressMediaFormat, fileName, progress.Fraction * 100),
+            _ => string.Format(Strings.ProjectLoadProgressTimelineFormat, fileName),
+        };
 
     /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
     internal static string DescribeSaveProgress(string fileName, ProjectSaveProgress progress)

@@ -267,6 +267,15 @@
   <data name="ProjectStatusOpenFailedFormat" xml:space="preserve">
     <value>打开工程 {0} 失败:{1}</value>
   </data>
+  <data name="ProjectStatusOpeningFormat" xml:space="preserve">
+    <value>正在打开工程 {0}…</value>
+  </data>
+  <data name="ProjectLoadProgressTimelineFormat" xml:space="preserve">
+    <value>正在打开工程 {0}…读时间轴数据</value>
+  </data>
+  <data name="ProjectLoadProgressMediaFormat" xml:space="preserve">
+    <value>正在打开工程 {0}…解出参考视频 {1:F0}%</value>
+  </data>
   <data name="ProjectStatusSavingFormat" xml:space="preserve">
     <value>正在保存工程 {0}…</value>
   </data>

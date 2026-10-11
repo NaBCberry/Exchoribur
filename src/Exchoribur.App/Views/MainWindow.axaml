@@ -167,7 +167,7 @@
                            Classes.error="{Binding HasError}"
                            Text="{Binding StatusText}"
                            VerticalAlignment="Center" />
-                <!-- 只在保存时出现的细进度条:打包大素材要等几十秒,没有它看不出还在动 -->
+                 <!-- 保存/打开时才出现的细进度条:打包或解出大素材要等几十秒,没有它看不出还在动 -->
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             Spacing="8"
@@ -176,8 +176,8 @@
                                  Height="4"
                                  Minimum="0"
                                  Maximum="100"
-                                 Value="{Binding SaveProgress}"
-                                 IsVisible="{Binding IsSaving}"
+                                 Value="{Binding BusyProgress}"
+                                 IsVisible="{Binding IsBusy}"
                                  Foreground="{DynamicResource AccentBrush}"
                                  VerticalAlignment="Center" />
 

@@ -177,7 +177,12 @@ public static class ProjectFile
     /// 打开工程。参考媒体会解到临时目录(同一个工程重复打开会复用),
     /// 并作为工程的 MediaPath 返回——播放器需要能直接读到的文件。
     /// </summary>
-    public static TimelineDocument Load(string path)
+    public static TimelineDocument Load(string path) => Load(path, progress: null);
+
+    /// <summary>
+    /// 打开工程,并报进度。参考视频几百兆时解压要等一会儿,界面靠这个把进度条走起来。
+    /// </summary>
+    public static TimelineDocument Load(string path, IProgress<ProjectLoadProgress>? progress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -191,10 +196,39 @@ public static class ProjectFile
                 $"工程文件版本是 {manifest.FormatVersion},这个版本的程序只认 {ProjectFileFormat.FormatVersion}。");
         }
 
-        var timeline = TimelineJson.Read(ReadText(archive, ProjectFileFormat.TimelineName));
-        var mediaPath = ExtractMedia(archive, path, manifest.MediaName);
+        var timelineJson = ReadText(archive, ProjectFileFormat.TimelineName);
+        var timeline = TimelineJson.Read(timelineJson);
+
+        var mediaEntry = FindMediaEntry(archive, manifest.MediaName);
+
+        // 进度按字节算:几百兆的视频和几兆的时间轴放一起,谁占时间一目了然。
+        var timelineBytes = Encoding.UTF8.GetByteCount(timelineJson);
+        var mediaBytes = mediaEntry?.Length ?? 0;
+        var totalBytes = timelineBytes + mediaBytes;
+
+        progress?.Report(new ProjectLoadProgress(
+            ProjectLoadStage.Timeline,
+            Percent(timelineBytes, totalBytes) / 100d));
+
+        var mediaPath = mediaEntry is null
+            ? null
+            : ExtractMedia(mediaEntry, path, totalBytes, progress);
 
         return new TimelineDocument(manifest.Name ?? TimelineDocument.DefaultName, timeline, mediaPath);
+    }
+
+    /// <summary>
+    /// 打开工程的后台版本。解压几百兆的参考视频放在界面线程上做会让窗口整段卡住,
+    /// 所以整个读盘丢到线程池执行;进度通过 progress 报回来。
+    /// </summary>
+    public static Task<TimelineDocument> LoadAsync(
+        string path,
+        IProgress<ProjectLoadProgress>? progress = null)
+    {
+        // 参数不对就当场抛,别等到后台线程里才炸。
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        return Task.Run(() => Load(path, progress));
     }
 
     private static ManifestDto ReadManifest(ZipArchive archive)
@@ -210,19 +244,27 @@ public static class ProjectFile
         }
     }
 
-    private static string? ExtractMedia(ZipArchive archive, string projectPath, string? mediaName)
+    /// <summary>容器里那条参考视频;没有视频、或者清单里没写文件名时是 null。</summary>
+    private static ZipArchiveEntry? FindMediaEntry(ZipArchive archive, string? mediaName)
     {
         if (string.IsNullOrWhiteSpace(mediaName))
         {
             return null;
         }
 
-        var entry = archive.GetEntry($"{ProjectFileFormat.MediaDirectory}/{mediaName}");
-        if (entry is null)
-        {
-            return null;
-        }
+        return archive.GetEntry($"{ProjectFileFormat.MediaDirectory}/{mediaName}");
+    }
 
+    /// <summary>
+    /// 把参考视频解到临时目录,按已解出的字节数报进度。
+    /// 同一个工程重复打开会复用上一次的文件(大小对得上就不重解)。
+    /// </summary>
+    private static string ExtractMedia(
+        ZipArchiveEntry entry,
+        string projectPath,
+        long totalBytes,
+        IProgress<ProjectLoadProgress>? progress)
+    {
         // 每个工程一个固定目录:重复打开同一工程不必反复解压。
         var folder = Path.Combine(
             Path.GetTempPath(),
@@ -230,14 +272,56 @@ public static class ProjectFile
             Path.GetFileNameWithoutExtension(projectPath));
         Directory.CreateDirectory(folder);
 
-        var target = Path.Combine(folder, mediaName);
+        var target = Path.Combine(folder, entry.Name);
         if (File.Exists(target) && new FileInfo(target).Length == entry.Length)
         {
+            progress?.Report(new ProjectLoadProgress(
+                ProjectLoadStage.Media,
+                Percent(totalBytes, totalBytes) / 100d));
             return target;
         }
 
-        entry.ExtractToFile(target, overwrite: true);
+        CopyWithProgress(entry, target, totalBytes - entry.Length, totalBytes, progress);
         return target;
+    }
+
+    /// <summary>
+    /// 把条目边解边写。进度每提高一个百分点报一次,免得大文件把界面线程刷爆。
+    /// </summary>
+    private static void CopyWithProgress(
+        ZipArchiveEntry entry,
+        string target,
+        long bytesBefore,
+        long totalBytes,
+        IProgress<ProjectLoadProgress>? progress)
+    {
+        using var source = entry.Open();
+        using var destination = File.Create(target);
+
+        var buffer = new byte[CopyBufferSize];
+        long copied = 0;
+        var lastPercent = -1;
+
+        while (true)
+        {
+            var read = source.Read(buffer, 0, buffer.Length);
+            if (read == 0)
+            {
+                break;
+            }
+
+            destination.Write(buffer, 0, read);
+            copied += read;
+
+            var percent = Percent(bytesBefore + copied, totalBytes);
+            if (percent == lastPercent)
+            {
+                continue;
+            }
+
+            lastPercent = percent;
+            progress?.Report(new ProjectLoadProgress(ProjectLoadStage.Media, percent / 100d));
+        }
     }
 
     private static void WriteText(ZipArchive archive, string entryName, string text)

@@ -1,6 +1,7 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Tests;
 
@@ -20,6 +21,23 @@ public sealed class ProjectSessionTests : IDisposable
     public ProjectSessionTests() => Directory.CreateDirectory(_directory);
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
+
+    [Fact]
+    public async Task Opening_a_project_reports_the_loading_state()
+    {
+        var project = WriteProject("巡演.exb");
+        var host = new FakeHost();
+        var session = CreateSession(host, new StubFilePicker(projectPath: project));
+
+        await session.OpenProjectAsync();
+
+        Assert.False(host.LastMessageIsError, host.LastMessage);
+        Assert.NotNull(host.Document);
+
+        // 进过"正在打开"、也收回来了;收尾时进度清零,界面上的进度条才会收起来。
+        Assert.Equal([true, false], host.LoadingHistory);
+        Assert.Equal(0, host.LoadProgress);
+    }
 
     [Fact]
     public async Task Saving_without_a_project_reports_instead_of_writing()
@@ -93,6 +111,17 @@ public sealed class ProjectSessionTests : IDisposable
         return path;
     }
 
+    /// <summary>造一个带参考媒体的工程文件:进度条要能跟着解压走起来。</summary>
+    private string WriteProject(string name)
+    {
+        var media = Path.Combine(_directory, "素材.mp4");
+        File.WriteAllBytes(media, new byte[64 * 1024]);
+
+        var project = Path.Combine(_directory, name);
+        ProjectFile.Save(project, new TimelineDocument("巡演", Timeline.Empty, media));
+        return project;
+    }
+
     /// <summary>假宿主:记录文件流程都动了界面上的哪些东西。</summary>
     private sealed class FakeHost : IProjectHost
     {
@@ -107,6 +136,23 @@ public sealed class ProjectSessionTests : IDisposable
         public bool IsSaving { get; set; }
 
         public double SaveProgress { get; set; }
+
+        /// <summary>界面看到的"正在打开"状态按顺序记下来:用来验证进来又退出去。</summary>
+        public List<bool> LoadingHistory { get; } = [];
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set
+            {
+                _isLoading = value;
+                LoadingHistory.Add(value);
+            }
+        }
+
+        public double LoadProgress { get; set; }
+
+        private bool _isLoading;
 
         public IReadOnlyList<Block> Blocks => Timeline.Blocks;
 

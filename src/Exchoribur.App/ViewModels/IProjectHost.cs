@@ -27,6 +27,12 @@ internal interface IProjectHost
     /// <summary>保存进度 0-100。</summary>
     double SaveProgress { get; set; }
 
+    /// <summary>正在打开工程:状态栏显示进度条(解参考视频要等一会儿)。</summary>
+    bool IsLoading { get; set; }
+
+    /// <summary>打开进度 0-100。</summary>
+    double LoadProgress { get; set; }
+
     /// <summary>时间轴上的块,导出时统计用。</summary>
     IReadOnlyList<Block> Blocks { get; }
 
