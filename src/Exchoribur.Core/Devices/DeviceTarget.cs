@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 namespace Exchoribur.Core.Devices;
 
@@ -69,35 +70,51 @@ public sealed record DeviceTarget
             return false;
         }
 
-        var addressPart = trimmed;
-        var colon = trimmed.LastIndexOf(':');
-
-        if (colon >= 0)
+        // 先整串当 IP 试:IPv6 字面量里全是冒号,不能拿最后一个冒号当端口分隔符。
+        if (IPAddress.TryParse(trimmed, out var address))
         {
-            addressPart = trimmed[..colon];
-
-            if (!int.TryParse(trimmed[(colon + 1)..], out var port))
-            {
-                error = "UDP 端口不是数字。";
-                return false;
-            }
-
-            if (port != DeviceProtocol.UdpPort)
-            {
-                error = $"UDP 端口固定是 {DeviceProtocol.UdpPort},不能填 {port}。";
-                return false;
-            }
+            return Accept(address, out host, out error);
         }
 
-        if (!IPAddress.TryParse(addressPart, out var address))
+        // 再认从别处粘过来的 "地址:端口";端口写了就必须是协议那个值。
+        var separator = trimmed.LastIndexOf(':');
+
+        if (separator <= 0 || trimmed.IndexOf(':') != separator)
         {
             error = "UDP 目标地址不是合法的 IP。";
             return false;
         }
 
-        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+        if (!int.TryParse(trimmed[(separator + 1)..], out var port))
         {
-            error = "UDP 目标地址要写 IPv4,暂时不支持 IPv6。";
+            error = "UDP 端口不是数字。";
+            return false;
+        }
+
+        if (port != DeviceProtocol.UdpPort)
+        {
+            error = $"UDP 端口固定是 {DeviceProtocol.UdpPort},不能填 {port}。";
+            return false;
+        }
+
+        if (!IPAddress.TryParse(trimmed[..separator], out address))
+        {
+            error = "UDP 目标地址不是合法的 IP。";
+            return false;
+        }
+
+        return Accept(address, out host, out error);
+    }
+
+    /// <summary>设备那边是 IPv4 的 socket,这里只收 IPv4,IPv6 一律不收。</summary>
+    private static bool Accept(IPAddress address, out string? host, out string? error)
+    {
+        host = null;
+        error = null;
+
+        if (address.AddressFamily != AddressFamily.InterNetwork)
+        {
+            error = "UDP 目标地址要写 IPv4,不收 IPv6。";
             return false;
         }
 
