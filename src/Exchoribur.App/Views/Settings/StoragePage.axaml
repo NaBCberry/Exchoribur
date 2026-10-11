@@ -1,17 +1,18 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
              x:Class="Exchoribur.App.Views.Settings.StoragePage"
              x:DataType="vm:SettingsViewModel">
 
     <StackPanel Spacing="10">
         <Border Classes="settingsGroup">
             <StackPanel Spacing="6">
-                <TextBlock Classes="rowLabel" Text="设置文件位置" />
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsStorageFilePath}" />
                 <TextBlock Classes="rowValue"
                            Text="{Binding SettingsFilePath}"
                            TextWrapping="Wrap" />
-                <Button Content="打开所在文件夹"
+                <Button Content="{x:Static res:Strings.SettingsStorageOpenFolder}"
                         Command="{Binding OpenSettingsFolderCommand}"
                         HorizontalAlignment="Left"
                         Padding="12,4" />
@@ -20,9 +21,9 @@
 
         <Border Classes="settingsGroup">
             <StackPanel Spacing="6">
-                <TextBlock Classes="rowLabel" Text="恢复默认设置" />
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsResetButton}" />
                 <TextBlock Classes="note"
-                           Text="点击两次确认取消" />
+                           Text="{x:Static res:Strings.SettingsStorageResetNote}" />
                 <Button Content="{Binding ResetButtonText}"
                         Command="{Binding ResetToDefaultsCommand}"
                         HorizontalAlignment="Left"

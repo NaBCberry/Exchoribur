@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:res="using:Exchoribur.App.Resources"
         mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="170"
         x:Class="Exchoribur.App.Views.UnsavedChangesWindow"
         Width="460" Height="174"
@@ -18,14 +19,14 @@
                         VerticalAlignment="Center"
                         Spacing="8"
                         Margin="0,0,14,0">
-                <Button Content="保存" Click="OnSave" Padding="18,4" />
-                <Button Content="不保存" Click="OnDiscard" Padding="18,4" />
-                <Button Content="取消" Click="OnCancel" Padding="18,4" />
+                <Button Content="{x:Static res:Strings.UnsavedChangesSave}" Click="OnSave" Padding="18,4" />
+                <Button Content="{x:Static res:Strings.UnsavedChangesDiscard}" Click="OnDiscard" Padding="18,4" />
+                <Button Content="{x:Static res:Strings.CommonCancel}" Click="OnCancel" Padding="18,4" />
             </StackPanel>
         </Border>
 
         <StackPanel Margin="18" Spacing="8">
-            <TextBlock Classes="panelTitle" Text="有未保存的改动" />
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.UnsavedChangesTitle}" />
             <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
         </StackPanel>
     </DockPanel>

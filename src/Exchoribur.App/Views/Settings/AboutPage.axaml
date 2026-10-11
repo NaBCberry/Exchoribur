@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
              x:Class="Exchoribur.App.Views.Settings.AboutPage"
              x:DataType="vm:SettingsViewModel">
 
@@ -11,25 +12,25 @@
                            FontSize="16"
                            Text="{Binding AppName}" />
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
-                    <TextBlock Classes="rowLabel" Text="版本" />
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutVersion}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
                                Text="{Binding CurrentVersionText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
-                    <TextBlock Classes="rowLabel" Text="构建配置" />
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutBuildConfiguration}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
                                Text="{Binding BuildConfigurationText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
-                    <TextBlock Classes="rowLabel" Text="许可" />
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutLicense}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
                                Text="{Binding LicenseText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
-                    <TextBlock Classes="rowLabel" Text="版权" />
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutCopyright}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
                                Text="{Binding CopyrightText}" />
@@ -39,15 +40,15 @@
 
         <Border Classes="settingsGroup">
             <StackPanel Spacing="8">
-                <TextBlock Classes="panelTitle" Text="链接与声明" />
+                <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.SettingsAboutLinksTitle}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="打开项目主页"
+                    <Button Content="{x:Static res:Strings.SettingsAboutProjectUrl}"
                             Command="{Binding OpenProjectUrlCommand}"
                             Padding="12,4" />
-                    <Button Content="许可证全文"
+                    <Button Content="{x:Static res:Strings.SettingsAboutLicenseFile}"
                             Command="{Binding OpenLicenseCommand}"
                             Padding="12,4" />
-                    <Button Content="第三方组件声明"
+                    <Button Content="{x:Static res:Strings.SettingsAboutNotices}"
                             Command="{Binding OpenNoticesCommand}"
                             Padding="12,4" />
                 </StackPanel>

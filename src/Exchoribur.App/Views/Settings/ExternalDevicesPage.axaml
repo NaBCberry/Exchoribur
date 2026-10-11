@@ -1,24 +1,25 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
              x:Class="Exchoribur.App.Views.Settings.ExternalDevicesPage"
              x:DataType="vm:SettingsViewModel">
 
     <StackPanel Spacing="10">
         <Border Classes="settingsGroup">
             <StackPanel Spacing="6">
-                <TextBlock Classes="rowLabel" Text="灯光设备输出" />
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesOutputTitle}" />
                 <TextBlock Classes="note"
-                           Text="发送侧的协议层(帧打包、压缩、组装)已经写好并有测试,连接、握手和播放时吐帧还没做。这一页先占位,做完再接进来。" />
+                           Text="{x:Static res:Strings.SettingsDevicesOutputNote}" />
             </StackPanel>
         </Border>
 
         <Border Classes="settingsGroup">
             <StackPanel Spacing="4">
-                <TextBlock Classes="panelTitle" Text="计划支持的接口" />
-                <TextBlock Classes="rowValue" Text="串口 — 尚未实现" />
-                <TextBlock Classes="rowValue" Text="BLE — 尚未实现" />
-                <TextBlock Classes="rowValue" Text="UDP / Wi-Fi — 尚未实现" />
+                <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.SettingsDevicesPlannedTitle}" />
+                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesSerial}" />
+                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesBle}" />
+                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesUdp}" />
             </StackPanel>
         </Border>
     </StackPanel>
