@@ -151,7 +151,6 @@ internal static class Strings
     public static string ColorChannelBlue => Get(nameof(ColorChannelBlue));
     public static string ColorPanelOutputTitle => Get(nameof(ColorPanelOutputTitle));
     public static string ColorPanelApplyButton => Get(nameof(ColorPanelApplyButton));
-    public static string ColorPanelApplyHint => Get(nameof(ColorPanelApplyHint));
     public static string UnsavedChangesTitle => Get(nameof(UnsavedChangesTitle));
     public static string UnsavedChangesSave => Get(nameof(UnsavedChangesSave));
     public static string UnsavedChangesDiscard => Get(nameof(UnsavedChangesDiscard));

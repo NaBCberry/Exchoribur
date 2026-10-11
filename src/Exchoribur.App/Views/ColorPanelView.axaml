@@ -135,9 +135,6 @@
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
                     Command="{Binding ApplyEditorColorCommand}" />
-
-            <TextBlock Classes="note"
-                       Text="{x:Static res:Strings.ColorPanelApplyHint}" />
         </StackPanel>
     </ScrollViewer>
 

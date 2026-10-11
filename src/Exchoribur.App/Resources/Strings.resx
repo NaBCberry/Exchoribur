@@ -537,9 +537,6 @@
   <data name="ColorPanelApplyButton" xml:space="preserve">
     <value>应用到选中帧</value>
   </data>
-  <data name="ColorPanelApplyHint" xml:space="preserve">
-    <value>选中的是哪几帧、哪几个通道,就改哪些;模式保持原样,可以 Ctrl+Z 撤销。</value>
-  </data>
   <data name="UnsavedChangesTitle" xml:space="preserve">
     <value>有未保存的改动</value>
   </data>
