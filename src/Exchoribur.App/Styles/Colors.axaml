@@ -12,7 +12,7 @@
         <SolidColorBrush x:Key="TextBrush" Color="#C8C8C8" />
         <SolidColorBrush x:Key="DimTextBrush" Color="#8A8A8A" />
         <!-- 强调色,和播放头同色:保存进度条、设置页选中项这类"当前"的提示用它 -->
-        <SolidColorBrush x:Key="AccentBrush" Color="#FF5A36" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#0080ff" />
 
         <!--
             自绘时间轴用的颜色。这里放的是画刷,自绘控件只取它的颜色:
