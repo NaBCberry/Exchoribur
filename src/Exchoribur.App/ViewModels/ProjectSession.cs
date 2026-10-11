@@ -1,3 +1,4 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Storage;
@@ -120,7 +121,7 @@ internal sealed class ProjectSession(
     {
         if (host.Document is null)
         {
-            host.Report("还没有工程可保存，先打开工程或导入 CSV 或 视频。", error: true);
+            host.Report(Strings.ProjectStatusNoProjectToSave, error: true);
             return;
         }
 
@@ -172,8 +173,11 @@ internal sealed class ProjectSession(
             host.Report(string.Empty, error: false);
             _ = document.MediaPath is { } media && host.OpenVideo(media);
 
-            host.Report($"已打开工程 {fileName}:{document.Timeline.Blocks.Count:N0} 个块,"
-                + $"{document.Timeline.Markers.Count:N0} 个标记。");
+            host.Report(string.Format(
+                Strings.ProjectStatusOpenedFormat,
+                fileName,
+                document.Timeline.Blocks.Count,
+                document.Timeline.Markers.Count));
 
             return true;
         }
@@ -182,7 +186,7 @@ internal sealed class ProjectSession(
             or FormatException
             or InvalidDataException)
         {
-            host.Report($"打开工程 {fileName} 失败:{exception.Message}", error: true);
+            host.Report(string.Format(Strings.ProjectStatusOpenFailedFormat, fileName, exception.Message), error: true);
             return false;
         }
     }
@@ -202,7 +206,7 @@ internal sealed class ProjectSession(
 
         host.IsSaving = true;
         host.SaveProgress = 0;
-        host.Report($"正在保存工程 {fileName}…");
+        host.Report(string.Format(Strings.ProjectStatusSavingFormat, fileName));
 
         try
         {
@@ -229,9 +233,11 @@ internal sealed class ProjectSession(
             // 参考视频不在了的话,这次只存下了时间轴。用报错样式说,免得用户以为存全了。
             host.Report(
                 result.MissingMediaName is null
-                    ? $"工程 {fileName}已保存。"
-                    : $"工程 {fileName}已保存,但参考视频 {result.MissingMediaName} 丢失,"
-                        + "视频未打包。",
+                    ? string.Format(Strings.ProjectStatusSavedFormat, fileName)
+                    : string.Format(
+                        Strings.ProjectStatusSavedMissingMediaFormat,
+                        fileName,
+                        result.MissingMediaName),
                 error: result.MissingMediaName is not null);
         }
         catch (Exception exception)
@@ -252,7 +258,7 @@ internal sealed class ProjectSession(
     {
         if (host.Document is null)
         {
-            host.Report("还没有工程,没什么可导出的。", error: true);
+            host.Report(Strings.ProjectStatusNothingToExport, error: true);
             return;
         }
 
@@ -273,12 +279,15 @@ internal sealed class ProjectSession(
         {
             TimelineCsvFile.Save(path, host.Timeline);
 
-            host.Report($"已导出 {fileName}:{host.Blocks.Count:N0} 个块,"
-                + $"{host.Markers.Count:N0} 个标记。");
+            host.Report(string.Format(
+                Strings.ProjectStatusExportedFormat,
+                fileName,
+                host.Blocks.Count,
+                host.Markers.Count));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            host.Report($"导出 {fileName} 失败:{exception.Message}", error: true);
+            host.Report(string.Format(Strings.ProjectStatusExportFailedFormat, fileName, exception.Message), error: true);
         }
     }
 
@@ -349,15 +358,19 @@ internal sealed class ProjectSession(
             host.RefreshWindowTitle();
 
             host.Report(timeline.Blocks.Count == 0
-                ? $"已载入 {fileName},但里面没有任何灯光内容。"
-                : $"已载入 {fileName}:{timeline.Blocks.Count:N0} 个块,"
-                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Duration)}。");
+                ? string.Format(Strings.ProjectStatusLoadedEmptyFormat, fileName)
+                : string.Format(
+                    Strings.ProjectStatusLoadedFormat,
+                    fileName,
+                    timeline.Blocks.Count,
+                    timeline.Markers.Count,
+                    Timecode.Format(timeline.Duration)));
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
             or FormatException)
         {
-            host.Report($"打开 {fileName} 失败:{exception.Message}", error: true);
+            host.Report(string.Format(Strings.ProjectStatusLoadFailedFormat, fileName, exception.Message), error: true);
         }
     }
 
@@ -376,15 +389,15 @@ internal sealed class ProjectSession(
     private async Task<string?> AskForTimelineNameAsync(string suggestedName)
         => namePrompt is null
             ? suggestedName
-            : await namePrompt.AskAsync("新建时间线", suggestedName);
+            : await namePrompt.AskAsync(Strings.ProjectPromptNewTimeline, suggestedName);
 
     /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
     internal static string DescribeSaveProgress(string fileName, ProjectSaveProgress progress)
         => progress.Stage switch
         {
             ProjectSaveStage.Media =>
-                $"正在保存工程 {fileName}…打包参考视频 {progress.Fraction * 100:F0}%",
-            _ => $"正在保存工程 {fileName}…整理时间轴数据",
+                string.Format(Strings.ProjectSaveProgressMediaFormat, fileName, progress.Fraction * 100),
+            _ => string.Format(Strings.ProjectSaveProgressTimelineFormat, fileName),
         };
 
     /// <summary>
@@ -395,16 +408,15 @@ internal sealed class ProjectSession(
     {
         var reason = FileFailure.Classify(exception) switch
         {
-            FileFailureReason.InUse =>
-                "文件正被其他程序占用,关掉占用程序再试",
-            FileFailureReason.AccessDenied =>
-                "文件无法写入,文件可能只读/被占用",
-            FileFailureReason.DiskFull => "磁盘空间不够",
+            FileFailureReason.InUse => Strings.ProjectSaveFailureInUse,
+            FileFailureReason.AccessDenied => Strings.ProjectSaveFailureAccessDenied,
+            FileFailureReason.DiskFull => Strings.ProjectSaveFailureDiskFull,
             _ => null,
         };
 
-        return reason is null
-            ? $"保存工程 {fileName} 失败:{exception.Message}"
-            : $"保存工程 {fileName} 失败:{reason}。";
+        return string.Format(
+            reason is null ? Strings.ProjectSaveFailureUnknownFormat : Strings.ProjectSaveFailureKnownFormat,
+            fileName,
+            reason ?? exception.Message);
     }
 }

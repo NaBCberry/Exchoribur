@@ -14,6 +14,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      界面文案的资源名显式写死:默认名是从 RootNamespace 拼出来的,谁改了工程名或
+      RootNamespace,资源就会悄悄读不到(界面上一堆键名)。
+    -->
+    <EmbeddedResource Update="Resources\Strings.resx">
+      <LogicalName>Exchoribur.App.Resources.Strings.resources</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 关于页要能打开这三份声明,所以随程序一起发出去 -->
     <Content Include="..\..\LICENSE"
              Link="LICENSE"

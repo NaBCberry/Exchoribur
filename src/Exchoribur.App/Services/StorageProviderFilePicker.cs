@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Exchoribur.App.Resources;
 using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Services;
@@ -11,13 +12,19 @@ namespace Exchoribur.App.Services;
 public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
 {
     public Task<string?> PickTimelineAsync() => PickAsync(
-        "打开时间轴 CSV",
-        [new FilePickerFileType("时间轴 CSV") { Patterns = [ProjectFileExtensions.CsvPattern] }, FilePickerFileTypes.All]);
+        Strings.FileDialogOpenTimeline,
+        [
+            new FilePickerFileType(Strings.FileTypeTimelineCsv)
+            {
+                Patterns = [ProjectFileExtensions.CsvPattern],
+            },
+            FilePickerFileTypes.All,
+        ]);
 
     public Task<string?> PickVideoAsync() => PickAsync(
-        "导入参考视频",
+        Strings.FileDialogImportVideo,
         [
-            new FilePickerFileType("视频")
+            new FilePickerFileType(Strings.FileTypeVideo)
             {
                 Patterns = ["*.mp4", "*.mkv", "*.mov", "*.avi", "*.wmv", "*.webm", "*.m4v"],
             },
@@ -25,14 +32,14 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
         ]);
 
     public Task<string?> PickProjectAsync() => PickAsync(
-        "打开工程",
+        Strings.FileDialogOpenProject,
         [CreateProjectFileType(), FilePickerFileTypes.All]);
 
     public async Task<string?> PickProjectSaveAsync(string suggestedName)
     {
         var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "保存工程",
+            Title = Strings.FileDialogSaveProject,
             SuggestedFileName = suggestedName,
             DefaultExtension = ProjectFileFormat.Extension.TrimStart('.'),
             FileTypeChoices = [CreateProjectFileType()],
@@ -42,7 +49,7 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
     }
 
     private static FilePickerFileType CreateProjectFileType()
-        => new(ProjectFileFormat.DisplayName)
+        => new(Strings.FileTypeProject)
         {
             Patterns = [$"*{ProjectFileFormat.Extension}"],
         };
@@ -51,11 +58,16 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
     {
         var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "导出时间轴 CSV",
+            Title = Strings.FileDialogExportTimeline,
             SuggestedFileName = suggestedName,
-            DefaultExtension = "csv",
+            DefaultExtension = ProjectFileExtensions.Csv.TrimStart('.'),
             FileTypeChoices =
-                [new FilePickerFileType("时间轴 CSV") { Patterns = [ProjectFileExtensions.CsvPattern] }],
+            [
+                new FilePickerFileType(Strings.FileTypeTimelineCsv)
+                {
+                    Patterns = [ProjectFileExtensions.CsvPattern],
+                },
+            ],
         });
 
         return file?.TryGetLocalPath();

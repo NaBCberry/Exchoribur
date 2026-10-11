@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Exchoribur.App.Controls;
+using Exchoribur.App.Resources;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Storage;
 
@@ -346,7 +347,7 @@ public sealed class TimelineControl : Control
         if (blocks is not { Count: > 0 })
         {
             context.DrawText(
-                GetDimText("双击空白处新建编排块", 12),
+                GetDimText(Strings.TimelineEmptyHint, 12),
                 new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
         }
     }

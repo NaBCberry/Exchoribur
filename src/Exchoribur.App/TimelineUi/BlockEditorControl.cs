@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Exchoribur.App.Controls;
+using Exchoribur.App.Resources;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Storage;
@@ -335,7 +336,7 @@ public sealed class BlockEditorControl : Control
         if (viewport is not { Scale: > 0 } || CurrentBlock is not { } current)
         {
             context.DrawText(
-                GetDimText("单击上面的块,在这里编辑它的灯光", 12),
+                GetDimText(Strings.BlockEditorEmptyHint, 12),
                 new Point(TrackLeft + 12, bodyTop + 16));
             DrawDivider(context, height);
             return;

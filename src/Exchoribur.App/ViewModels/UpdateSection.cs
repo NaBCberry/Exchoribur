@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.Core.Updates;
 
@@ -75,14 +76,17 @@ internal sealed class UpdateSection : ObservableObject
 
         UpdateStatusText = state.Stage switch
         {
-            UpdateStage.Unsupported => "当前是开发运行(没有安装信息),不检查更新。",
-            UpdateStage.Idle => "还没有检查过。",
-            UpdateStage.Checking => "正在检查…",
-            UpdateStage.UpToDate => "已经是最新版本。",
-            UpdateStage.Available => $"发现新版本 v{state.Version},可以下载。",
-            UpdateStage.Downloading => $"正在下载 v{state.Version}…{state.ProgressPercent}%",
-            UpdateStage.Ready => $"v{state.Version} 已经下载好,重启后生效。",
-            UpdateStage.Failed => $"更新失败:{state.Error}",
+            UpdateStage.Unsupported => Strings.UpdateStatusUnsupported,
+            UpdateStage.Idle => Strings.UpdateStatusIdle,
+            UpdateStage.Checking => Strings.UpdateStatusChecking,
+            UpdateStage.UpToDate => Strings.UpdateStatusUpToDate,
+            UpdateStage.Available => string.Format(Strings.UpdateStatusAvailableFormat, state.Version),
+            UpdateStage.Downloading => string.Format(
+                Strings.UpdateStatusDownloadingFormat,
+                state.Version,
+                state.ProgressPercent),
+            UpdateStage.Ready => string.Format(Strings.UpdateStatusReadyFormat, state.Version),
+            UpdateStage.Failed => string.Format(Strings.UpdateStatusFailedFormat, state.Error),
             _ => string.Empty,
         };
 

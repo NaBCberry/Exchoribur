@@ -3,6 +3,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Settings;
@@ -152,28 +153,28 @@ public partial class SettingsViewModel : ViewModelBase
 
     private IReadOnlyList<SettingsGroupItem> BuildGroups() =>
     [
-        new("常规", IconShape.Settings,
+        new(Strings.SettingsGroupGeneral, IconShape.Settings,
         [
-            new(SettingsPageKind.Input, "输入", SelectPage),
-            new(SettingsPageKind.Storage, "存储", SelectPage),
+            new(SettingsPageKind.Input, Strings.SettingsPageInput, SelectPage),
+            new(SettingsPageKind.Storage, Strings.SettingsPageStorage, SelectPage),
         ], SelectGroup),
-        new("时间轴", IconShape.Channels,
+        new(Strings.SettingsGroupTimeline, IconShape.Channels,
         [
-            new(SettingsPageKind.TimelineEdit, "编辑", SelectPage),
-            new(SettingsPageKind.Blocks, "块", SelectPage),
+            new(SettingsPageKind.TimelineEdit, Strings.SettingsPageTimelineEdit, SelectPage),
+            new(SettingsPageKind.Blocks, Strings.SettingsPageBlocks, SelectPage),
         ], SelectGroup),
-        new("音频", IconShape.Volume,
+        new(Strings.SettingsGroupAudio, IconShape.Volume,
         [
-            new(SettingsPageKind.Audio, "输出设备", SelectPage),
+            new(SettingsPageKind.Audio, Strings.SettingsPageAudioOutput, SelectPage),
         ], SelectGroup),
-        new("外部设备", IconShape.SerialPort,
+        new(Strings.SettingsGroupExternalDevices, IconShape.SerialPort,
         [
-            new(SettingsPageKind.ExternalDevices, "串口", SelectPage),
+            new(SettingsPageKind.ExternalDevices, Strings.SettingsPageSerialPort, SelectPage),
         ], SelectGroup),
-        new("更新", IconShape.Refresh,
+        new(Strings.SettingsGroupUpdates, IconShape.Refresh,
         [
-            new(SettingsPageKind.Updates, "更新", SelectPage),
-            new(SettingsPageKind.About, "关于", SelectPage),
+            new(SettingsPageKind.Updates, Strings.SettingsPageUpdates, SelectPage),
+            new(SettingsPageKind.About, Strings.SettingsPageAbout, SelectPage),
         ], SelectGroup),
     ];
 
@@ -199,7 +200,8 @@ public partial class SettingsViewModel : ViewModelBase
     public double UndoDepthMaximum => AppSettings.MaxUndoDepth;
 
     /// <summary>可填范围,写在输入框下面。</summary>
-    public string UndoDepthHint => $"可填 {AppSettings.MinUndoDepth} 到 {AppSettings.MaxUndoDepth}。";
+    public string UndoDepthHint
+        => string.Format(Strings.SettingsUndoDepthHintFormat, AppSettings.MinUndoDepth, AppSettings.MaxUndoDepth);
 
     /// <summary>新建编排块的默认长度(毫秒)。</summary>
     [ObservableProperty]
@@ -305,7 +307,8 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>"恢复默认设置"按钮上的字:第一次点完换成确认。</summary>
-    public string ResetButtonText => _resetConfirmPending ? "再点一次确认恢复" : "恢复默认设置";
+    public string ResetButtonText
+        => _resetConfirmPending ? Strings.SettingsResetButtonConfirm : Strings.SettingsResetButton;
 
     [RelayCommand]
     private void ResetToDefaults()
@@ -340,10 +343,10 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ---- 关于 ----
 
-    public string AppName => "Exchoribur";
+    public string AppName => Strings.AppName;
     public string BuildConfigurationText => AppVersion.Configuration;
     public string ProjectUrl => VelopackUpdateFeed.RepositoryUrl;
-    public string LicenseText => "MIT";
+    public string LicenseText => Strings.SettingsLicenseName;
     public string CopyrightText => "© 2026 NaBCberry";
 
     /// <summary>打开项目主页。</summary>

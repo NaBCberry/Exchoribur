@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!--
+      界面文案的正文。改文案改这里,然后跑 python tools/build-strings.py 生成 Strings.g.cs。
+      带 {0} 的是格式化模板,调用方用 string.Format 填;两个参数之间不要加空格,否则
+      中文标点会跟着错位。
+  -->
+
+  <!-- 通用 -->
+  <data name="AppName" xml:space="preserve"><value>Exchoribur</value></data>
+
+  <!-- 主窗口:状态栏与菜单 -->
+  <data name="MainStatusEmpty" xml:space="preserve"><value>还没有载入工程文件,用「文件 → 打开」选一个 CSV。</value></data>
+  <data name="MainWindowTitleFormat" xml:space="preserve"><value>{0} — Exchoribur</value></data>
+  <data name="MainWindowTitleModifiedFormat" xml:space="preserve"><value>*{0} — Exchoribur</value></data>
+  <data name="MainLabelUndo" xml:space="preserve"><value>撤销</value></data>
+  <data name="MainLabelRedo" xml:space="preserve"><value>重做</value></data>
+  <data name="MainMenuUndoFormat" xml:space="preserve"><value>撤销 {0}</value></data>
+  <data name="MainMenuRedoFormat" xml:space="preserve"><value>重做 {0}</value></data>
+  <data name="MainUndoDoneFormat" xml:space="preserve"><value>已撤销:{0}。</value></data>
+  <data name="MainRedoDoneFormat" xml:space="preserve"><value>已重做:{0}。</value></data>
+  <data name="MainBlockEditorTitleFormat" xml:space="preserve"><value>{0} · CH{1} · 选中 {2} 帧</value></data>
+  <data name="MainUpdateAvailableFormat" xml:space="preserve"><value>发现新版本 v{0}</value></data>
+  <data name="MainUpdateDownloadingFormat" xml:space="preserve"><value>正在下载 v{0}…{1}%</value></data>
+  <data name="MainUpdateReadyFormat" xml:space="preserve"><value>v{0} 已下载,重启后生效</value></data>
+  <data name="MainVideoUnavailableFormat" xml:space="preserve"><value>视频预览不可用:{0}</value></data>
+  <data name="MainVideoOpenFailedFormat" xml:space="preserve"><value>打开视频 {0} 失败。</value></data>
+  <data name="MainVideoLoadedFormat" xml:space="preserve"><value>已载入参考视频 {0}。</value></data>
+
+  <!-- 主窗口:提示语 -->
+  <data name="MainHintSelectBlockFirst" xml:space="preserve"><value>先在时间轴上选一个块。</value></data>
+  <data name="MainHintOpenBlockEditorFirst" xml:space="preserve"><value>先单击一个块,打开下面的块编辑器。</value></data>
+  <data name="MainHintSelectFramesFirst" xml:space="preserve"><value>先在块编辑器里选几帧。</value></data>
+  <data name="MainHintPlayheadOutsideBlock" xml:space="preserve"><value>播放头不在这块里,先把它挪进来。</value></data>
+  <data name="MainHintKeepAtLeastOneFrame" xml:space="preserve"><value>块里至少要留一帧,不能全删。</value></data>
+  <data name="MainPromptRenameBlock" xml:space="preserve"><value>给这个块起个名字</value></data>
+
+  <!-- 主窗口:编辑动作名(会出现在撤销/重做菜单里) -->
+  <data name="MainActionNewBlock" xml:space="preserve"><value>新建块</value></data>
+  <data name="MainActionMoveBlocks" xml:space="preserve"><value>移动块</value></data>
+  <data name="MainActionDeleteBlocks" xml:space="preserve"><value>删除块</value></data>
+  <data name="MainActionRenameBlock" xml:space="preserve"><value>重命名</value></data>
+  <data name="MainActionCopyToOtherChannels" xml:space="preserve"><value>复制到其他通道</value></data>
+  <data name="MainActionLinkBlocks" xml:space="preserve"><value>链接块</value></data>
+  <data name="MainActionUnlinkBlocks" xml:space="preserve"><value>解除链接</value></data>
+  <data name="MainActionSetColor" xml:space="preserve"><value>设置颜色</value></data>
+  <data name="MainActionTakePlayheadColor" xml:space="preserve"><value>取播放头颜色</value></data>
+  <data name="MainActionInsertFrame" xml:space="preserve"><value>插入帧</value></data>
+  <data name="MainActionDeleteFrames" xml:space="preserve"><value>删除帧</value></data>
+
+  <!-- 主窗口:操作结果 -->
+  <data name="MainStatusBlockCreatedFormat" xml:space="preserve"><value>已在 CH{0} 的 {1} 建了一个块。</value></data>
+  <data name="MainStatusBlocksMovedFormat" xml:space="preserve"><value>已把 {0} 个块移到 {1}。</value></data>
+  <data name="MainStatusBlocksDeletedFormat" xml:space="preserve"><value>已删除 {0} 个块。</value></data>
+  <data name="MainStatusBlockRenamedFormat" xml:space="preserve"><value>块已改名为「{0}」。</value></data>
+  <data name="MainStatusCopiedToOtherChannelsFormat" xml:space="preserve"><value>已把内容复制到其余 {0} 个通道(共 {1} 个块);和已有块重叠的地方无法播放,画成灰色。</value></data>
+  <data name="MainStatusLinkRemoved" xml:space="preserve"><value>已解除这些块的链接。</value></data>
+  <data name="MainStatusLinkedFormat" xml:space="preserve"><value>已把 {0} 个块链接在一起,拖动任意一个会带着其他一起动。</value></data>
+  <data name="MainStatusColorPaintedFormat" xml:space="preserve"><value>已把 {0} 帧的颜色改成 R{1} G{2} B{3}。</value></data>
+  <data name="MainStatusFrameInsertedFormat" xml:space="preserve"><value>已在块内 {0} 插入 1 帧。</value></data>
+  <data name="MainStatusFramesDeletedFormat" xml:space="preserve"><value>已从块里删掉 {0} 帧。</value></data>
+
+  <!-- 自绘控件的占位提示 -->
+  <data name="TimelineEmptyHint" xml:space="preserve"><value>双击空白处新建编排块</value></data>
+  <data name="BlockEditorEmptyHint" xml:space="preserve"><value>单击上面的块,在这里编辑它的灯光</value></data>
+
+  <!-- 工程文件流程 -->
+  <data name="ProjectStatusNoProjectToSave" xml:space="preserve"><value>还没有工程可保存，先打开工程或导入 CSV 或 视频。</value></data>
+  <data name="ProjectStatusNothingToExport" xml:space="preserve"><value>还没有工程,没什么可导出的。</value></data>
+  <data name="ProjectStatusOpenedFormat" xml:space="preserve"><value>已打开工程 {0}:{1:N0} 个块,{2:N0} 个标记。</value></data>
+  <data name="ProjectStatusOpenFailedFormat" xml:space="preserve"><value>打开工程 {0} 失败:{1}</value></data>
+  <data name="ProjectStatusSavingFormat" xml:space="preserve"><value>正在保存工程 {0}…</value></data>
+  <data name="ProjectStatusSavedFormat" xml:space="preserve"><value>工程 {0}已保存。</value></data>
+  <data name="ProjectStatusSavedMissingMediaFormat" xml:space="preserve"><value>工程 {0}已保存,但参考视频 {1} 丢失,视频未打包。</value></data>
+  <data name="ProjectStatusExportedFormat" xml:space="preserve"><value>已导出 {0}:{1:N0} 个块,{2:N0} 个标记。</value></data>
+  <data name="ProjectStatusExportFailedFormat" xml:space="preserve"><value>导出 {0} 失败:{1}</value></data>
+  <data name="ProjectStatusLoadedEmptyFormat" xml:space="preserve"><value>已载入 {0},但里面没有任何灯光内容。</value></data>
+  <data name="ProjectStatusLoadedFormat" xml:space="preserve"><value>已载入 {0}:{1:N0} 个块,{2:N0} 个标记,时长 {3}。</value></data>
+  <data name="ProjectStatusLoadFailedFormat" xml:space="preserve"><value>打开 {0} 失败:{1}</value></data>
+  <data name="ProjectPromptNewTimeline" xml:space="preserve"><value>新建时间线</value></data>
+  <data name="ProjectSaveProgressMediaFormat" xml:space="preserve"><value>正在保存工程 {0}…打包参考视频 {1:F0}%</value></data>
+  <data name="ProjectSaveProgressTimelineFormat" xml:space="preserve"><value>正在保存工程 {0}…整理时间轴数据</value></data>
+  <data name="ProjectSaveFailureInUse" xml:space="preserve"><value>文件正被其他程序占用,关掉占用程序再试</value></data>
+  <data name="ProjectSaveFailureAccessDenied" xml:space="preserve"><value>文件无法写入,文件可能只读/被占用</value></data>
+  <data name="ProjectSaveFailureDiskFull" xml:space="preserve"><value>磁盘空间不够</value></data>
+  <data name="ProjectSaveFailureUnknownFormat" xml:space="preserve"><value>保存工程 {0} 失败:{1}</value></data>
+  <data name="ProjectSaveFailureKnownFormat" xml:space="preserve"><value>保存工程 {0} 失败:{1}。</value></data>
+
+  <!-- 文件对话框 -->
+  <data name="FileDialogOpenTimeline" xml:space="preserve"><value>打开时间轴 CSV</value></data>
+  <data name="FileTypeTimelineCsv" xml:space="preserve"><value>时间轴 CSV</value></data>
+  <data name="FileDialogImportVideo" xml:space="preserve"><value>导入参考视频</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>视频</value></data>
+  <data name="FileDialogOpenProject" xml:space="preserve"><value>打开工程</value></data>
+  <data name="FileDialogSaveProject" xml:space="preserve"><value>保存工程</value></data>
+  <data name="FileDialogExportTimeline" xml:space="preserve"><value>导出时间轴 CSV</value></data>
+  <data name="FileTypeProject" xml:space="preserve"><value>Exchoribur 工程</value></data>
+
+  <!-- 设置页:导航 -->
+  <data name="SettingsGroupGeneral" xml:space="preserve"><value>常规</value></data>
+  <data name="SettingsGroupTimeline" xml:space="preserve"><value>时间轴</value></data>
+  <data name="SettingsGroupAudio" xml:space="preserve"><value>音频</value></data>
+  <data name="SettingsGroupExternalDevices" xml:space="preserve"><value>外部设备</value></data>
+  <data name="SettingsGroupUpdates" xml:space="preserve"><value>更新</value></data>
+  <data name="SettingsPageInput" xml:space="preserve"><value>输入</value></data>
+  <data name="SettingsPageStorage" xml:space="preserve"><value>存储</value></data>
+  <data name="SettingsPageTimelineEdit" xml:space="preserve"><value>编辑</value></data>
+  <data name="SettingsPageBlocks" xml:space="preserve"><value>块</value></data>
+  <data name="SettingsPageAudioOutput" xml:space="preserve"><value>输出设备</value></data>
+  <data name="SettingsPageSerialPort" xml:space="preserve"><value>串口</value></data>
+  <data name="SettingsPageUpdates" xml:space="preserve"><value>更新</value></data>
+  <data name="SettingsPageAbout" xml:space="preserve"><value>关于</value></data>
+
+  <!-- 设置页:音频 -->
+  <data name="SettingsAudioFollowSystemDefault" xml:space="preserve"><value>跟随系统默认</value></data>
+  <data name="SettingsAudioHintUnavailable" xml:space="preserve"><value>解码器不可用,预览音量和输出设备都不能改。</value></data>
+  <data name="SettingsAudioHintNoDevices" xml:space="preserve"><value>没有枚举到可选设备,预览会用系统默认设备。</value></data>
+
+  <!-- 设置页:时间轴 -->
+  <data name="SettingsUndoDepthHintFormat" xml:space="preserve"><value>可填 {0} 到 {1}。</value></data>
+
+  <!-- 设置页:存储 -->
+  <data name="SettingsResetButton" xml:space="preserve"><value>恢复默认设置</value></data>
+  <data name="SettingsResetButtonConfirm" xml:space="preserve"><value>再点一次确认恢复</value></data>
+
+  <!-- 设置页:关于 -->
+  <data name="SettingsLicenseName" xml:space="preserve"><value>MIT</value></data>
+
+  <!-- 设置页:更新 -->
+  <data name="UpdateStatusUnsupported" xml:space="preserve"><value>当前是开发运行(没有安装信息),不检查更新。</value></data>
+  <data name="UpdateStatusIdle" xml:space="preserve"><value>还没有检查过。</value></data>
+  <data name="UpdateStatusChecking" xml:space="preserve"><value>正在检查…</value></data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve"><value>已经是最新版本。</value></data>
+  <data name="UpdateStatusAvailableFormat" xml:space="preserve"><value>发现新版本 v{0},可以下载。</value></data>
+  <data name="UpdateStatusDownloadingFormat" xml:space="preserve"><value>正在下载 v{0}…{1}%</value></data>
+  <data name="UpdateStatusReadyFormat" xml:space="preserve"><value>v{0} 已经下载好,重启后生效。</value></data>
+  <data name="UpdateStatusFailedFormat" xml:space="preserve"><value>更新失败:{0}</value></data>
+</root>

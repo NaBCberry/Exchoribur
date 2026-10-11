@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 
 namespace Exchoribur.App.ViewModels;
@@ -24,7 +25,7 @@ internal sealed class AudioDeviceSection(IAudioDeviceController? audio)
         Devices.Clear();
 
         // 第一项是"跟随系统默认",Id 为 null。
-        Devices.Add(new AudioDeviceOption(null, "跟随系统默认"));
+        Devices.Add(new AudioDeviceOption(null, Strings.SettingsAudioFollowSystemDefault));
 
         foreach (var device in audio?.GetDevices() ?? [])
         {
@@ -45,8 +46,8 @@ internal sealed class AudioDeviceSection(IAudioDeviceController? audio)
     /// 所以第二句现在到不了。这里**故意保持原样**:改判据等于改行为,等单独确认。
     /// </remarks>
     public string Hint => !IsAvailable
-        ? "解码器不可用,预览音量和输出设备都不能改。"
+        ? Strings.SettingsAudioHintUnavailable
         : Devices.Count == 0
-            ? "没有枚举到可选设备,预览会用系统默认设备。"
+            ? Strings.SettingsAudioHintNoDevices
             : string.Empty;
 }
