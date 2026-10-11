@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:res="using:Exchoribur.App.Resources"
+        mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="196"
+        x:Class="Exchoribur.App.Views.UpdateAvailableWindow"
+        Width="440" Height="196"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Height="52"
+                Background="{DynamicResource ChromeBackgroundBrush}">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Margin="0,0,14,0">
+                <Button Content="{x:Static res:Strings.UpdateDialogOpenSettings}" Click="OnOpenSettings" Padding="18,4" />
+                <Button Content="{x:Static res:Strings.UpdateDialogLater}" Click="OnLater" Padding="18,4" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="18" Spacing="8">
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.UpdateDialogTitle}" />
+            <TextBlock x:Name="MessageText" Classes="note" TextWrapping="Wrap" />
+        </StackPanel>
+    </DockPanel>
+
+</Window>

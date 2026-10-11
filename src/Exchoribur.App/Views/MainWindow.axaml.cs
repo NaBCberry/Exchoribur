@@ -26,6 +26,53 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DropEvent, OnDrop);
         Closing += OnClosing;
         Closed += OnClosed;
+
+        // DataContext 是装配完之后塞进来的,订阅更新那两件事得等它到了再说。
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.ExitRequested += OnExitRequested;
+        viewModel.UpdateAvailableFound += OnUpdateAvailableFound;
+    }
+
+    /// <summary>装更新:未保存的改动视图模型已经问过了,这里直接关掉自己让安装器接管。</summary>
+    private void OnExitRequested()
+    {
+        _closingConfirmed = true;
+        _settingsWindow?.Close();
+        Close();
+    }
+
+    /// <summary>查到新版本:弹一次提示,点「去设置页」就带他过去。</summary>
+    private void OnUpdateAvailableFound(string version) => _ = ShowUpdateAvailableAsync(version);
+
+    private async Task ShowUpdateAvailableAsync(string version)
+    {
+        try
+        {
+            if (DataContext is not MainViewModel viewModel)
+            {
+                return;
+            }
+
+            var dialog = new UpdateAvailableWindow(version, viewModel.Settings.CurrentVersionText);
+
+            if (await dialog.ShowDialog<bool>(this))
+            {
+                OpenSettings(SettingsPageKind.Updates);
+            }
+        }
+        catch (Exception)
+        {
+            // 弹提示失败不该影响正在编排的人
+        }
     }
 
     /// <summary>窗口关了就放掉懒创建的播放器,别把解码线程和固定住的内存留着。</summary>
@@ -61,11 +108,19 @@ public partial class MainWindow : Window
     /// <summary>
     /// 打开设置页。用非模态窗口:开着设置也能直接滚时间轴试方向,不用来回关。
     /// </summary>
-    private void OnSettingsClick(object? sender, RoutedEventArgs e)
+    private void OnSettingsClick(object? sender, RoutedEventArgs e) => OpenSettings(null);
+
+    /// <summary>打开设置页(非模态:开着设置也能滚时间轴);带了页号就直接切过去。</summary>
+    private void OpenSettings(SettingsPageKind? page)
     {
         if (DataContext is not MainViewModel viewModel)
         {
             return;
+        }
+
+        if (page is { } kind)
+        {
+            viewModel.Settings.ShowPage(kind);
         }
 
         if (_settingsWindow is { IsVisible: true })

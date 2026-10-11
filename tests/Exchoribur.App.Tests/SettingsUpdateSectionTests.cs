@@ -38,7 +38,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
 
         await section.CheckAsync();
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载。", section.UpdateStatusText);
+        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", section.UpdateStatusText);
         Assert.True(section.CanDownloadUpdate);
     }
 
@@ -51,7 +51,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
             () => false));
 
         Assert.False(section.IsUpdateSupported);
-        Assert.Equal("当前是开发运行(没有安装信息),不检查更新。", section.UpdateStatusText);
+        Assert.Equal("这一份不是安装版(旁边没有安装信息),不检查更新。", section.UpdateStatusText);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
 
         await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载。", viewModel.UpdateStatusText);
+        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.UpdateStatusText);
         Assert.Contains(nameof(SettingsViewModel.UpdateStatusText), relayed);
         Assert.Contains(nameof(SettingsViewModel.CanDownloadUpdate), relayed);
     }

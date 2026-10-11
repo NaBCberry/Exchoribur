@@ -1,8 +1,8 @@
 namespace Exchoribur.Core.Updates;
 
 /// <summary>
-/// 更新源。核心只认这个接口,具体用哪套更新框架是界面层的事
-/// (现在是 Velopack),这样更新流程本身可以脱离界面测试。
+/// 更新源。核心只认这个接口,具体从哪儿查、怎么装是界面层的事
+/// (现在是读 GitHub Release 的订阅再跑安装器),这样更新流程本身可以脱离界面测试。
 /// </summary>
 public interface IUpdateFeed
 {

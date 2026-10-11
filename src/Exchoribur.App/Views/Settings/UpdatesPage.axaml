@@ -54,15 +54,13 @@
                             Command="{Binding CheckForUpdatesCommand}"
                             IsEnabled="{Binding IsUpdateSupported}"
                             Padding="12,4" />
-                    <Button Content="{x:Static res:Strings.SettingsUpdatesDownloadButton}"
-                            Command="{Binding DownloadUpdateCommand}"
-                            IsEnabled="{Binding CanDownloadUpdate}"
-                            Padding="12,4" />
-                    <Button Content="{x:Static res:Strings.SettingsUpdatesApplyButton}"
-                            Command="{Binding ApplyUpdateCommand}"
-                            IsEnabled="{Binding CanApplyUpdate}"
+                    <Button Content="{x:Static res:Strings.SettingsUpdatesInstallButton}"
+                            Command="{Binding InstallUpdateCommand}"
+                            IsEnabled="{Binding CanInstallUpdate}"
                             Padding="12,4" />
                 </StackPanel>
+
+                <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsUpdatesInstallNote}" />
             </StackPanel>
         </Border>
     </StackPanel>

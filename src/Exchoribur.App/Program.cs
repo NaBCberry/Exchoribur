@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Media;
-using Velopack;
 
 namespace Exchoribur.App;
 
@@ -12,9 +11,6 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // 安装包在首次启动、升级和卸载时要靠这个钩子做收尾,必须跑在界面初始化之前。
-        VelopackApp.Build().Run();
-
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

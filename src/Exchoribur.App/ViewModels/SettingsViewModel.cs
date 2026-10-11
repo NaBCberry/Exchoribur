@@ -365,7 +365,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ---- 更新 ----
 
-    /// <summary>当前版本,写不上 Velopack 信息时用编译进程序集的那个。</summary>
+    /// <summary>当前版本,读不到更新源信息时用编译进程序集的那个。</summary>
     public string CurrentVersionText => _updateSection.CurrentVersionText;
 
     /// <summary>这个运行环境支不支持自动更新(开发运行不支持)。</summary>
@@ -379,6 +379,8 @@ public partial class SettingsViewModel : ViewModelBase
     public bool CanDownloadUpdate => _updateSection.CanDownloadUpdate;
 
     public bool CanApplyUpdate => _updateSection.CanApplyUpdate;
+
+    public bool CanInstallUpdate => _updateSection.CanInstallUpdate;
 
     public int UpdateProgress => _updateSection.UpdateProgress;
 
@@ -399,8 +401,39 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private Task DownloadUpdateAsync() => _updateSection.DownloadAsync();
 
+    /// <summary>
+    /// 主视图模型接手"装更新"这件事:它得先问清楚未保存的改动,装完还要把程序关掉。
+    /// 没人接手(比如测试里单独建的设置页)就自己走完下载加启动安装器。
+    /// </summary>
+    internal Action? InstallUpdateRequested { get; set; }
+
     [RelayCommand]
-    private void ApplyUpdate() => _updateSection.ApplyAndRestart();
+    private async Task InstallUpdateAsync()
+    {
+        if (InstallUpdateRequested is { } request)
+        {
+            request();
+            return;
+        }
+
+        await _updateSection.InstallAsync();
+    }
+
+    /// <summary>直接切到某一页,给"有新版本"提示里的"去设置页"用。</summary>
+    public void ShowPage(SettingsPageKind kind)
+    {
+        foreach (var group in Groups)
+        {
+            if (group.Pages.FirstOrDefault(page => page.Kind == kind) is not { } target)
+            {
+                continue;
+            }
+
+            SelectGroup(group);
+            SelectPage(target);
+            return;
+        }
+    }
 
     // ---- 存储 ----
 
@@ -468,7 +501,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     public string AppName => Strings.AppName;
     public string BuildConfigurationText => AppVersion.Configuration;
-    public string ProjectUrl => VelopackUpdateFeed.RepositoryUrl;
+    public string ProjectUrl => GithubReleaseUpdateFeed.RepositoryUrl;
     public string LicenseText => Strings.SettingsLicenseName;
     public string CopyrightText => "© 2026 NaBCberry";
 

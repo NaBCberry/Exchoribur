@@ -29,7 +29,7 @@ internal sealed class UpdateSection : ObservableObject
         Refresh();
     }
 
-    /// <summary>当前版本,写不上 Velopack 信息时用编译进程序集的那个。</summary>
+    /// <summary>当前版本,读不到更新源信息时用编译进程序集的那个。</summary>
     public string CurrentVersionText => _updates?.CurrentVersion ?? AppVersion.Current;
 
     /// <summary>这个运行环境支不支持自动更新(开发运行不支持)。</summary>
@@ -44,6 +44,9 @@ internal sealed class UpdateSection : ObservableObject
     public bool CanDownloadUpdate { get; private set; }
 
     public bool CanApplyUpdate { get; private set; }
+
+    /// <summary>能"下载并安装":查到新版本还没下,或者已经下好了。</summary>
+    public bool CanInstallUpdate { get; private set; }
 
     public int UpdateProgress { get; private set; }
 
@@ -70,6 +73,30 @@ internal sealed class UpdateSection : ObservableObject
     /// <summary>重启并装上已经下载好的版本。</summary>
     public void ApplyAndRestart() => _updates?.ApplyAndRestart();
 
+    /// <summary>
+    /// 装更新:没下过就先下,下好了启动安装器。返回 false 表示没装成——调用方别退出程序。
+    /// </summary>
+    public async Task<bool> InstallAsync()
+    {
+        if (_updates is null)
+        {
+            return false;
+        }
+
+        if (_updates.State.Stage == UpdateStage.Available)
+        {
+            await DownloadAsync();
+        }
+
+        if (_updates.State.Stage != UpdateStage.Ready)
+        {
+            return false;
+        }
+
+        ApplyAndRestart();
+        return true;
+    }
+
     private void Refresh()
     {
         var state = _updates?.State ?? new UpdateState(UpdateStage.Unsupported);
@@ -93,6 +120,7 @@ internal sealed class UpdateSection : ObservableObject
         IsUpdateBusy = state.IsBusy;
         CanDownloadUpdate = state.Stage == UpdateStage.Available;
         CanApplyUpdate = state.Stage == UpdateStage.Ready;
+        CanInstallUpdate = state.Stage is UpdateStage.Available or UpdateStage.Ready;
         UpdateProgress = state.ProgressPercent;
         IsUpdateProgressVisible = state.Stage == UpdateStage.Downloading;
 
@@ -100,6 +128,7 @@ internal sealed class UpdateSection : ObservableObject
         OnPropertyChanged(nameof(IsUpdateBusy));
         OnPropertyChanged(nameof(CanDownloadUpdate));
         OnPropertyChanged(nameof(CanApplyUpdate));
+        OnPropertyChanged(nameof(CanInstallUpdate));
         OnPropertyChanged(nameof(UpdateProgress));
         OnPropertyChanged(nameof(IsUpdateProgressVisible));
         OnPropertyChanged(nameof(CurrentVersionText));

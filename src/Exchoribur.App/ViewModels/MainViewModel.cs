@@ -95,7 +95,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
         // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
         SettingsViewModel? currentSettings = null;
         _updates = new UpdateCoordinator(
-            updateFeed ?? new VelopackUpdateFeed(),
+            updateFeed ?? new GithubReleaseUpdateFeed(),
             () => currentSettings?.AutoDownloadUpdates ?? false,
             () => currentSettings?.IncludePrereleaseVersions ?? false);
         _updates.Changed += OnUpdatesChanged;
@@ -105,6 +105,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
         currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();
+
+        // 设置页的「下载并安装」交给这里:装之前得先把未保存的改动问清楚。
+        Settings.InstallUpdateRequested = () => _ = InstallUpdateAsync();
 
         // 场控设备这条线:面板上的连接状态与发包统计都归它,默认参数从设置页现取。
         _deviceService = device;
@@ -465,8 +468,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
     /// <summary>有更新提示时,状态条右边多出一块。</summary>
     public bool IsUpdateBannerVisible => UpdateBannerText.Length > 0;
 
-    /// <summary>更新已经下好了,点一下重启装上。</summary>
-    public bool IsUpdateApplyVisible => _updates.State.Stage == UpdateStage.Ready;
+    /// <summary>有版本可以装(下没下好都算),状态条右边就多出一个按钮。</summary>
+    public bool IsUpdateApplyVisible => _updates.State.Stage is UpdateStage.Available or UpdateStage.Ready;
+
+    /// <summary>查到新版本时抬一次(每次运行只抬一次),窗口据此弹一次提示。</summary>
+    public event Action<string>? UpdateAvailableFound;
+
+    /// <summary>装更新要退出程序了:窗口订阅它,关掉自己让安装器接管。</summary>
+    public event Action? ExitRequested;
+
+    /// <summary>这次运行已经弹过"有新版本"没有。</summary>
+    private bool _updateNotified;
 
     partial void OnUpdateBannerTextChanged(string value)
     {
@@ -486,8 +498,32 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
         }
     }
 
+    /// <summary>
+    /// 下载并装上更新,然后退出程序——安装器装完会把新版拉起来。
+    /// 装之前先把未保存的改动问清楚,免得更新吃掉用户还没存的东西。
+    /// </summary>
     [RelayCommand]
-    private void ApplyUpdate() => _updates.ApplyAndRestart();
+    private async Task InstallUpdateAsync()
+    {
+        if (!await ConfirmDiscardChangesAsync())
+        {
+            return;
+        }
+
+        if (_updates.State.Stage == UpdateStage.Available)
+        {
+            await _updates.DownloadAsync();
+        }
+
+        // 下载失败或者中途被打断:停在原地,别把程序关掉
+        if (_updates.State.Stage != UpdateStage.Ready)
+        {
+            return;
+        }
+
+        _updates.ApplyAndRestart();
+        ExitRequested?.Invoke();
+    }
 
     private void RefreshUpdateBanner()
     {
@@ -503,6 +539,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
             UpdateStage.Ready => string.Format(Strings.MainUpdateReadyFormat, state.Version),
             _ => string.Empty,
         };
+
+        if (state.Stage == UpdateStage.Available && state.Version is { } version && !_updateNotified)
+        {
+            _updateNotified = true;
+            UpdateAvailableFound?.Invoke(version);
+        }
     }
 
     /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>

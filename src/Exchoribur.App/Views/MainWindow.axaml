@@ -190,7 +190,7 @@
                                IsVisible="{Binding IsUpdateBannerVisible}" />
                     <Button Classes="transport"
                             ToolTip.Tip="{x:Static res:Strings.MainTooltipApplyUpdate}"
-                            Command="{Binding ApplyUpdateCommand}"
+                            Command="{Binding InstallUpdateCommand}"
                             IsVisible="{Binding IsUpdateApplyVisible}">
                         <Path Classes="icon" Data="{x:Static controls:Icons.Refresh}" />
                     </Button>

@@ -116,6 +116,10 @@ internal static class Strings
     public static string UpdateStatusDownloadingFormat => Get(nameof(UpdateStatusDownloadingFormat));
     public static string UpdateStatusReadyFormat => Get(nameof(UpdateStatusReadyFormat));
     public static string UpdateStatusFailedFormat => Get(nameof(UpdateStatusFailedFormat));
+    public static string UpdateDialogTitle => Get(nameof(UpdateDialogTitle));
+    public static string UpdateDialogBodyFormat => Get(nameof(UpdateDialogBodyFormat));
+    public static string UpdateDialogOpenSettings => Get(nameof(UpdateDialogOpenSettings));
+    public static string UpdateDialogLater => Get(nameof(UpdateDialogLater));
     public static string CommonCancel => Get(nameof(CommonCancel));
     public static string MainMenuFile => Get(nameof(MainMenuFile));
     public static string MainMenuOpenProject => Get(nameof(MainMenuOpenProject));
@@ -192,8 +196,8 @@ internal static class Strings
     public static string SettingsUpdatesPrerelease => Get(nameof(SettingsUpdatesPrerelease));
     public static string SettingsUpdatesStatus => Get(nameof(SettingsUpdatesStatus));
     public static string SettingsUpdatesCheckButton => Get(nameof(SettingsUpdatesCheckButton));
-    public static string SettingsUpdatesDownloadButton => Get(nameof(SettingsUpdatesDownloadButton));
-    public static string SettingsUpdatesApplyButton => Get(nameof(SettingsUpdatesApplyButton));
+    public static string SettingsUpdatesInstallButton => Get(nameof(SettingsUpdatesInstallButton));
+    public static string SettingsUpdatesInstallNote => Get(nameof(SettingsUpdatesInstallNote));
     public static string SettingsAboutVersion => Get(nameof(SettingsAboutVersion));
     public static string SettingsAboutBuildConfiguration => Get(nameof(SettingsAboutBuildConfiguration));
     public static string SettingsAboutLicense => Get(nameof(SettingsAboutLicense));

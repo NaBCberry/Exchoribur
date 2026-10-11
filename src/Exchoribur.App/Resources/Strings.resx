@@ -157,7 +157,7 @@
     <value>正在下载 v{0}…{1}%</value>
   </data>
   <data name="MainUpdateReadyFormat" xml:space="preserve">
-    <value>v{0} 已下载,重启后生效</value>
+    <value>v{0} 已下好,点右边装上去</value>
   </data>
   <data name="MainVideoUnavailableFormat" xml:space="preserve">
     <value>视频预览不可用:{0}</value>
@@ -409,7 +409,7 @@
     <value>MIT</value>
   </data>
   <data name="UpdateStatusUnsupported" xml:space="preserve">
-    <value>当前是开发运行(没有安装信息),不检查更新。</value>
+    <value>这一份不是安装版(旁边没有安装信息),不检查更新。</value>
   </data>
   <data name="UpdateStatusIdle" xml:space="preserve">
     <value>还没有检查过。</value>
@@ -421,16 +421,28 @@
     <value>已经是最新版本。</value>
   </data>
   <data name="UpdateStatusAvailableFormat" xml:space="preserve">
-    <value>发现新版本 v{0},可以下载。</value>
+    <value>发现新版本 v{0},可以下载并安装。</value>
   </data>
   <data name="UpdateStatusDownloadingFormat" xml:space="preserve">
     <value>正在下载 v{0}…{1}%</value>
   </data>
   <data name="UpdateStatusReadyFormat" xml:space="preserve">
-    <value>v{0} 已经下载好,重启后生效。</value>
+    <value>v{0} 已经下载好,点「下载并安装」装上去。</value>
   </data>
   <data name="UpdateStatusFailedFormat" xml:space="preserve">
     <value>更新失败:{0}</value>
+  </data>
+  <data name="UpdateDialogTitle" xml:space="preserve">
+    <value>有新版本</value>
+  </data>
+  <data name="UpdateDialogBodyFormat" xml:space="preserve">
+    <value>新版本 {0} 已经发布,当前是 {1}。到设置页的「更新」里可以下载并安装。</value>
+  </data>
+  <data name="UpdateDialogOpenSettings" xml:space="preserve">
+    <value>去设置页</value>
+  </data>
+  <data name="UpdateDialogLater" xml:space="preserve">
+    <value>稍后</value>
   </data>
   <data name="CommonCancel" xml:space="preserve">
     <value>取消</value>
@@ -643,7 +655,7 @@
     <value>当前版本</value>
   </data>
   <data name="SettingsUpdatesUnsupportedNote" xml:space="preserve">
-    <value>当前是开发运行(没有安装信息),自动更新不可用。装上安装包或解压便携版之后才生效。</value>
+    <value>自动更新只对安装包装出来的那一份生效。便携版和开发运行请到 Release 页手动下载新版。</value>
   </data>
   <data name="SettingsUpdatesCheckOnStartup" xml:space="preserve">
     <value>启动时检查更新</value>
@@ -660,11 +672,11 @@
   <data name="SettingsUpdatesCheckButton" xml:space="preserve">
     <value>立即检查更新</value>
   </data>
-  <data name="SettingsUpdatesDownloadButton" xml:space="preserve">
-    <value>下载</value>
+  <data name="SettingsUpdatesInstallButton" xml:space="preserve">
+    <value>下载并安装</value>
   </data>
-  <data name="SettingsUpdatesApplyButton" xml:space="preserve">
-    <value>重启并安装</value>
+  <data name="SettingsUpdatesInstallNote" xml:space="preserve">
+    <value>会先下载安装包,再静默覆盖安装到当前目录,然后自动重启。</value>
   </data>
   <data name="SettingsAboutVersion" xml:space="preserve">
     <value>版本</value>
@@ -691,7 +703,7 @@
     <value>第三方组件声明</value>
   </data>
   <data name="MainTooltipApplyUpdate" xml:space="preserve">
-    <value>重启并安装更新</value>
+    <value>下载并安装更新</value>
   </data>
   <data name="MainTooltipGoToStart" xml:space="preserve">
     <value>回到开头</value>
