@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Exchoribur.App.Controls;
 using Exchoribur.Core.Models;
 using Exchoribur.Core.Storage;
@@ -39,23 +40,33 @@ public sealed class TimelineControl : Control
     /// <summary>指针离播放头多近算"点在播放头上"。</summary>
     private const double PlayheadHitSlack = 4;
 
-    private static readonly IBrush GutterBackground = new SolidColorBrush(Color.Parse("#202020"));
-    private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.Parse("#E0B457"));
-    private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
-    private static readonly IBrush UnplayableMask = new SolidColorBrush(Color.Parse("#8C808080"));
-
-    /// <summary>框选时那块半透明的白。</summary>
-    private static readonly IBrush BoxSelectionFill = new SolidColorBrush(Color.Parse("#26FFFFFF"));
-
-    private static readonly IPen SelectedBlockPen = new Pen(new SolidColorBrush(Colors.White), 2);
-    private static readonly IPen BoxSelectionPen = new Pen(new SolidColorBrush(Color.Parse("#CCFFFFFF")), 1.5);
-    private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
-
     // 每次重画都要用、但值不会变的东西缓存起来少做重复功。
     private readonly TimelineBrushCache _brushes = new();
     /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
     private readonly List<BlockColorRun> _colorRuns = [];
     private readonly TimelineTextCache _text = new(TextCacheLimit);
+
+    /// <summary>当前主题下的一套颜色。主题变体换了要重新取,所以记着取的是哪一版。</summary>
+    private TimelinePalette? _palette;
+    private ThemeVariant? _paletteVariant;
+
+    /// <summary>
+    /// 当前主题下的一套颜色。取一次就缓存住:资源字典查询比读字段贵,
+    /// 而这里每帧都要用几十次。
+    /// </summary>
+    private TimelinePalette Palette
+    {
+        get
+        {
+            if (_palette is null || _paletteVariant != ActualThemeVariant)
+            {
+                _paletteVariant = ActualThemeVariant;
+                _palette = TimelinePalette.Resolve(this);
+            }
+
+            return _palette;
+        }
+    }
 
     /// <summary>标尺带上用"左右拖动"的光标提示这里能拖播放头。</summary>
     private static readonly Cursor ScrubCursor = new(StandardCursorType.SizeWestEast);
@@ -291,12 +302,12 @@ public sealed class TimelineControl : Control
         // 顶部标尺带先铺一层常驻的底色:它和左边的通道名列连成一圈"工具条",
         // 同时也保证这条带子上始终画着东西(不然它是一片透明的)。
         context.FillRectangle(
-            GutterBackground,
+            Palette.GutterBackground,
             new Rect(0, 0, width, TimelineLayout.RulerHeight));
 
         // 左侧通道名列再铺一层不透明的底:它永远是最下层。
-        context.FillRectangle(GutterBackground, new Rect(0, 0, TimelineLayout.TrackLeft, height));
-        context.FillRectangle(TimelinePalette.TrackBackground, trackRect);
+        context.FillRectangle(Palette.GutterBackground, new Rect(0, 0, TimelineLayout.TrackLeft, height));
+        context.FillRectangle(Palette.TrackBackground, trackRect);
 
         DrawChannelRows(context, trackWidth, rowHeight, height);
 
@@ -328,7 +339,7 @@ public sealed class TimelineControl : Control
         DrawChannelLabels(context, rowHeight, width, height);
 
         context.DrawLine(
-            TimelinePalette.GutterDividerPen,
+            Palette.GutterDividerPen,
             new Point(TimelineLayout.TrackLeft, 0),
             new Point(TimelineLayout.TrackLeft, height));
 
@@ -357,7 +368,7 @@ public sealed class TimelineControl : Control
             }
 
             context.FillRectangle(
-                TimelinePalette.RowBackground,
+                Palette.RowBackground,
                 new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
         }
     }
@@ -382,7 +393,7 @@ public sealed class TimelineControl : Control
                 GetDimText($"CH{channel}", 11.5),
                 new Point(10, y + (rowHeight / 2) - 7.5));
 
-            context.DrawLine(TimelinePalette.RowSeparatorPen, new Point(0, y), new Point(width, y));
+            context.DrawLine(Palette.RowSeparatorPen, new Point(0, y), new Point(width, y));
         }
     }
 
@@ -425,14 +436,14 @@ public sealed class TimelineControl : Control
             DrawBlockBody(context, block, viewport, rect, trackWidth);
             DrawBlockTitle(context, block, rect);
 
-            var pen = SelectedBlockPen;
+            var pen = Palette.SelectedBlockPen;
             if (CurrentBlockId == block.Id)
             {
-                pen = TimelinePalette.CurrentBlockPen;
+                pen = Palette.CurrentBlockPen;
             }
             else if (selected is null || !selected.Contains(block))
             {
-                pen = TimelinePalette.BlockPen;
+                pen = Palette.BlockPen;
             }
 
             context.DrawRectangle(null, pen, rect, BlockCornerRadius, BlockCornerRadius);
@@ -455,7 +466,7 @@ public sealed class TimelineControl : Control
         }
 
         context.FillRectangle(
-            TimelinePalette.BlockFill,
+            Palette.BlockFill,
             new Rect(rect.X, bodyTop, rect.Width, bodyHeight));
 
         // 只画落在轨道区里的列:块可能长达几小时,整块逐像素画会拖垮一帧。
@@ -484,7 +495,7 @@ public sealed class TimelineControl : Control
         }
 
         var titleRect = new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height));
-        context.FillRectangle(TimelinePalette.BlockTitleFill, titleRect);
+        context.FillRectangle(Palette.BlockTitleFill, titleRect);
 
         if (rect.Width < 30)
         {
@@ -538,7 +549,7 @@ public sealed class TimelineControl : Control
                     var x0 = TimelineLayout.TrackLeft + viewport.MapTime(start);
                     var x1 = TimelineLayout.TrackLeft + viewport.MapTime(end);
 
-                    context.FillRectangle(UnplayableMask, new Rect(x0, top, Math.Max(1, x1 - x0), height));
+                    context.FillRectangle(Palette.UnplayableMask, new Rect(x0, top, Math.Max(1, x1 - x0), height));
                 }
             }
         }
@@ -553,7 +564,7 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        context.DrawRectangle(BoxSelectionFill, BoxSelectionPen, rect);
+        context.DrawRectangle(Palette.BoxSelectionFill, Palette.BoxSelectionPen, rect);
     }
 
     /// <summary>
@@ -574,7 +585,7 @@ public sealed class TimelineControl : Control
         }
 
         context.FillRectangle(
-            UnplayableMask,
+            Palette.UnplayableMask,
             new Rect(TimelineLayout.TrackLeft, TimelineLayout.RulerHeight, width, trackHeight));
     }
 
@@ -608,7 +619,7 @@ public sealed class TimelineControl : Control
             var x = TimelineLayout.TrackLeft + viewport.MapTime(marker.Time);
 
             context.DrawLine(
-                MarkerLinePen,
+                Palette.MarkerLinePen,
                 new Point(x, TimelineLayout.TimecodeBandHeight),
                 new Point(x, Bounds.Height));
 
@@ -621,7 +632,7 @@ public sealed class TimelineControl : Control
                 figure.EndFigure(true);
             }
 
-            context.DrawGeometry(MarkerBrush, null, flag);
+            context.DrawGeometry(Palette.MarkerBrush, null, flag);
 
             if (marker.Name.Length == 0 || x + 9 < lastLabelRight)
             {
@@ -631,7 +642,7 @@ public sealed class TimelineControl : Control
             var name = GetMarkerText(marker.Name);
             var tag = new Rect(x + 9, flagTop, name.Width + 6, name.Height + 2);
 
-            context.FillRectangle(MarkerTagBackground, tag);
+            context.FillRectangle(Palette.MarkerTagBackground, tag);
             context.DrawText(name, new Point(tag.X + 3, tag.Y + 1));
 
             lastLabelRight = tag.Right;
@@ -649,7 +660,7 @@ public sealed class TimelineControl : Control
         var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
 
         context.DrawLine(
-            TimelinePalette.PlayheadPen,
+            Palette.PlayheadPen,
             new Point(x, TimelineLayout.TimecodeBandHeight),
             new Point(x, Bounds.Height));
 
@@ -669,7 +680,7 @@ public sealed class TimelineControl : Control
             figure.EndFigure(true);
         }
 
-        context.DrawGeometry(TimelinePalette.PlayheadFill, null, geometry);
+        context.DrawGeometry(Palette.PlayheadFill, null, geometry);
     }
 
     private void DrawTimeRuler(DrawingContext context, TimelineViewport viewport)
@@ -694,7 +705,7 @@ public sealed class TimelineControl : Control
             var x = TimelineLayout.TrackLeft + viewport.MapTime(time);
 
             context.DrawLine(
-                TimelinePalette.RowSeparatorPen,
+                Palette.RowSeparatorPen,
                 new Point(x, TimelineLayout.TimecodeBandHeight - 4),
                 new Point(x, TimelineLayout.TimecodeBandHeight));
 
@@ -1108,13 +1119,13 @@ public sealed class TimelineControl : Control
     private FormattedText GetTickText(string text) => GetDimText(text, 11);
 
     private FormattedText GetDimText(string text, double size)
-        => _text.Get(text, size, TimelinePalette.DimText);
+        => _text.Get(text, size, Palette.DimText);
 
     private FormattedText GetBlockText(string text, double size)
-        => _text.Get(text, size, TimelinePalette.BlockText);
+        => _text.Get(text, size, Palette.BlockText);
 
     private FormattedText GetMarkerText(string text)
-        => _text.Get(text, 11, MarkerBrush);
+        => _text.Get(text, 11, Palette.MarkerBrush);
 
     /// <summary>窗口上的字体可能变,变了就把排好版的文字丢掉重来。</summary>
     private void UpdateTypeface() => _text.UseTypeface(TextElement.GetFontFamily(this));

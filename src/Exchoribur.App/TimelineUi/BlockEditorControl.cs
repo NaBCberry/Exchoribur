@@ -6,6 +6,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Exchoribur.App.Controls;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
@@ -39,17 +40,6 @@ public sealed class BlockEditorControl : Control
     /// <summary>滚轮一格平移多少像素。</summary>
     private const double PanPixelsPerWheelStep = 60;
 
-    private static readonly IBrush DimBlockFill = new SolidColorBrush(Color.Parse("#242424"));
-    private static readonly IBrush DimBlockText = new SolidColorBrush(Color.Parse("#7A7A7A"));
-
-    /// <summary>盖在同通道其他块上的半透明灰:内容看得见,但一看就知道现在改不了它。</summary>
-    private static readonly IBrush DimScrim = new SolidColorBrush(Color.Parse("#99202020"));
-
-    private static readonly IBrush FrameTick = new SolidColorBrush(Color.Parse("#B0FFFFFF"));
-    private static readonly IBrush SelectionFill = new SolidColorBrush(Color.Parse("#40FFFFFF"));
-
-    private static readonly IPen SelectionPen = new Pen(new SolidColorBrush(Colors.White), 1.5);
-
     private readonly TimelineBrushCache _brushes = new();
     /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
     private readonly List<BlockColorRun> _colorRuns = [];
@@ -57,11 +47,33 @@ public sealed class BlockEditorControl : Control
     private readonly List<FrameTick> _frameTicks = [];
     private readonly TimelineTextCache _text = new(TextCacheLimit);
 
+    /// <summary>当前主题下的一套颜色。主题变体换了要重新取,所以记着取的是哪一版。</summary>
+    private TimelinePalette? _palette;
+    private ThemeVariant? _paletteVariant;
+
     private bool _isScrubbing;
     private bool _isSelectingFrames;
 
     /// <summary>当前这个块已经对过焦了没有。对完焦之后视口就交给用户自己缩放平移。</summary>
     private bool _focusApplied;
+
+    /// <summary>
+    /// 当前主题下的一套颜色。取一次就缓存住:资源字典查询比读字段贵,
+    /// 而这里每帧都要用几十次。
+    /// </summary>
+    private TimelinePalette Palette
+    {
+        get
+        {
+            if (_palette is null || _paletteVariant != ActualThemeVariant)
+            {
+                _paletteVariant = ActualThemeVariant;
+                _palette = TimelinePalette.Resolve(this);
+            }
+
+            return _palette;
+        }
+    }
 
     public static readonly StyledProperty<IReadOnlyList<Block>?> BlocksProperty =
         AvaloniaProperty.Register<BlockEditorControl, IReadOnlyList<Block>?>(nameof(Blocks));
@@ -314,9 +326,9 @@ public sealed class BlockEditorControl : Control
         var bodyTop = RulerHeight;
         var bodyHeight = Math.Max(0, height - RulerHeight);
 
-        context.FillRectangle(TimelinePalette.TrackBackground, new Rect(0, 0, width, height));
+        context.FillRectangle(Palette.TrackBackground, new Rect(0, 0, width, height));
         context.FillRectangle(
-            TimelinePalette.RowBackground,
+            Palette.RowBackground,
             new Rect(TrackLeft, bodyTop, trackWidth, bodyHeight));
 
         var viewport = Viewport;
@@ -367,14 +379,14 @@ public sealed class BlockEditorControl : Control
 
             var rect = BlockRect(block.Start, block.End, viewport, bodyTop, bodyHeight);
 
-            context.FillRectangle(DimBlockFill, rect);
+            context.FillRectangle(Palette.DimBlockFill, rect);
 
             // 把这一块自己的灯光也画出来,只是盖一层灰表示"现在不能改它"。
             DrawBlockColors(context, block, viewport, rect, trackWidth);
-            context.FillRectangle(DimScrim, rect);
+            context.FillRectangle(Palette.DimScrim, rect);
 
             context.FillRectangle(
-                TimelinePalette.BlockTitleFill,
+                Palette.BlockTitleFill,
                 new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height)));
 
             if (rect.Width > 30)
@@ -385,7 +397,7 @@ public sealed class BlockEditorControl : Control
                 }
             }
 
-            context.DrawRectangle(null, TimelinePalette.BlockPen, rect, BlockCornerRadius, BlockCornerRadius);
+            context.DrawRectangle(null, Palette.BlockPen, rect, BlockCornerRadius, BlockCornerRadius);
         }
     }
 
@@ -400,9 +412,9 @@ public sealed class BlockEditorControl : Control
     {
         var rect = BlockRect(block.Start, block.End, viewport, bodyTop, bodyHeight);
 
-        context.FillRectangle(TimelinePalette.BlockFill, rect);
+        context.FillRectangle(Palette.BlockFill, rect);
         context.FillRectangle(
-            TimelinePalette.BlockTitleFill,
+            Palette.BlockTitleFill,
             new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height)));
 
         if (rect.Width > 30)
@@ -432,13 +444,13 @@ public sealed class BlockEditorControl : Control
         {
             var x = tick.X;
 
-            context.FillRectangle(FrameTick, new Rect(x, tickTop, FrameMarkerWidth, tickHeight));
+            context.FillRectangle(Palette.FrameTick, new Rect(x, tickTop, FrameMarkerWidth, tickHeight));
             context.FillRectangle(
                 _brushes.For(frames[tick.FrameIndex].State.Color),
                 new Rect(x, rect.Bottom - 9, Math.Max(FrameMarkerWidth, 9), 8));
         }
 
-        context.DrawRectangle(null, TimelinePalette.CurrentBlockPen, rect, BlockCornerRadius, BlockCornerRadius);
+        context.DrawRectangle(null, Palette.CurrentBlockPen, rect, BlockCornerRadius, BlockCornerRadius);
     }
 
     /// <summary>按像素列取色,把一个块自己的内容画出来。</summary>
@@ -498,7 +510,7 @@ public sealed class BlockEditorControl : Control
             bodyTop,
             bodyHeight);
 
-        context.DrawRectangle(SelectionFill, SelectionPen, rect);
+        context.DrawRectangle(Palette.FrameSelectionFill, Palette.SelectionPen, rect);
     }
 
     private void DrawRuler(DrawingContext context, TimelineViewport viewport)
@@ -523,7 +535,7 @@ public sealed class BlockEditorControl : Control
             var x = TrackLeft + viewport.MapTime(time);
 
             context.DrawLine(
-                TimelinePalette.RowSeparatorPen,
+                Palette.RowSeparatorPen,
                 new Point(x, RulerHeight - 4),
                 new Point(x, RulerHeight));
             context.DrawText(GetDimText(Timecode.Format(time), 10.5), new Point(x + 3, 1));
@@ -540,7 +552,7 @@ public sealed class BlockEditorControl : Control
         }
 
         var x = TrackLeft + viewport.MapTime(PlayheadTime);
-        context.DrawLine(TimelinePalette.PlayheadPen, new Point(x, 0), new Point(x, height));
+        context.DrawLine(Palette.PlayheadPen, new Point(x, 0), new Point(x, height));
     }
 
     private void DrawChannelLabel(DrawingContext context, Block block, double bodyTop, double bodyHeight)
@@ -553,7 +565,7 @@ public sealed class BlockEditorControl : Control
     private void DrawDivider(DrawingContext context, double height)
     {
         context.DrawLine(
-            TimelinePalette.GutterDividerPen,
+            Palette.GutterDividerPen,
             new Point(TrackLeft, 0),
             new Point(TrackLeft, height));
     }
@@ -708,13 +720,13 @@ public sealed class BlockEditorControl : Control
         => TimelineGeometry.EditorBlockRect(start, end, viewport, bodyTop, bodyHeight);
 
     private FormattedText GetDimText(string text, double size)
-        => GetText(text, size, TimelinePalette.DimText);
+        => GetText(text, size, Palette.DimText);
 
     private FormattedText GetBlockText(string text)
-        => GetText(text, 11, TimelinePalette.BlockText);
+        => GetText(text, 11, Palette.BlockText);
 
     private FormattedText GetDimBlockText(string text)
-        => GetText(text, 11, DimBlockText);
+        => GetText(text, 11, Palette.DimBlockText);
 
     private FormattedText GetText(string text, double size, IBrush brush)
         => _text.Get(text, size, brush);
