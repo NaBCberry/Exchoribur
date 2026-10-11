@@ -43,8 +43,9 @@ public class AuthFrameTests
     [Fact]
     public void An_expired_license_cannot_be_sent()
     {
+        // 到期时刻本身还算有效(和驱动一致),过了那一秒才不能发。
         var failure = Assert.Throws<InvalidOperationException>(
-            () => AuthFrame.Build(License, hostUnixTime: License.ExpireUnixTime));
+            () => AuthFrame.Build(License, hostUnixTime: License.ExpireUnixTime + 1));
 
         Assert.Contains("过期", failure.Message);
     }

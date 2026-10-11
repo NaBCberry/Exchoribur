@@ -59,7 +59,11 @@ public class DeviceTargetTests
     [InlineData("192.168.19.123:1234", "32712")]
     [InlineData("192.168.19.123:abc", "数字")]
     [InlineData("not-an-ip", "IP")]
+    // IPv6 一律不收,带不带方括号都不收。
     [InlineData("::1", "IPv4")]
+    [InlineData("fe80::1", "IPv4")]
+    [InlineData("[::1]", "IPv4")]
+    [InlineData("[::1]:32712", "IPv4")]
     public void A_bad_udp_host_explains_what_is_wrong(string text, string expectedFragment)
     {
         Assert.False(DeviceTarget.TryNormalizeUdpHost(text, out var host, out var error));
