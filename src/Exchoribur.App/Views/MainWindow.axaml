@@ -390,12 +390,13 @@
                         <!--
                             刻度、标记、十条轨道、播放头都在同一个控件里画,
                             免得滚动时各层落在不同的合成帧上对不齐。
-                            两行这样切:上面那行给轨道,下面那行的高度就是块编辑器的高度,
-                            调色盘浮在上面那行里,所以不会盖住编辑器。
+                            两行这样切:上面那行给轨道,下面那行的高度就是块编辑器的高度。
+                            右列是调色盘,编辑窗打开时它才占位,轨道跟着让出这块宽度,谁都不挡谁。
                         -->
-                        <Grid ClipToBounds="True" RowDefinitions="*,Auto">
+                        <Grid ClipToBounds="True" ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
                             <timeline:TimelineControl
                                 Grid.RowSpan="2"
+                                Grid.Column="0"
                                 Blocks="{Binding Blocks}"
                                 Markers="{Binding Markers}"
                                 Viewport="{Binding Viewport}"
@@ -412,24 +413,22 @@
                                 Cursor="Hand" />
 
                             <!--
-                                调色盘:编辑窗打开时浮到轨道右上角,编辑器收起就跟着收回,
-                                不再常年占着右栏。做成浮层是为了不改时间轴的宽度。
+                                调色盘:编辑窗打开时在右边占一列(上下顶满),编辑器收起就空出这一列,
+                                不编辑的时候时间轴是整宽的。
                             -->
-                            <Border Grid.Row="0"
-                                    HorizontalAlignment="Right"
+                            <Border Grid.Column="1"
+                                    Grid.RowSpan="2"
                                     Width="220"
-                                    Margin="0,8,8,8"
                                     IsVisible="{Binding HasCurrentBlock}"
                                     Background="{DynamicResource PanelBackgroundBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    BoxShadow="-8 0 18 0 #88000000">
+                                    BorderThickness="1,0,0,0">
                                 <views:ColorPanelView />
                             </Border>
 
                             <!-- 块编辑器:盖在轨道上面(不挤压轨道),打开时主时间轴会把选中的块滚到它上面 -->
                             <Border Grid.Row="1"
+                                    Grid.Column="0"
                                     Height="{Binding EditorOverlayHeight}"
                                     IsVisible="{Binding HasCurrentBlock}"
                                     Background="{DynamicResource PanelBackgroundBrush}"
