@@ -24,6 +24,10 @@
     <Content Include="..\..\ACKNOWLEDGEMENTS.md"
              Link="ACKNOWLEDGEMENTS.md"
              CopyToOutputDirectory="PreserveNewest" />
+    <!-- LGPL 与 OFL 要求随分发附上许可全文,单独放一个子目录 -->
+    <Content Include="..\..\licenses\**"
+             Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

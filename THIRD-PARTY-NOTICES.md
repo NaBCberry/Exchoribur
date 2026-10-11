@@ -64,8 +64,8 @@
 - 许可:SIL Open Font License 1.1
 - 版权:The Inter Project Authors,完整声明见字体仓库的 LICENSE.txt
 - 来源:<https://rsms.me/inter/>
-- 说明:字体本体按 OFL 分发,和这个 NuGet 包自身的 MIT 声明是两回事;OFL 要求
-  随字体副本附上许可文本,获取地址见文末。
+- 说明:字体本体按 OFL 分发,和这个 NuGet 包自身的 MIT 声明是两回事。OFL 要求的
+  许可全文随程序发布,见 `licenses/OFL-1.1.txt`。
 
 ## 媒体
 
@@ -83,6 +83,7 @@
 - 许可:LGPL-2.1-or-later
 - 版权:Copyright (c) VideoLAN
 - 来源:<https://www.videolan.org/vlc/libvlc.html>
+- 许可全文:随程序发布,见 `licenses/LGPL-2.1.txt`
 - 修改说明:分发的是上游未经修改的构建,程序通过动态链接调用,用户可以换成
   自己的构建。Linux 上由发行版提供,不随本项目分发。随包附带的插件里有一
   部分另有许可(多为 GPLv2 及以上),同样是上游原样分发。
@@ -101,10 +102,15 @@
 测试与构建期依赖(xunit、coverlet、Microsoft.NET.Test.Sdk) 仅在开发和 CI 里
 使用
 
-## 许可文本获取地址
+## 许可文本
+
+LGPL 与 OFL 要求随分发附上许可全文,这两份放在程序目录的 `licenses/` 里:
+
+- LGPL-2.1-or-later:`licenses/LGPL-2.1.txt`
+- SIL OFL 1.1:`licenses/OFL-1.1.txt`
+
+其余组件的许可文本可以看这些地址:
 
 - MIT:<https://opensource.org/license/mit>
 - ISC:<https://opensource.org/license/isc-license-txt>
 - BSD-3-Clause:<https://opensource.org/license/bsd-3-clause>
-- LGPL-2.1-or-later:<https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>
-- SIL OFL 1.1:<https://openfontlicense.org>
