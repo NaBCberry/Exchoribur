@@ -167,9 +167,9 @@ public sealed class MainViewModelTests : IDisposable
     public void Save_failure_text_explains_what_to_do()
     {
         // 0x80070020 是共享冲突:文件被别的程序开着。
-        var inUse = MainViewModel.DescribeSaveFailure(
+        var inUse = ProjectSession.DescribeSaveFailure(
             "演出.exb", new IOException("占用了", unchecked((int)0x80070020)));
-        var unknown = MainViewModel.DescribeSaveFailure(
+        var unknown = ProjectSession.DescribeSaveFailure(
             "演出.exb", new InvalidOperationException("自爆"));
 
         Assert.Contains("演出.exb", inUse);
@@ -182,9 +182,9 @@ public sealed class MainViewModelTests : IDisposable
     [Fact]
     public void Save_progress_text_names_the_stage_and_the_percentage()
     {
-        var media = MainViewModel.DescribeSaveProgress(
+        var media = ProjectSession.DescribeSaveProgress(
             "演出.exb", new ProjectSaveProgress(ProjectSaveStage.Media, 0.42));
-        var timeline = MainViewModel.DescribeSaveProgress(
+        var timeline = ProjectSession.DescribeSaveProgress(
             "演出.exb", new ProjectSaveProgress(ProjectSaveStage.Timeline, 0.01));
 
         Assert.Contains("演出.exb", media);

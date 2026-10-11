@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using Exchoribur.Core;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Services;
 
@@ -12,7 +12,7 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
 {
     public Task<string?> PickTimelineAsync() => PickAsync(
         "打开时间轴 CSV",
-        [new FilePickerFileType("时间轴 CSV") { Patterns = ["*.csv"] }, FilePickerFileTypes.All]);
+        [new FilePickerFileType("时间轴 CSV") { Patterns = [ProjectFileExtensions.CsvPattern] }, FilePickerFileTypes.All]);
 
     public Task<string?> PickVideoAsync() => PickAsync(
         "导入参考视频",
@@ -54,7 +54,8 @@ public sealed class StorageProviderFilePicker(Window owner) : IFilePicker
             Title = "导出时间轴 CSV",
             SuggestedFileName = suggestedName,
             DefaultExtension = "csv",
-            FileTypeChoices = [new FilePickerFileType("时间轴 CSV") { Patterns = ["*.csv"] }],
+            FileTypeChoices =
+                [new FilePickerFileType("时间轴 CSV") { Patterns = [ProjectFileExtensions.CsvPattern] }],
         });
 
         return file?.TryGetLocalPath();

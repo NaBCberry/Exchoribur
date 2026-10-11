@@ -82,52 +82,33 @@ public static class ProjectFile
 
         var timelineJson = TimelineJson.Write(document.Timeline);
 
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
         // 进度按字节算:几百兆的视频和几兆的时间轴放一起,谁占时间一目了然。
         var timelineBytes = Encoding.UTF8.GetByteCount(timelineJson);
         var mediaBytes = mediaPath is null ? 0 : new FileInfo(mediaPath).Length;
         var totalBytes = timelineBytes + mediaBytes;
 
-        // 先写同目录的临时文件,写完整了再换成正式文件:直接往目标文件写的话,
-        // 中途失败(磁盘满、被杀进程、断电)之后,原来的工程就只剩一个空壳了。
-        var temporary = path + TemporarySuffix;
-
-        try
+        AtomicFile.Write(path, TemporarySuffix, temporary =>
         {
             // 目标写不进去(被别的程序占着、只读)现在就报错,别等几 GB 的参考视频
             // 拷进临时文件之后才轮到失败。
             RequireWritableTarget(path);
 
-            using (var stream = File.Create(temporary))
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+            using var stream = File.Create(temporary);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+
+            WriteText(archive, ProjectFileFormat.ManifestName, JsonSerializer.Serialize(manifest, ManifestOptions));
+            WriteText(archive, ProjectFileFormat.TimelineName, timelineJson);
+            progress?.Report(new ProjectSaveProgress(
+                ProjectSaveStage.Timeline,
+                Percent(timelineBytes, totalBytes) / 100d));
+
+            if (mediaPath is not null)
             {
-                WriteText(archive, ProjectFileFormat.ManifestName, JsonSerializer.Serialize(manifest, ManifestOptions));
-                WriteText(archive, ProjectFileFormat.TimelineName, timelineJson);
-                progress?.Report(new ProjectSaveProgress(
-                    ProjectSaveStage.Timeline,
-                    Percent(timelineBytes, totalBytes) / 100d));
-
-                if (mediaPath is not null)
-                {
-                    CopyMedia(archive, mediaPath, timelineBytes, totalBytes, progress);
-                }
+                CopyMedia(archive, mediaPath, timelineBytes, totalBytes, progress);
             }
+        });
 
-            // 同一个目录里改名,系统只改目录项,不会把数据再搬一遍。
-            File.Move(temporary, path, overwrite: true);
-
-            return new ProjectSaveResult(missingMediaName);
-        }
-        catch
-        {
-            TryDelete(temporary);
-            throw;
-        }
+        return new ProjectSaveResult(missingMediaName);
     }
 
     /// <summary>
@@ -142,19 +123,6 @@ public static class ProjectFile
         }
 
         using var probe = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
-    }
-
-    /// <summary>收拾没写完的临时文件。收拾不掉也不算错,真正的失败原因由调用方抛出。</summary>
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            // 忽略:临时文件留着不影响工程,下次保存会覆盖它。
-        }
     }
 
     /// <summary>

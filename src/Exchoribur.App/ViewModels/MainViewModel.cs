@@ -1,16 +1,15 @@
 using System.ComponentModel;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
+using Exchoribur.App.DesignTime;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.Core;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Playback;
 using Exchoribur.Core.Settings;
 using Exchoribur.Core.Storage;
 using Exchoribur.Core.Updates;
@@ -21,23 +20,21 @@ namespace Exchoribur.App.ViewModels;
 /// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
 /// 界面只管把这些属性画出来,不直接读文件。
 /// </summary>
-public partial class MainViewModel : ViewModelBase
+public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 {
     private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
 
-    private readonly IFilePicker? _filePicker;
-    private readonly IPlaybackClock? _clock;
     private readonly INamePrompt? _namePrompt;
-    private readonly IUnsavedChangesPrompt? _unsavedPrompt;
     private readonly IAudioDeviceController _audio;
     private readonly UpdateCoordinator _updates;
+    private readonly PlaybackController _playback;
+    private readonly ProjectSession _projects;
 
-    /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
-    private string? _projectPath;
-    private readonly PlaybackState _playback = new();
+    /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
+    private bool _disposed;
 
-    /// <summary>当前工程的编辑栈(撤销、重做)。没有时间轴时是 null。</summary>
-    private TimelineEditor? _editor;
+    /// <summary>块编辑的会话:撤销栈和几条"编辑之后界面怎么变"的规则。</summary>
+    private readonly BlockEditingSession _editing = new();
 
     /// <summary>选中集合在"补全链接组"时会回写自己,用这个标记挡住递归。</summary>
     private bool _syncingSelection;
@@ -56,34 +53,96 @@ public partial class MainViewModel : ViewModelBase
         SettingsViewModel? settings = null,
         IAudioDeviceController? audio = null,
         IUpdateFeed? updateFeed = null)
+        : this(
+            filePicker,
+            clock,
+            namePrompt,
+            unsavedPrompt,
+            settings,
+            audio,
+            updateFeed,
+            externalLauncher: null,
+            videoFactory: null)
     {
-        _filePicker = filePicker;
-        _clock = clock;
+    }
+
+    /// <summary>
+    /// 启动装配用的构造函数:多了"用系统程序打开链接/文件夹"的能力,以及自定义播放器的入口。
+    /// 测试里可以塞一个假的播放器,免得为了跑一个用例把 libvlc 拉起来。
+    /// </summary>
+    public MainViewModel(
+        IFilePicker? filePicker,
+        IPlaybackClock? clock,
+        INamePrompt? namePrompt,
+        IUnsavedChangesPrompt? unsavedPrompt,
+        SettingsViewModel? settings,
+        IAudioDeviceController? audio,
+        IUpdateFeed? updateFeed,
+        IExternalLauncher? externalLauncher,
+        Func<IVideoService>? videoFactory)
+    {
         _namePrompt = namePrompt;
-        _unsavedPrompt = unsavedPrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
+        _videoFactory = videoFactory ?? (() => new VideoService());
         _audio = audio ?? new VideoAudioDeviceController(() => _video);
+
+        // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
+        // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
+        SettingsViewModel? currentSettings = null;
         _updates = new UpdateCoordinator(
             updateFeed ?? new VelopackUpdateFeed(),
-            () => Settings!.AutoDownloadUpdates,
-            () => Settings!.IncludePrereleaseVersions);
-        _updates.Changed += (_, _) => RefreshUpdateBanner();
+            () => currentSettings?.AutoDownloadUpdates ?? false,
+            () => currentSettings?.IncludePrereleaseVersions ?? false);
+        _updates.Changed += OnUpdatesChanged;
 
-        Settings = settings ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates);
+        Settings = settings
+            ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates, externalLauncher);
+        currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();
+
+        // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
+        _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
+
+        // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
+        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt);
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
-        Timeline = Design.IsDesignMode ? CreateSampleTimeline() : Timeline.Empty;
+        Timeline = DesignTimeTimeline.Current;
         StatusText = EmptyStatusText;
         WindowTitle = "Exchoribur";
         UndoLabel = "撤销";
         RedoLabel = "重做";
 
+    }
+
+    /// <summary>更新状态变了,状态条上的提示跟着换。</summary>
+    private void OnUpdatesChanged(object? sender, EventArgs e) => RefreshUpdateBanner();
+
+    /// <summary>
+    /// 关窗时把懒创建的播放器放掉:它挂着 libvlc 的解码线程和一块固定住的内存,
+    /// 窗口都关了没必要留着。重复调用没有副作用。
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _updates.Changed -= OnUpdatesChanged;
+        Settings.PropertyChanged -= OnSettingsChanged;
+
+        _video?.Dispose();
+        _video = null;
+
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>预览用的当前帧画面。</summary>
@@ -214,7 +273,7 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             // 有链接的块要把同组的一起带上,带上之后再写回属性,界面也一起亮。
-            var expanded = ExpandLinked(value);
+            var expanded = BlockEditingSession.ExpandLinked(Timeline, value);
 
             if (!expanded.SequenceEqual(value))
             {
@@ -269,27 +328,10 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnIsModifiedChanged(bool value) => UpdateWindowTitle();
 
-    /// <summary>新建一个空工程,用它承载接下来的导入。</summary>
-    private void CreateDocument(string name, string? mediaPath = null)
-    {
-        Document = new TimelineDocument(name, Timeline.Empty, mediaPath);
-        TimelineName = Document.Name;
-        IsModified = false;
-
-        OnPropertyChanged(nameof(Document));
-        UpdateWindowTitle();
-    }
-
     private void UpdateWindowTitle()
         => WindowTitle = Document is null
             ? "Exchoribur"
             : $"{(IsModified ? "*" : string.Empty)}{TimelineName} — Exchoribur";
-
-    /// <summary>问一个名字;测试或命令行模式下没有对话框,直接沿用建议名。</summary>
-    private async Task<string?> AskForTimelineNameAsync(string suggestedName)
-        => _namePrompt is null
-            ? suggestedName
-            : await _namePrompt.AskAsync("新建时间线", suggestedName);
 
     /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
     [ObservableProperty]
@@ -407,28 +449,30 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth) && _editor is not null)
+        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth))
         {
-            _editor.MaxUndoSteps = Settings.UndoDepthValue;
+            _editing.SetMaxUndoSteps(Settings.UndoDepthValue);
         }
     }
 
     /// <summary>右侧编辑面板里正在挑的颜色。</summary>
     public ColorEditorViewModel Color { get; } = new();
 
-    private VideoService? _video;
+    private readonly Func<IVideoService> _videoFactory;
+
+    private IVideoService? _video;
 
     /// <summary>
     /// 视频预览用的播放器。第一次真正用到时才创建:它会加载 libvlc(重、会起线程),
     /// 没导入视频的场合没必要付这个代价。
     /// </summary>
-    public VideoService Video
+    public IVideoService Video
     {
         get
         {
             if (_video is null)
             {
-                _video = new VideoService();
+                _video = _videoFactory();
                 // 每解出一帧抬一次序号;位图是同一个对象,界面靠它知道内容变了。
                 _video.FrameUpdated += (_, _) => VideoFrameVersion++;
                 // 播放器刚建出来,把设置里的音量与输出设备应用上去。
@@ -498,7 +542,7 @@ public partial class MainViewModel : ViewModelBase
 
         // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、块选中、撤销历史
         // 都该留在原地;只有换成另一条时间轴(打开、导入、新建)才从头开始。
-        if (!ReferenceEquals(_editor?.Timeline, value))
+        if (!ReferenceEquals(_editing.Timeline, value))
         {
             StartEditing(value);
         }
@@ -509,10 +553,8 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void StartEditing(Timeline timeline)
     {
-        _editor = new TimelineEditor(timeline)
-        {
-            MaxUndoSteps = Settings.UndoDepthValue,
-        };
+        _editing.Start(timeline, Settings.UndoDepthValue);
+
         SetBlockSelection([]);
         CurrentBlock = null;
         SelectedFrames = BlockFrameRange.Empty;
@@ -523,10 +565,9 @@ public partial class MainViewModel : ViewModelBase
         CurrentFrame = BlockSampler.Sample(timeline, PlayheadTime);
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
-        _playback.Stop();
-        _playback.SetDuration(PlaybackLength);
-        SyncPlaybackFlags();
-        _clock?.Stop();
+        // 视频不动:新数据可能紧接着就要挂上自己的参考媒体。
+        _playback.Reset();
+        _playback.SetLength(PlaybackLength);
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
         Viewport.SetContent(TimelineStart, Duration - TimelineStart);
@@ -535,10 +576,10 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>把编辑栈的状态搬到界面上:撤销/重做能不能点、菜单显示什么字。</summary>
     private void SyncEditorState()
     {
-        CanUndo = _editor?.CanUndo ?? false;
-        CanRedo = _editor?.CanRedo ?? false;
-        UndoLabel = _editor?.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
-        RedoLabel = _editor?.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
+        CanUndo = _editing.CanUndo;
+        CanRedo = _editing.CanRedo;
+        UndoLabel = _editing.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
+        RedoLabel = _editing.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
@@ -563,346 +604,45 @@ public partial class MainViewModel : ViewModelBase
         // 播放也从这里继续。相等时不动,免得播放中每帧都去 seek 把画面弄卡。
         if (value != _playback.Position)
         {
-            _playback.Seek(value);
-            KeepVideoAtPlayhead();
+            _playback.SeekTo(value);
+            _playback.FollowPosition(value);
         }
     }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
     [RelayCommand]
-    private async Task OpenAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        if (!await ConfirmDiscardChangesAsync())
-        {
-            return; // 用户决定停下来处理当前工程
-        }
-
-        var path = await _filePicker.PickTimelineAsync();
-        if (path is null)
-        {
-            return; // 用户点了取消
-        }
-
-        // 已经有工程:这是改里面的数据,不新建也不问名字。
-        if (Document is not null)
-        {
-            await LoadAsync(path);
-            return;
-        }
-
-        // 导入前先问工程名;取消就什么都不做,主窗口保持原样。
-        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
-        if (name is null)
-        {
-            return;
-        }
-
-        await LoadAsync(path, name);
-    }
+    private Task OpenAsync() => _projects.OpenAsync();
 
     /// <summary>菜单「文件 → 打开工程」:读一个 .exb,连参考媒体一起挂上。</summary>
     [RelayCommand]
-    private async Task OpenProjectAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        if (!await ConfirmDiscardChangesAsync())
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickProjectAsync();
-        if (path is null)
-        {
-            return;
-        }
-
-        await LoadProjectAsync(path);
-    }
+    private Task OpenProjectAsync() => _projects.OpenProjectAsync();
 
     /// <summary>
     /// 换文件、关窗口之前的确认。返回 true 表示可以继续;
     /// 用户选了取消,或者选了保存却没存成,都返回 false,调用方就停在原地。
     /// </summary>
-    public async Task<bool> ConfirmDiscardChangesAsync()
-    {
-        // 没有对话框可用时(设计器、命令行)按原来的行为继续,不拦。
-        if (_unsavedPrompt is null || !IsModified || Document is null)
-        {
-            return true;
-        }
-
-        var choice = await _unsavedPrompt.AskAsync(TimelineName) ?? UnsavedChangesChoice.Cancel;
-
-        switch (choice)
-        {
-            case UnsavedChangesChoice.Save:
-                await SaveProjectAsync();
-
-                // 没存成(保存失败,或者另存为被取消)时工程还是脏的,继续下去就丢改动了。
-                return !IsModified;
-
-            case UnsavedChangesChoice.Discard:
-                return true;
-
-            default:
-                return false;
-        }
-    }
+    public Task<bool> ConfirmDiscardChangesAsync() => _projects.ConfirmDiscardChangesAsync();
 
     /// <summary>拖进窗口的 CSV 按"打开"处理:同样先拦未保存的改动。</summary>
-    public async Task OpenDroppedAsync(string path)
-    {
-        if (await ConfirmDiscardChangesAsync())
-        {
-            await LoadAsync(path);
-        }
-    }
+    public Task OpenDroppedAsync(string path) => _projects.OpenDroppedAsync(path);
 
     /// <summary>保存工程。没存过就当作另存为。</summary>
     [RelayCommand]
-    private async Task SaveProjectAsync()
-    {
-        if (Document is null)
-        {
-            HasError = true;
-            StatusText = "还没有工程可保存，先打开工程或导入 CSV 或 视频。";
-            return;
-        }
-
-        if (_projectPath is null)
-        {
-            await SaveProjectAsAsync();
-            return;
-        }
-
-        await SaveProjectToAsync(_projectPath);
-    }
+    private Task SaveProjectAsync() => _projects.SaveAsync();
 
     [RelayCommand]
-    private async Task SaveProjectAsAsync()
-    {
-        if (Document is null || _filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickProjectSaveAsync($"{TimelineName}{ProjectFileFormat.Extension}");
-        if (path is null)
-        {
-            return;
-        }
-
-        await SaveProjectToAsync(path);
-    }
+    private Task SaveProjectAsAsync() => _projects.SaveAsAsync();
 
     /// <summary>打开工程文件。失败只改状态栏,不动已经打开的内容。</summary>
-    public async Task<bool> LoadProjectAsync(string path)
-    {
-        var fileName = Path.GetFileName(path);
-
-        try
-        {
-            // 读容器和解压媒体都不该卡住界面。
-            var document = await Task.Run(() => ProjectFile.Load(path));
-
-            _projectPath = path;
-            Document = document;
-            Timeline = document.Timeline;
-            TimelineName = document.Name;
-            IsModified = document.IsModified;
-            OnPropertyChanged(nameof(Document));
-            UpdateWindowTitle();
-
-            HasError = false;
-            HasVideo = document.MediaPath is { } media && OpenVideo(media);
-
-            StatusText = $"已打开工程 {fileName}:{document.Timeline.Blocks.Count:N0} 个块,"
-                + $"{document.Timeline.Markers.Count:N0} 个标记。";
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or FormatException
-            or InvalidDataException)
-        {
-            HasError = true;
-            StatusText = $"打开工程 {fileName} 失败:{exception.Message}";
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 保存工程。打包要原样复制整个参考视频,放在界面线程上做窗口会整段卡住,
-    /// 所以丢给后台跑,进度显示在状态栏上。
-    /// </summary>
-    private async Task SaveProjectToAsync(string path)
-    {
-        if (Document is null || IsSaving)
-        {
-            return;
-        }
-
-        var document = Document;
-        var fileName = Path.GetFileName(path);
-
-        IsSaving = true;
-        SaveProgress = 0;
-        HasError = false;
-        StatusText = $"正在保存工程 {fileName}…";
-
-        try
-        {
-            // Progress 是在界面线程上建的,后台线程报上来的进度会自动回到界面线程。
-            var progress = new Progress<ProjectSaveProgress>(report =>
-            {
-                // 保存已经收尾就不再改状态栏,免得最后一步的进度把结果盖掉。
-                if (!IsSaving)
-                {
-                    return;
-                }
-
-                StatusText = DescribeSaveProgress(fileName, report);
-                SaveProgress = report.Fraction * 100;
-            });
-
-            var result = await ProjectFile.SaveAsync(path, document, progress);
-
-            _projectPath = path;
-            document.MarkSaved();
-            IsModified = false;
-            UpdateWindowTitle();
-
-            // 参考视频不在了的话,这次只存下了时间轴。用报错样式说,免得用户以为存全了。
-            HasError = result.MissingMediaName is not null;
-            StatusText = result.MissingMediaName is null
-                ? $"工程 {fileName}已保存。"
-                : $"工程 {fileName}已保存,但参考视频 {result.MissingMediaName} 丢失,"
-                    + "视频未打包。";
-        }
-        catch (Exception exception)
-        {
-            // 这条链路最后落在 async void 上,漏出去的异常没人接得住,会直接把进程带走。
-            // 所以保存出任何问题都在这里收住,只写状态栏。
-            HasError = true;
-            StatusText = DescribeSaveFailure(fileName, exception);
-        }
-        finally
-        {
-            IsSaving = false;
-            SaveProgress = 0;
-        }
-    }
-
-    /// <summary>把核心层报的进度翻译成状态栏那句话。</summary>
-    internal static string DescribeSaveProgress(string fileName, ProjectSaveProgress progress)
-        => progress.Stage switch
-        {
-            ProjectSaveStage.Media =>
-                $"正在保存工程 {fileName}…打包参考视频 {progress.Fraction * 100:F0}%",
-            _ => $"正在保存工程 {fileName}…整理时间轴数据",
-        };
-
-    /// <summary>
-    /// 保存失败时状态栏那句话。系统给的是英文原文,而且只说"被占用",
-    /// 不会告诉用户该去关什么,所以能认出来的原因换成能照着做的说法。
-    /// </summary>
-    internal static string DescribeSaveFailure(string fileName, Exception exception)
-    {
-        var reason = FileFailure.Classify(exception) switch
-        {
-            FileFailureReason.InUse =>
-                "文件正被其他程序占用,关掉占用程序再试",
-            FileFailureReason.AccessDenied =>
-                "文件无法写入,文件可能只读/被占用",
-            FileFailureReason.DiskFull => "磁盘空间不够",
-            _ => null,
-        };
-
-        return reason is null
-            ? $"保存工程 {fileName} 失败:{exception.Message}"
-            : $"保存工程 {fileName} 失败:{reason}。";
-    }
+    public Task<bool> LoadProjectAsync(string path) => _projects.LoadProjectAsync(path);
 
     /// <summary>菜单「文件 → 导出时间轴 CSV」:按取样规则展开成扁平 CSV 写出去。</summary>
     [RelayCommand]
-    private async Task ExportTimelineAsync()
-    {
-        if (Document is null)
-        {
-            Report("还没有工程,没什么可导出的。", error: true);
-            return;
-        }
-
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickTimelineSaveAsync($"{TimelineName}.csv");
-        if (path is null)
-        {
-            return;
-        }
-
-        var fileName = Path.GetFileName(path);
-
-        try
-        {
-            TimelineCsvFile.Save(path, Timeline);
-
-            HasError = false;
-            StatusText = $"已导出 {fileName}:{Blocks.Count:N0} 个块,"
-                + $"{Markers.Count:N0} 个标记。";
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            Report($"导出 {fileName} 失败:{exception.Message}", error: true);
-        }
-    }
+    private Task ExportTimelineAsync() => _projects.ExportTimelineAsync();
 
     /// <summary>菜单「文件 → 导入参考媒体」:挑一个视频丢给预览播放器。</summary>
     [RelayCommand]
-    private async Task ImportVideoAsync()
-    {
-        if (_filePicker is null)
-        {
-            return;
-        }
-
-        var path = await _filePicker.PickVideoAsync();
-        if (path is null)
-        {
-            return; // 用户点了取消
-        }
-
-        // 已经有工程:只是换掉参考媒体。
-        if (Document is not null)
-        {
-            OpenVideo(path);
-            Document.AttachMedia(path);
-            IsModified = Document.IsModified;
-            return;
-        }
-
-        var name = await AskForTimelineNameAsync(Path.GetFileNameWithoutExtension(path));
-        if (name is null)
-        {
-            return;
-        }
-
-        // 只导入视频也是新工程:参考媒体记在工程上,灯光数据等之后再导入。
-        CreateDocument(name, path);
-        OpenVideo(path);
-    }
+    private Task ImportVideoAsync() => _projects.ImportVideoAsync();
 
     [RelayCommand]
     private void GoToStart() => Seek(TimeSpan.Zero);
@@ -928,9 +668,6 @@ public partial class MainViewModel : ViewModelBase
     private void StopPlayback()
     {
         _playback.Stop();
-        _clock?.Stop();
-        Video.Stop();
-        SyncPlaybackFlags();
         PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
     }
@@ -965,93 +702,37 @@ public partial class MainViewModel : ViewModelBase
 
         // 播放时让播放头一直留在画面里:跑出画面就整页翻过去,落点在视口左边靠右一点。
         Viewport.PageTo(PlayheadTime);
-        KeepVideoInSync();
-
-        if (!_playback.IsPlaying)
-        {
-            _clock?.Stop();
-            Video.Pause();
-        }
+        _playback.CorrectDrift();
     }
 
     private void StartPlayback()
     {
-        _playback.SetDuration(PlaybackLength);
-        _playback.Play();
+        _playback.SetLength(PlaybackLength);
+        _playback.Play(AdvancePlayback);
 
         if (!_playback.IsPlaying)
         {
             return; // 没有内容可播
         }
 
-        SyncPlaybackFlags();
         PlayheadTime = _playback.Position;
-        _clock?.Start(AdvancePlayback);
-
-        if (HasVideo)
-        {
-            Video.Play();
-            Video.Seek(PlayheadTime);
-        }
     }
 
-    private void PausePlayback()
-    {
-        if (!_playback.IsPlaying)
-        {
-            return;
-        }
-
-        _playback.Pause();
-        _clock?.Stop();
-        Video.Pause();
-        SyncPlaybackFlags();
-    }
+    private void PausePlayback() => _playback.Pause();
 
     /// <summary>把播放头挪到指定位置:暂停状态下用,位置、视口、视频一起跟上。</summary>
     private void Seek(TimeSpan position)
     {
         PausePlayback();
-        _playback.SetDuration(PlaybackLength);
-        _playback.Seek(position);
+        _playback.SetLength(PlaybackLength);
+        _playback.SeekTo(position);
 
         PlayheadTime = _playback.Position;
         Viewport.EnsureVisible(PlayheadTime);
-        KeepVideoAtPlayhead();
+        _playback.FollowPosition(PlayheadTime);
     }
 
     private void SyncPlaybackFlags() => IsPlaying = _playback.IsPlaying;
-
-    /// <summary>把视频挪到播放头所在的位置(暂停着看某一帧时用)。</summary>
-    private void KeepVideoAtPlayhead()
-    {
-        if (HasVideo)
-        {
-            Video.Seek(PlayheadTime);
-        }
-    }
-
-    /// <summary>
-    /// 视频是跟着播放头走的,但它是独立解码的,时间长了会飘。
-    /// 偏得不多就不动它(频繁 seek 会卡),超过容差才拉回来一次。
-    /// </summary>
-    private void KeepVideoInSync()
-    {
-        // 容差给得大是故意的:libvlc 报的时间本身有几百毫秒的粒度,
-        // 容差太小就会一直去 seek,每 seek 一次画面就顿一下,看着就是"卡一下动一下"。
-        // 两个时钟都按真实时间走,长期飘移不大,偶尔纠正一次就够。
-        const double toleranceMilliseconds = 2000;
-
-        if (!_playback.IsPlaying || !HasVideo)
-        {
-            return;
-        }
-
-        if (Math.Abs((Video.Position - PlayheadTime).TotalMilliseconds) > toleranceMilliseconds)
-        {
-            Video.Seek(PlayheadTime);
-        }
-    }
 
     [RelayCommand]
     private void ZoomIn() => Viewport.ZoomBy(1.4);
@@ -1066,30 +747,30 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void UndoEdits()
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
 
         PausePlayback();
-        _editor.Undo();
+        _editing.Undo();
         PublishEditorTimeline();
-        Report($"已撤销:{_editor.RedoName}。");
+        Report($"已撤销:{_editing.RedoName}。");
     }
 
     /// <summary>重做上一步被撤销的编辑。</summary>
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private void RedoEdits()
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
 
         PausePlayback();
-        _editor.Redo();
+        _editing.Redo();
         PublishEditorTimeline();
-        Report($"已重做:{_editor.UndoName}。");
+        Report($"已重做:{_editing.UndoName}。");
     }
 
     /// <summary>选中全部块。</summary>
@@ -1108,7 +789,7 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>双击空白处建块:内容先放一帧,状态沿用那一刻该通道的状态。</summary>
     public void CreateBlockAt(int channel, TimeSpan time)
     {
-        if (_editor is null || Document is null)
+        if (!_editing.IsActive || Document is null)
         {
             return;
         }
@@ -1133,7 +814,7 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>主时间轴拖动块:整体平移时间,并按上下方向换通道。</summary>
     public void MoveSelectedBlocks(TimeSpan timeDelta, int channelDelta)
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             return;
         }
@@ -1169,7 +850,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void DeleteSelectedBlocks()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -1188,7 +869,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task RenameSelectedBlockAsync()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -1216,7 +897,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void CopyBlockToOtherChannels()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             Report("先在时间轴上选一个块。", error: true);
             return;
@@ -1252,7 +933,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleLink()
     {
-        if (_editor is null || Document is null || SelectedBlocks.Count == 0)
+        if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
             return;
         }
@@ -1295,41 +976,11 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>换掉选中的块集合;有链接的块会自动把同组的其他块一起带上。</summary>
-    private void SetBlockSelection(IReadOnlyList<Block> blocks) => SelectedBlocks = ExpandLinked(blocks);
-
-    /// <summary>把链接组补全:只要选中了组里的一个,整组都算选中。</summary>
-    private IReadOnlyList<Block> ExpandLinked(IReadOnlyList<Block> blocks)
-    {
-        var groups = blocks
-            .Where(block => block.LinkGroupId is { })
-            .Select(block => block.LinkGroupId!.Value)
-            .ToHashSet();
-
-        if (groups.Count == 0)
-        {
-            return [.. blocks];
-        }
-
-        return [.. Timeline.Blocks.Where(block =>
-            blocks.Contains(block)
-            || (block.LinkGroupId is { } group && groups.Contains(group)))];
-    }
+    private void SetBlockSelection(IReadOnlyList<Block> blocks)
+        => SelectedBlocks = BlockEditingSession.ExpandLinked(Timeline, blocks);
 
     /// <summary>链接图标该显示成什么颜色。</summary>
-    private void SyncLinkState()
-    {
-        if (SelectedBlocks.Count == 0)
-        {
-            LinkState = LinkIndicator.Idle;
-            return;
-        }
-
-        var linked = SelectedBlocks.Count(block => block.LinkGroupId is not null);
-
-        LinkState = linked == SelectedBlocks.Count
-            ? LinkIndicator.Linked
-            : linked == 0 ? LinkIndicator.Idle : LinkIndicator.Mixed;
-    }
+    private void SyncLinkState() => LinkState = BlockEditingSession.LinkStateOf(SelectedBlocks);
 
     /// <summary>单击块:把它打开到下面的块编辑器里。</summary>
     public void OpenBlockEditor(Block block)
@@ -1368,38 +1019,26 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>把颜色刷进块里选中的那几帧;一帧都没选就是整块。</summary>
     private void PaintBlockFrames(Block block, LightColor color, string actionName)
     {
-        if (_editor is null || Document is null)
+        if (!_editing.IsActive || Document is null)
         {
             return;
         }
 
-        var selection = SelectedFrames.IsEmpty
-            ? new BlockFrameRange(0, block.Frames.Count - 1)
-            : SelectedFrames;
-
-        if (selection.Last >= block.Frames.Count)
+        // 范围越界时什么都不做(和以前一样:先算好的选区才动手)。
+        if (BlockEditingSession.PaintFrames(block, SelectedFrames, color) is not { } painted)
         {
             return;
         }
 
-        var frames = block.Frames.ToArray();
-
-        for (var index = selection.First; index <= selection.Last; index++)
-        {
-            frames[index] = new BlockFrame(
-                frames[index].Offset,
-                new ChannelState(color, frames[index].State.Mode));
-        }
-
-        ApplyBlockContent(block, frames, actionName);
-        Report($"已把 {selection.Count} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
+        ApplyBlockContent(block, painted.Frames, actionName);
+        Report($"已把 {painted.PaintedCount} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
     }
 
     /// <summary>在播放头处往当前块里插一帧,默认沿用那一刻的状态。</summary>
     [RelayCommand]
     private void InsertFrameAtPlayhead()
     {
-        if (_editor is null || Document is null || CurrentBlock is not { } block)
+        if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
             Report("先单击一个块,打开下面的块编辑器。", error: true);
             return;
@@ -1434,7 +1073,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void DeleteSelectedFrames()
     {
-        if (_editor is null || Document is null || CurrentBlock is not { } block)
+        if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
             Report("先单击一个块,打开下面的块编辑器。", error: true);
             return;
@@ -1467,15 +1106,8 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>换掉当前块的内容;新帧超出原长度时自动把块延长到刚好装下。</summary>
     private void ApplyBlockContent(Block block, IReadOnlyList<BlockFrame> frames, string actionName)
     {
-        var length = block.Length;
-        var last = frames.Count == 0 ? TimeSpan.Zero : frames.Max(frame => frame.Offset);
-
-        if (last >= length)
-        {
-            length = last + TimeSpan.FromTicks(1);
-        }
-
-        var updated = block.WithContent(frames, length);
+        var (fitted, length) = BlockEditingSession.FitContent(block, frames);
+        var updated = block.WithContent(fitted, length);
 
         ApplyEdit(new BlockSetEdit(actionName, [block], [updated]));
         SetBlockSelection([updated]);
@@ -1485,7 +1117,7 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>走一步编辑:先停下播放,再把结果搬回界面。</summary>
     private void ApplyEdit(ITimelineEdit edit)
     {
-        if (_editor is null)
+        if (!_editing.IsActive)
         {
             return;
         }
@@ -1493,23 +1125,22 @@ public partial class MainViewModel : ViewModelBase
         // 边播边改会让人看不出改的是哪一帧,先停下来。
         PausePlayback();
 
-        _editor.Apply(edit);
+        _editing.Apply(edit);
         PublishEditorTimeline();
     }
 
     /// <summary>编辑栈换了内容之后,把结果搬回界面:时间轴对象、脏标记、撤销菜单。</summary>
     private void PublishEditorTimeline()
     {
-        if (_editor is null)
+        if (_editing.Timeline is not { } edited)
         {
             return;
         }
 
-        Timeline = _editor.Timeline;
+        Timeline = edited;
 
         // 撤销/重做之后块都换成了新对象,按 id 把选中集合和当前块重新指过去。
-        var selectedIds = SelectedBlocks.Select(block => block.Id).ToHashSet();
-        SelectedBlocks = [.. Timeline.Blocks.Where(block => selectedIds.Contains(block.Id))];
+        SelectedBlocks = BlockEditingSession.RebindSelected(Timeline, SelectedBlocks);
 
         CurrentBlock = CurrentBlock is { } current ? Timeline.FindBlock(current.Id) : null;
 
@@ -1531,92 +1162,39 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 读一个文件进来。解析放在后台线程,几万行也不会把窗口卡住;
-    /// 出错只改状态栏,已经打开的内容保持不动。
-    /// </summary>
-    /// <summary>
     /// 读一个 CSV。documentName 是刚在命名对话框里起的新工程名;
     /// 不传就是"往已有工程里换数据"或者"用文件名兜底新建"。
     /// </summary>
-    public async Task LoadAsync(string path, string? documentName = null)
+    public Task LoadAsync(string path, string? documentName = null)
+        => _projects.LoadAsync(path, documentName);
+
+    // ---- 工程文件流程要用的界面状态 ----
+
+    /// <summary>工程对象换了,通知界面重新读它。</summary>
+    void IProjectHost.NotifyDocumentChanged() => OnPropertyChanged(nameof(Document));
+
+    /// <summary>重算窗口标题。</summary>
+    void IProjectHost.RefreshWindowTitle() => UpdateWindowTitle();
+
+    /// <summary>文件流程写状态栏:error 为 null 表示保持当前的报错标记不变。</summary>
+    void IProjectHost.Report(string text, bool? error)
     {
-        var fileName = Path.GetFileName(path);
-
-        try
+        if (error is { } flag)
         {
-            // 已有工程:这是把里面的时间轴换掉;没有工程:用文件名兜底新建。
-            // 用户在命名对话框里起的名字优先。
-            var existing = Document;
-            var name = documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName);
-
-            // 导入进来的帧会按通道切成块,块就用工程名命名。
-            var timeline = await TimelineCsvFile.LoadAsync(path, name);
-
-            Timeline = timeline;
-
-            Document = new TimelineDocument(name, timeline, existing?.MediaPath);
-
-            // 只有"往已有工程里换数据"才算改动;新建工程不算。
-            if (existing is not null && documentName is null)
-            {
-                Document.MarkModified();
-            }
-
-            TimelineName = Document.Name;
-            IsModified = Document.IsModified;
-            OnPropertyChanged(nameof(Document));
-            UpdateWindowTitle();
-
-            HasError = false;
-            StatusText = timeline.Blocks.Count == 0
-                ? $"已载入 {fileName},但里面没有任何灯光内容。"
-                : $"已载入 {fileName}:{timeline.Blocks.Count:N0} 个块,"
-                    + $"{timeline.Markers.Count:N0} 个标记,时长 {Timecode.Format(timeline.Duration)}。";
-
+            Report(text, flag);
+            return;
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or FormatException)
-        {
-            HasError = true;
-            StatusText = $"打开 {fileName} 失败:{exception.Message}";
-        }
+
+        // 只换文字,不碰"是不是报错"——打开工程时状态栏要显示正文,
+        // 同时保留参考视频打不开留下的报错标记。
+        StatusText = text;
     }
 
-    /// <summary>只在设计器里用的假数据,保证预览界面不是一片空白。</summary>
-    private static Timeline CreateSampleTimeline()
+    /// <summary>文件流程按路径读写工程,工程对象只能由它换。</summary>
+    TimelineDocument? IProjectHost.Document
     {
-        var blocks = new List<Block>
-        {
-            SampleBlock("前奏", 0, 0, 3600, (0, new LightColor(15, 0, 0)), (1200, new LightColor(15, 8, 0))),
-            SampleBlock("副歌", 3, 900, 2700, (0, new LightColor(0, 0, 15)), (900, new LightColor(0, 15, 0))),
-            SampleBlock("扫光", 7, 1800, 1800, (0, new LightColor(8, 8, 8)), (600, new LightColor(15, 15, 15))),
-        };
-
-        TimelineMarker[] markers =
-        [
-            new(TimeSpan.FromMilliseconds(900), "前奏"),
-            new(TimeSpan.FromMilliseconds(3600), "副歌"),
-            new(TimeSpan.FromMilliseconds(7200), "结尾"),
-        ];
-
-        return new Timeline(blocks, markers);
+        get => Document;
+        set => Document = value;
     }
 
-    /// <summary>造一个样例块:内容就是给出的几个状态变化点。</summary>
-    private static Block SampleBlock(
-        string name,
-        int channel,
-        double startMilliseconds,
-        double lengthMilliseconds,
-        params (double Offset, LightColor Color)[] frames)
-        => new(
-            Block.NewId(),
-            name,
-            channel,
-            TimeSpan.FromMilliseconds(startMilliseconds),
-            TimeSpan.FromMilliseconds(lengthMilliseconds),
-            [.. frames.Select(frame => new BlockFrame(
-                TimeSpan.FromMilliseconds(frame.Offset),
-                new ChannelState(frame.Color, FlashMode.Solid)))]);
 }

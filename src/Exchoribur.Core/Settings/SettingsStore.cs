@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.Core.Settings;
 
@@ -12,6 +13,9 @@ public static class SettingsStore
     {
         WriteIndented = true,
     };
+
+    /// <summary>写临时文件用的后缀,写完整了才改名顶替正式文件。</summary>
+    private const string TemporarySuffix = ".tmp";
 
     /// <summary>系统里默认的设置文件位置(当前用户自己的配置目录)。</summary>
     public static string DefaultPath { get; } = Path.Combine(
@@ -61,15 +65,10 @@ public static class SettingsStore
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var temporaryPath = path + ".tmp";
-        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, WriteOptions));
-        File.Move(temporaryPath, path, overwrite: true);
+        AtomicFile.Write(
+            path,
+            TemporarySuffix,
+            temporary => File.WriteAllText(temporary, JsonSerializer.Serialize(settings, WriteOptions)));
     }
 
     /// <summary>

@@ -24,7 +24,12 @@ public partial class App : Application
                 new StorageProviderFilePicker(window),
                 new DispatcherPlaybackClock(),
                 new WindowNamePrompt(window),
-                new WindowUnsavedChangesPrompt(window));
+                new WindowUnsavedChangesPrompt(window),
+                settings: null,
+                audio: null,
+                updateFeed: null,
+                externalLauncher: new TopLevelExternalLauncher(window),
+                videoFactory: null);
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;
@@ -35,7 +40,7 @@ public partial class App : Application
             // 允许从命令行直接打开一个工程文件(Exchoribur.exe 演出.csv),
             // 以后做文件关联也是走这里。加载失败只在状态栏提示,不拦住启动。
             var path = desktop.Args?.FirstOrDefault(
-                argument => argument.EndsWith(".csv", StringComparison.OrdinalIgnoreCase));
+                argument => argument.EndsWith(ProjectFileExtensions.Csv, StringComparison.OrdinalIgnoreCase));
 
             if (path is not null)
             {

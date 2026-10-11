@@ -1,4 +1,4 @@
-namespace Exchoribur.Core;
+namespace Exchoribur.Core.Storage;
 
 /// <summary>
 /// 工程文件的格式约定:一个 zip 容器,里面装时间轴和参考媒体。

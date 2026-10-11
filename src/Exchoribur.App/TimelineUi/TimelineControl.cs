@@ -1,21 +1,14 @@
 using System.ComponentModel;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
 using Exchoribur.App.Controls;
-using Exchoribur.Core;
 using Exchoribur.Core.Models;
+using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.TimelineUi;
-
-/// <summary>双击空白处建块的请求。</summary>
-public sealed record BlockCreateRequest(int Channel, TimeSpan Time);
-
-/// <summary>拖动块之后要把它们整体平移多少。</summary>
-public sealed record BlockMoveRequest(TimeSpan TimeDelta, int ChannelDelta);
 
 /// <summary>
 /// 主时间轴:左侧通道名列、顶部刻度与标记、十条通道行、块、播放头。
@@ -46,58 +39,28 @@ public sealed class TimelineControl : Control
     /// <summary>指针离播放头多近算"点在播放头上"。</summary>
     private const double PlayheadHitSlack = 4;
 
-    /// <summary>
-    /// 刻度上的时间码用等宽字体:数字宽度一致,缩放或平移时标签不会左右抖。
-    /// 列表按顺序取第一个装了的,各平台都有对应的常见等宽字体。
-    /// </summary>
-    private static readonly FontFamily TimecodeFontFamily =
-        new("Cascadia Mono, Consolas, JetBrains Mono, Menlo, DejaVu Sans Mono");
-
     private static readonly IBrush GutterBackground = new SolidColorBrush(Color.Parse("#202020"));
-    private static readonly IBrush TrackBackground = new SolidColorBrush(Color.Parse("#151515"));
-    private static readonly IBrush RowBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
-    private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8A8A8A"));
     private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.Parse("#E0B457"));
     private static readonly IBrush MarkerTagBackground = new SolidColorBrush(Color.Parse("#D9241C0E"));
     private static readonly IBrush UnplayableMask = new SolidColorBrush(Color.Parse("#8C808080"));
-    private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#FF5A36"));
-
-    /// <summary>块的底色:暗灰,不跟里面的灯光抢注意力。</summary>
-    private static readonly IBrush BlockFill = new SolidColorBrush(Color.Parse("#2E2E2E"));
-
-    /// <summary>块顶部的标题栏:比主体亮一点点。</summary>
-    private static readonly IBrush BlockTitleFill = new SolidColorBrush(Color.Parse("#3A3A3A"));
-
-    private static readonly IBrush BlockText = new SolidColorBrush(Color.Parse("#D0D0D0"));
 
     /// <summary>框选时那块半透明的白。</summary>
     private static readonly IBrush BoxSelectionFill = new SolidColorBrush(Color.Parse("#26FFFFFF"));
 
-    private static readonly IPen BlockPen = new Pen(new SolidColorBrush(Color.Parse("#3F3F3F")), 1);
     private static readonly IPen SelectedBlockPen = new Pen(new SolidColorBrush(Colors.White), 2);
-    private static readonly IPen CurrentBlockPen = new Pen(new SolidColorBrush(Color.Parse("#FF5A36")), 2);
     private static readonly IPen BoxSelectionPen = new Pen(new SolidColorBrush(Color.Parse("#CCFFFFFF")), 1.5);
-    private static readonly IPen PlayheadPen = new Pen(PlayheadBrush, 1.5);
     private static readonly IPen MarkerLinePen = new Pen(new SolidColorBrush(Color.Parse("#66E0B457")), 1);
-    private static readonly IPen RowSeparatorPen = new Pen(new SolidColorBrush(Color.Parse("#2A2A2A")), 1);
-    private static readonly IPen GutterDividerPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")), 1);
 
     // 每次重画都要用、但值不会变的东西缓存起来少做重复功。
-    private readonly Dictionary<uint, IBrush> _brushCache = [];
+    private readonly TimelineBrushCache _brushes = new();
     /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
     private readonly List<BlockColorRun> _colorRuns = [];
-    private readonly Dictionary<(string Text, double Size), FormattedText> _dimTextCache = [];
-    private readonly Dictionary<(string Text, double Size), FormattedText> _blockTextCache = [];
-    private readonly Dictionary<string, FormattedText> _markerTextCache = [];
+    private readonly TimelineTextCache _text = new(TextCacheLimit);
 
     /// <summary>标尺带上用"左右拖动"的光标提示这里能拖播放头。</summary>
     private static readonly Cursor ScrubCursor = new(StandardCursorType.SizeWestEast);
     private static readonly Cursor DefaultCursor = new(StandardCursorType.Hand);
     private bool _showingScrubCursor;
-
-    private FontFamily? _cachedFontFamily;
-    private Typeface _uiTypeface = Typeface.Default;
-    private readonly Typeface _timecodeTypeface = new(TimecodeFontFamily);
 
     private bool _isScrubbing;
     private bool _isPanning;
@@ -333,25 +296,11 @@ public sealed class TimelineControl : Control
 
         // 左侧通道名列再铺一层不透明的底:它永远是最下层。
         context.FillRectangle(GutterBackground, new Rect(0, 0, TimelineLayout.TrackLeft, height));
-        context.FillRectangle(TrackBackground, trackRect);
+        context.FillRectangle(TimelinePalette.TrackBackground, trackRect);
 
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
-        {
-            var y = TimelineLayout.RulerHeight + (channel * rowHeight) - _vertical.Offset;
-
-            // 滚出去的整行不画。
-            if (y + rowHeight < TimelineLayout.RulerHeight || y > height)
-            {
-                continue;
-            }
-
-            context.FillRectangle(
-                RowBackground,
-                new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
-        }
+        DrawChannelRows(context, trackWidth, rowHeight, height);
 
         var blocks = Blocks;
-        var hasBlocks = blocks is { Count: > 0 };
 
         if (blocks is { Count: > 0 } && Viewport is { Scale: > 0 } viewport)
         {
@@ -376,6 +325,50 @@ public sealed class TimelineControl : Control
         }
 
         // 通道名和分隔线最后画,保证永远在最上层。
+        DrawChannelLabels(context, rowHeight, width, height);
+
+        context.DrawLine(
+            TimelinePalette.GutterDividerPen,
+            new Point(TimelineLayout.TrackLeft, 0),
+            new Point(TimelineLayout.TrackLeft, height));
+
+        if (blocks is not { Count: > 0 })
+        {
+            context.DrawText(
+                GetDimText("双击空白处新建编排块", 12),
+                new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
+        }
+    }
+
+    /// <summary>通道行的底色。滚出去的整行不画。</summary>
+    private void DrawChannelRows(
+        DrawingContext context,
+        double trackWidth,
+        double rowHeight,
+        double height)
+    {
+        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        {
+            var y = TimelineLayout.RulerHeight + (channel * rowHeight) - _vertical.Offset;
+
+            if (y + rowHeight < TimelineLayout.RulerHeight || y > height)
+            {
+                continue;
+            }
+
+            context.FillRectangle(
+                TimelinePalette.RowBackground,
+                new Rect(TimelineLayout.TrackLeft, y, trackWidth, Math.Max(0, rowHeight - 1)));
+        }
+    }
+
+    /// <summary>左侧的通道名和行分隔线。它们永远画在最上层。</summary>
+    private void DrawChannelLabels(
+        DrawingContext context,
+        double rowHeight,
+        double width,
+        double height)
+    {
         for (var channel = 0; channel < Frame.ChannelCount; channel++)
         {
             var y = TimelineLayout.RulerHeight + (channel * rowHeight) - _vertical.Offset;
@@ -389,19 +382,7 @@ public sealed class TimelineControl : Control
                 GetDimText($"CH{channel}", 11.5),
                 new Point(10, y + (rowHeight / 2) - 7.5));
 
-            context.DrawLine(RowSeparatorPen, new Point(0, y), new Point(width, y));
-        }
-
-        context.DrawLine(
-            GutterDividerPen,
-            new Point(TimelineLayout.TrackLeft, 0),
-            new Point(TimelineLayout.TrackLeft, height));
-
-        if (!hasBlocks)
-        {
-            context.DrawText(
-                GetDimText("双击空白处新建编排块", 12),
-                new Point(TimelineLayout.TrackLeft + 12, TimelineLayout.RulerHeight + 12));
+            context.DrawLine(TimelinePalette.RowSeparatorPen, new Point(0, y), new Point(width, y));
         }
     }
 
@@ -447,11 +428,11 @@ public sealed class TimelineControl : Control
             var pen = SelectedBlockPen;
             if (CurrentBlockId == block.Id)
             {
-                pen = CurrentBlockPen;
+                pen = TimelinePalette.CurrentBlockPen;
             }
             else if (selected is null || !selected.Contains(block))
             {
-                pen = BlockPen;
+                pen = TimelinePalette.BlockPen;
             }
 
             context.DrawRectangle(null, pen, rect, BlockCornerRadius, BlockCornerRadius);
@@ -473,7 +454,9 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        context.FillRectangle(BlockFill, new Rect(rect.X, bodyTop, rect.Width, bodyHeight));
+        context.FillRectangle(
+            TimelinePalette.BlockFill,
+            new Rect(rect.X, bodyTop, rect.Width, bodyHeight));
 
         // 只画落在轨道区里的列:块可能长达几小时,整块逐像素画会拖垮一帧。
         _colorRuns.Clear();
@@ -487,7 +470,7 @@ public sealed class TimelineControl : Control
         foreach (var run in _colorRuns)
         {
             context.FillRectangle(
-                BrushFor(ColorKey(run.Color)),
+                _brushes.For(run.Color),
                 new Rect(run.X, bodyTop, run.Width, bodyHeight));
         }
     }
@@ -501,7 +484,7 @@ public sealed class TimelineControl : Control
         }
 
         var titleRect = new Rect(rect.X, rect.Y, rect.Width, Math.Min(BlockTitleHeight, rect.Height));
-        context.FillRectangle(BlockTitleFill, titleRect);
+        context.FillRectangle(TimelinePalette.BlockTitleFill, titleRect);
 
         if (rect.Width < 30)
         {
@@ -521,27 +504,31 @@ public sealed class TimelineControl : Control
         TimelineViewport viewport,
         double rowHeight)
     {
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
+        // 一次按通道分组,而不是每条通道都把整表重扫一遍——块多的时候那是平方级的。
+        foreach (var onChannel in blocks.GroupBy(block => block.Channel))
         {
-            var onChannel = blocks.Where(block => block.Channel == channel).ToList();
-            if (onChannel.Count < 2)
+            var overlapping = onChannel.ToArray();
+            if (overlapping.Length < 2)
             {
                 continue;
             }
 
-            var top = TimelineLayout.RulerHeight + (channel * rowHeight) + BlockInset - _vertical.Offset;
+            var top = TimelineLayout.RulerHeight
+                + (onChannel.Key * rowHeight)
+                + BlockInset
+                - _vertical.Offset;
             var height = Math.Max(6, rowHeight - (BlockInset * 2));
 
-            for (var first = 0; first < onChannel.Count; first++)
+            for (var first = 0; first < overlapping.Length; first++)
             {
-                for (var second = first + 1; second < onChannel.Count; second++)
+                for (var second = first + 1; second < overlapping.Length; second++)
                 {
-                    var start = onChannel[first].Start > onChannel[second].Start
-                        ? onChannel[first].Start
-                        : onChannel[second].Start;
-                    var end = onChannel[first].End < onChannel[second].End
-                        ? onChannel[first].End
-                        : onChannel[second].End;
+                    var start = overlapping[first].Start > overlapping[second].Start
+                        ? overlapping[first].Start
+                        : overlapping[second].Start;
+                    var end = overlapping[first].End < overlapping[second].End
+                        ? overlapping[first].End
+                        : overlapping[second].End;
 
                     if (end <= start)
                     {
@@ -662,7 +649,7 @@ public sealed class TimelineControl : Control
         var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
 
         context.DrawLine(
-            PlayheadPen,
+            TimelinePalette.PlayheadPen,
             new Point(x, TimelineLayout.TimecodeBandHeight),
             new Point(x, Bounds.Height));
 
@@ -682,7 +669,7 @@ public sealed class TimelineControl : Control
             figure.EndFigure(true);
         }
 
-        context.DrawGeometry(PlayheadBrush, null, geometry);
+        context.DrawGeometry(TimelinePalette.PlayheadFill, null, geometry);
     }
 
     private void DrawTimeRuler(DrawingContext context, TimelineViewport viewport)
@@ -707,7 +694,7 @@ public sealed class TimelineControl : Control
             var x = TimelineLayout.TrackLeft + viewport.MapTime(time);
 
             context.DrawLine(
-                RowSeparatorPen,
+                TimelinePalette.RowSeparatorPen,
                 new Point(x, TimelineLayout.TimecodeBandHeight - 4),
                 new Point(x, TimelineLayout.TimecodeBandHeight));
 
@@ -1029,16 +1016,7 @@ public sealed class TimelineControl : Control
     // ---- 框选 ----
 
     private Rect BoxRect()
-    {
-        var left = Math.Min(_boxStart.X, _boxCurrent.X);
-        var top = Math.Min(_boxStart.Y, _boxCurrent.Y);
-
-        return new Rect(
-            left,
-            top,
-            Math.Abs(_boxCurrent.X - _boxStart.X),
-            Math.Abs(_boxCurrent.Y - _boxStart.Y));
-    }
+        => TimelineGeometry.SelectionBox(_boxStart, _boxCurrent);
 
     private void ApplyBoxSelection()
     {
@@ -1079,58 +1057,18 @@ public sealed class TimelineControl : Control
             return null;
         }
 
-        var rowHeight = RowHeight;
-
-        // 后画的在上面,所以从后往前找。
-        for (var index = blocks.Count - 1; index >= 0; index--)
-        {
-            // 按整行判定:块画面上上下各留了 2 像素空隙,点在空隙里也算点在这块上,
-            // 不然贴着行边界一点就会被当成"点空白",顺手建出一个新块。
-            if (BlockRowRect(blocks[index], viewport, rowHeight).Contains(position))
-            {
-                return blocks[index];
-            }
-        }
-
-        return null;
+        // 按整行判定:块画面上上下各留了 2 像素空隙,点在空隙里也算点在这块上,
+        // 不然贴着行边界一点就会被当成"点空白",顺手建出一个新块。
+        return TimelineGeometry.HitTestBlock(blocks, position, viewport, RowHeight, _vertical.Offset);
     }
 
     /// <summary>块所在的整行矩形:命中判定和框选用它(比画出来的块略高一点)。</summary>
     private Rect BlockRowRect(Block block, TimelineViewport viewport, double rowHeight)
-    {
-        var x0 = TimelineLayout.TrackLeft + viewport.MapTime(block.Start);
-        var x1 = TimelineLayout.TrackLeft + viewport.MapTime(block.End);
-
-        return new Rect(
-            x0,
-            TimelineLayout.RulerHeight + (block.Channel * rowHeight) - _vertical.Offset,
-            Math.Max(3, x1 - x0),
-            Math.Max(6, rowHeight));
-    }
-
-    private Rect BlockRect(Block block, TimelineViewport viewport, double rowHeight)
-    {
-        var x0 = TimelineLayout.TrackLeft + viewport.MapTime(block.Start);
-        var x1 = TimelineLayout.TrackLeft + viewport.MapTime(block.End);
-
-        return new Rect(
-            x0,
-            TimelineLayout.RulerHeight + (block.Channel * rowHeight) + BlockInset - _vertical.Offset,
-            Math.Max(3, x1 - x0),
-            Math.Max(6, rowHeight - (BlockInset * 2)));
-    }
+        => TimelineGeometry.BlockRowRect(block, viewport, rowHeight, _vertical.Offset);
 
     /// <summary>块标题栏的下边缘:指针在这条线以下才算"点在下半部分"。</summary>
     private double BlockTitleBottom(Block block)
-    {
-        var rowHeight = RowHeight;
-
-        return TimelineLayout.RulerHeight
-            + (block.Channel * rowHeight)
-            + BlockInset
-            + BlockTitleHeight
-            - _vertical.Offset;
-    }
+        => TimelineGeometry.BlockTitleBottom(block, RowHeight, _vertical.Offset, BlockInset, BlockTitleHeight);
 
     /// <summary>横坐标对应的时间,夹在时间轴范围内。</summary>
     private TimeSpan TimeAt(double x)
@@ -1140,42 +1078,18 @@ public sealed class TimelineControl : Control
             return TimeSpan.Zero;
         }
 
-        var time = viewport.MapX(x - TimelineLayout.TrackLeft);
-        var first = blocks.Min(block => block.Start);
-        var last = blocks.Max(block => block.End);
+        var (first, last) = TimelineGeometry.ContentRange(blocks);
 
-        if (time < first)
-        {
-            return first;
-        }
-
-        return time > last ? last : time;
+        return TimelineGeometry.ClampToContent(TimelineGeometry.TimeAt(x, viewport), first, last);
     }
 
     /// <summary>纵坐标对应的通道行。</summary>
     private int ChannelAt(double y)
-    {
-        var rowHeight = RowHeight;
-
-        if (rowHeight <= 0)
-        {
-            return 0;
-        }
-
-        var index = (int)((y - TimelineLayout.RulerHeight + _vertical.Offset) / rowHeight);
-        return Math.Clamp(index, 0, Frame.ChannelCount - 1);
-    }
+        => TimelineGeometry.ChannelAt(y, RowHeight, _vertical.Offset);
 
     private bool IsOnPlayhead(double x)
-    {
-        if (Viewport is not { } viewport)
-        {
-            return false;
-        }
-
-        var playheadX = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
-        return Math.Abs(x - playheadX) <= PlayheadHitSlack;
-    }
+        => Viewport is { } viewport
+            && TimelineGeometry.IsNearPlayhead(x, viewport, PlayheadTime, PlayheadHitSlack);
 
     /// <summary>把点击位置换成时间写回 PlayheadTime;按住拖动时会一直被调用。</summary>
     private void SeekTo(double x)
@@ -1186,7 +1100,7 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        PlayheadTime = viewport.MapX(x - TimelineLayout.TrackLeft);
+        PlayheadTime = TimelineGeometry.TimeAt(x, viewport);
     }
 
     // ---- 文字与颜色缓存 ----
@@ -1194,93 +1108,14 @@ public sealed class TimelineControl : Control
     private FormattedText GetTickText(string text) => GetDimText(text, 11);
 
     private FormattedText GetDimText(string text, double size)
-    {
-        if (_dimTextCache.TryGetValue((text, size), out var formatted))
-        {
-            return formatted;
-        }
-
-        if (_dimTextCache.Count >= TextCacheLimit)
-        {
-            _dimTextCache.Clear();
-        }
-
-        formatted = CreateText(text, size, DimText, _uiTypeface);
-        _dimTextCache[(text, size)] = formatted;
-        return formatted;
-    }
+        => _text.Get(text, size, TimelinePalette.DimText);
 
     private FormattedText GetBlockText(string text, double size)
-    {
-        if (_blockTextCache.TryGetValue((text, size), out var formatted))
-        {
-            return formatted;
-        }
-
-        if (_blockTextCache.Count >= TextCacheLimit)
-        {
-            _blockTextCache.Clear();
-        }
-
-        formatted = CreateText(text, size, BlockText, _uiTypeface);
-        _blockTextCache[(text, size)] = formatted;
-        return formatted;
-    }
+        => _text.Get(text, size, TimelinePalette.BlockText);
 
     private FormattedText GetMarkerText(string text)
-    {
-        if (_markerTextCache.TryGetValue(text, out var formatted))
-        {
-            return formatted;
-        }
-
-        if (_markerTextCache.Count >= TextCacheLimit)
-        {
-            _markerTextCache.Clear();
-        }
-
-        formatted = CreateText(text, 11, MarkerBrush, _uiTypeface);
-        _markerTextCache[text] = formatted;
-        return formatted;
-    }
-
-    private static FormattedText CreateText(string text, double size, IBrush brush, Typeface typeface)
-        => new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, size, brush);
+        => _text.Get(text, 11, MarkerBrush);
 
     /// <summary>窗口上的字体可能变,变了就把排好版的文字丢掉重来。</summary>
-    private void UpdateTypeface()
-    {
-        var family = TextElement.GetFontFamily(this);
-        if (ReferenceEquals(family, _cachedFontFamily))
-        {
-            return;
-        }
-
-        _cachedFontFamily = family;
-        _uiTypeface = new Typeface(family);
-        _dimTextCache.Clear();
-        _blockTextCache.Clear();
-        _markerTextCache.Clear();
-    }
-
-    /// <summary>四位分量压成一个整数,比较颜色和查表都方便。</summary>
-    private static uint ColorKey(LightColor color)
-        => (uint)((color.Red << 8) | (color.Green << 4) | color.Blue);
-
-    private IBrush BrushFor(uint colorKey)
-    {
-        if (!_brushCache.TryGetValue(colorKey, out var brush))
-        {
-            brush = new SolidColorBrush(ToColor(colorKey));
-            _brushCache[colorKey] = brush;
-        }
-
-        return brush;
-    }
-
-    private static Color ToColor(uint colorKey)
-        => Color.FromRgb(
-            (byte)(((colorKey >> 8) & 0xF) * 17),
-            (byte)(((colorKey >> 4) & 0xF) * 17),
-            (byte)((colorKey & 0xF) * 17));
+    private void UpdateTypeface() => _text.UseTypeface(TextElement.GetFontFamily(this));
 }

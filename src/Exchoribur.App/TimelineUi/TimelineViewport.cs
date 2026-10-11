@@ -1,4 +1,4 @@
-using System.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Exchoribur.App.TimelineUi;
 
@@ -11,7 +11,7 @@ namespace Exchoribur.App.TimelineUi;
 /// 这里只处理"轨道内部的像素",不算左边留给通道名的留白;
 /// 控件自己减掉 <see cref="TimelineLayout.TrackLeft"/> 再传进来。
 /// </remarks>
-public sealed class TimelineViewport : INotifyPropertyChanged
+public sealed class TimelineViewport : ObservableObject
 {
     /// <summary>放大上限:每秒钟占 2000 像素(1 像素 ≈ 0.5 毫秒),再放大也没有信息可看。</summary>
     private const double MaxPixelsPerSecond = 2000;
@@ -30,8 +30,6 @@ public sealed class TimelineViewport : INotifyPropertyChanged
 
     /// <summary>还没手动缩放时保持"整条铺满",窗口变大变小都自动跟着重算。</summary>
     private bool _isFitToWidth = true;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>整条时间轴的总长。</summary>
     public TimeSpan Duration => _duration;
@@ -268,7 +266,7 @@ public sealed class TimelineViewport : INotifyPropertyChanged
 
     private void RaiseChanged()
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Start)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Scale)));
+        OnPropertyChanged(nameof(Start));
+        OnPropertyChanged(nameof(Scale));
     }
 }

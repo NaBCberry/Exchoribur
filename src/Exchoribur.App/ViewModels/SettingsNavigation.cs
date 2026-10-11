@@ -1,6 +1,6 @@
-using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Exchoribur.App.Controls;
 
 namespace Exchoribur.App.ViewModels;
 
@@ -51,7 +51,7 @@ public sealed partial class SettingsGroupItem : ObservableObject
 
     public SettingsGroupItem(
         string title,
-        Geometry icon,
+        IconShape icon,
         IReadOnlyList<SettingsPageItem> pages,
         Action<SettingsGroupItem> select)
     {
@@ -64,7 +64,11 @@ public sealed partial class SettingsGroupItem : ObservableObject
 
     public string Title { get; }
 
-    public Geometry Icon { get; }
+    /// <summary>
+    /// 这个分类的图标标识。存标识而不是图形:图形要靠渲染平台才建得出来,
+    /// 存进来之后视图模型就没法脱离界面测试了。
+    /// </summary>
+    public IconShape Icon { get; }
 
     public IReadOnlyList<SettingsPageItem> Pages { get; }
 

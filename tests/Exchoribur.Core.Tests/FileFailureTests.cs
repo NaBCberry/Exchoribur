@@ -25,9 +25,10 @@ public sealed class FileFailureTests : IDisposable
         Assert.Equal(FileFailureReason.InUse, FileFailure.Classify(exception));
     }
 
-    [Fact]
+    [WindowsFact]
     public void System_error_codes_map_to_reasons()
     {
+        // 这几个是 Windows 的错误码;同一串数字在 Unix 上是别的含义,查表要分平台。
         // 0x80070020 共享冲突、0x80070021 区域被锁、0x80070005 拒绝访问、0x80070070 磁盘满。
         Assert.Equal(FileFailureReason.InUse, Classify(unchecked((int)0x80070020)));
         Assert.Equal(FileFailureReason.InUse, Classify(unchecked((int)0x80070021)));

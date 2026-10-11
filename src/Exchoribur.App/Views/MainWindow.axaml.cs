@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Exchoribur.App.Controls;
+using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
@@ -24,7 +25,12 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
         Closing += OnClosing;
+        Closed += OnClosed;
     }
+
+    /// <summary>窗口关了就放掉懒创建的播放器,别把解码线程和固定住的内存留着。</summary>
+    private void OnClosed(object? sender, EventArgs e)
+        => (DataContext as MainViewModel)?.Dispose();
 
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
 
@@ -128,7 +134,8 @@ public partial class MainWindow : Window
         foreach (var file in e.DataTransfer.TryGetFiles() ?? [])
         {
             var path = file.TryGetLocalPath();
-            if (path is not null && path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            if (path is not null
+                && path.EndsWith(ProjectFileExtensions.Csv, StringComparison.OrdinalIgnoreCase))
             {
                 return path;
             }
