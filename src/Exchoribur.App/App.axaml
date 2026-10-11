@@ -1,7 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Exchoribur.App.App"
-             xmlns:local="using:Exchoribur.App"
              xmlns:converters="using:Exchoribur.App.Converters"
              RequestedThemeVariant="Dark">
              <!-- 配色是照深色界面调的,所以固定用 Dark,避免系统是浅色主题时菜单、
@@ -13,10 +12,6 @@
             <converters:IconShapeConverter x:Key="IconShapeConverter" />
         </ResourceDictionary>
     </Application.Resources>
-
-    <Application.DataTemplates>
-        <local:ViewLocator />
-    </Application.DataTemplates>
 
     <Application.Styles>
         <FluentTheme />
