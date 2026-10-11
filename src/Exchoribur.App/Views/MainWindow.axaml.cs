@@ -32,6 +32,30 @@ public partial class MainWindow : Window
     private void OnClosed(object? sender, EventArgs e)
         => (DataContext as MainViewModel)?.Dispose();
 
+    /// <summary>
+    /// 空格是播放 / 暂停。这条没写进窗口的 KeyBindings:那里的绑定在事件走到输入框之前
+    /// 就被处理掉,焦点在输入框里时也照样触发,空格就打不出来了。放这里先看焦点在哪。
+    /// </summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None || IsTyping(e.Source))
+        {
+            return;
+        }
+
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.TogglePlayCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>焦点是不是在能打字的控件上(数字输入框内部也是输入框)。</summary>
+    private bool IsTyping(object? source)
+        => source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
+
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
 
     /// <summary>

@@ -676,7 +676,7 @@
     <value>跳到结尾</value>
   </data>
   <data name="MainTooltipPlayPause" xml:space="preserve">
-    <value>播放 / 暂停</value>
+    <value>播放 / 暂停 (空格)</value>
   </data>
   <data name="MainTooltipStop" xml:space="preserve">
     <value>停止</value>
