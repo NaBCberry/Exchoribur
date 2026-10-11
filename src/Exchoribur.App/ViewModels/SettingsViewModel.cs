@@ -343,7 +343,8 @@ public partial class SettingsViewModel : ViewModelBase
     public string AppName => "Exchoribur";
     public string BuildConfigurationText => AppVersion.Configuration;
     public string ProjectUrl => VelopackUpdateFeed.RepositoryUrl;
-    public string LicenseText => "尚未决定";
+    public string LicenseText => "MIT";
+    public string CopyrightText => "© 2026 NaBCberry";
 
     /// <summary>打开项目主页。</summary>
     [RelayCommand]
@@ -362,6 +363,16 @@ public partial class SettingsViewModel : ViewModelBase
         if (_externalLauncher is { } launcher)
         {
             await launcher.OpenFileAsync(Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md"));
+        }
+    }
+
+    /// <summary>用系统默认程序打开随程序发布的 MIT 许可全文。</summary>
+    [RelayCommand]
+    private async Task OpenLicenseAsync()
+    {
+        if (_externalLauncher is { } launcher)
+        {
+            await launcher.OpenFileAsync(Path.Combine(AppContext.BaseDirectory, "LICENSE"));
         }
     }
 

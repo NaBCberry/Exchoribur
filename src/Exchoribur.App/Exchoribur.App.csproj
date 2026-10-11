@@ -14,7 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 关于页要能打开这两份声明,所以随程序一起发出去 -->
+    <!-- 关于页要能打开这三份声明,所以随程序一起发出去 -->
+    <Content Include="..\..\LICENSE"
+             Link="LICENSE"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\THIRD-PARTY-NOTICES.md"
              Link="THIRD-PARTY-NOTICES.md"
              CopyToOutputDirectory="PreserveNewest" />

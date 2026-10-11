@@ -28,6 +28,12 @@
                                Classes="rowValue"
                                Text="{Binding LicenseText}" />
                 </Grid>
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="版权" />
+                    <TextBlock Grid.Column="1"
+                               Classes="rowValue"
+                               Text="{Binding CopyrightText}" />
+                </Grid>
             </StackPanel>
         </Border>
 
@@ -37,6 +43,9 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="打开项目主页"
                             Command="{Binding OpenProjectUrlCommand}"
+                            Padding="12,4" />
+                    <Button Content="许可证全文"
+                            Command="{Binding OpenLicenseCommand}"
                             Padding="12,4" />
                     <Button Content="第三方组件声明"
                             Command="{Binding OpenNoticesCommand}"
