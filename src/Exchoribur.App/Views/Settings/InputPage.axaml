@@ -1,15 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
              x:Class="Exchoribur.App.Views.Settings.InputPage"
              x:DataType="vm:SettingsViewModel">
 
     <StackPanel Spacing="10">
         <Border Classes="settingsGroup">
             <StackPanel Spacing="2">
-                <CheckBox Content="反转鼠标滚轮方向"
+                <CheckBox Content="{x:Static res:Strings.SettingsInputInvertWheel}"
                           IsChecked="{Binding InvertMouseWheel}" />
-                <CheckBox Content="反转触摸板横向滑动方向"
+                <CheckBox Content="{x:Static res:Strings.SettingsInputInvertTouchpad}"
                           Margin="0,8,0,0"
                           IsChecked="{Binding InvertTouchpadScroll}" />
             </StackPanel>

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:Exchoribur.App.Controls"
              xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
              mc:Ignorable="d" d:DesignWidth="210" d:DesignHeight="560"
              x:Class="Exchoribur.App.Views.ColorPanelView"
              x:DataType="vm:MainViewModel">
@@ -30,25 +31,25 @@
 
     <ScrollViewer>
         <StackPanel Margin="10" Spacing="9">
-            <TextBlock Classes="panelTitle" Text="颜色" />
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.ColorPanelTitle}" />
 
             <!-- 常用色:白 黄 蓝 橙 绿 红 黑 灰 -->
             <UniformGrid Columns="4" Rows="2">
-                <Button Classes="swatch" Background="#FFFFFF" ToolTip.Tip="白色"
+                <Button Classes="swatch" Background="#FFFFFF" ToolTip.Tip="{x:Static res:Strings.ColorPresetWhite}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#FFFFFF" />
-                <Button Classes="swatch" Background="#FFFF00" ToolTip.Tip="黄色"
+                <Button Classes="swatch" Background="#FFFF00" ToolTip.Tip="{x:Static res:Strings.ColorPresetYellow}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#FFFF00" />
-                <Button Classes="swatch" Background="#0000FF" ToolTip.Tip="蓝色"
+                <Button Classes="swatch" Background="#0000FF" ToolTip.Tip="{x:Static res:Strings.ColorPresetBlue}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#0000FF" />
-                <Button Classes="swatch" Background="#FF7F00" ToolTip.Tip="橙色"
+                <Button Classes="swatch" Background="#FF7F00" ToolTip.Tip="{x:Static res:Strings.ColorPresetOrange}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#FF7F00" />
-                <Button Classes="swatch" Background="#00FF00" ToolTip.Tip="绿色"
+                <Button Classes="swatch" Background="#00FF00" ToolTip.Tip="{x:Static res:Strings.ColorPresetGreen}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#00FF00" />
-                <Button Classes="swatch" Background="#FF0000" ToolTip.Tip="红色"
+                <Button Classes="swatch" Background="#FF0000" ToolTip.Tip="{x:Static res:Strings.ColorPresetRed}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#FF0000" />
-                <Button Classes="swatch" Background="#000000" ToolTip.Tip="黑色"
+                <Button Classes="swatch" Background="#000000" ToolTip.Tip="{x:Static res:Strings.ColorPresetBlack}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#000000" />
-                <Button Classes="swatch" Background="#808080" ToolTip.Tip="灰色"
+                <Button Classes="swatch" Background="#808080" ToolTip.Tip="{x:Static res:Strings.ColorPresetGray}"
                         Command="{Binding Color.SetPresetCommand}" CommandParameter="#808080" />
             </UniformGrid>
 
@@ -60,8 +61,8 @@
 
             <!-- Hex 输入 + 预览:井号是框外的标签,框里只有六位 -->
             <Grid ColumnDefinitions="Auto,Auto,*,26">
-                <TextBlock Text="Hex:" Classes="note" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <TextBlock Grid.Column="1" Text="#" Classes="note"
+                <TextBlock Text="{x:Static res:Strings.ColorPanelHexLabel}" Classes="note" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Grid.Column="1" Text="{x:Static res:Strings.ColorPanelHashLabel}" Classes="note"
                            VerticalAlignment="Center" Margin="0,0,4,0" />
                 <TextBox Grid.Column="2"
                          Classes="value"
@@ -78,7 +79,7 @@
 
             <!-- 八位 R/G/B:数值框 + 滑块 -->
             <Grid ColumnDefinitions="14,44,*" RowDefinitions="Auto,Auto,Auto">
-                <TextBlock Text="R" Classes="note" VerticalAlignment="Center" />
+                <TextBlock Text="{x:Static res:Strings.ColorChannelRed}" Classes="note" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Classes="value" Margin="0,2"
                          Text="{Binding Color.RedText}" />
                 <Slider Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
@@ -86,7 +87,7 @@
                         SmallChange="1" LargeChange="16"
                         Margin="6,0,0,0" Value="{Binding Color.Red}" />
 
-                <TextBlock Grid.Row="1" Text="G" Classes="note" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="{x:Static res:Strings.ColorChannelGreen}" Classes="note" VerticalAlignment="Center" />
                 <TextBox Grid.Row="1" Grid.Column="1" Classes="value" Margin="0,2"
                          Text="{Binding Color.GreenText}" />
                 <Slider Grid.Row="1" Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
@@ -94,7 +95,7 @@
                         SmallChange="1" LargeChange="16"
                         Margin="6,0,0,0" Value="{Binding Color.Green}" />
 
-                <TextBlock Grid.Row="2" Text="B" Classes="note" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="2" Text="{x:Static res:Strings.ColorChannelBlue}" Classes="note" VerticalAlignment="Center" />
                 <TextBox Grid.Row="2" Grid.Column="1" Classes="value" Margin="0,2"
                          Text="{Binding Color.BlueText}" />
                 <Slider Grid.Row="2" Grid.Column="2" Classes="inline" Minimum="0" Maximum="255"
@@ -106,7 +107,7 @@
             <Separator Margin="0,2" />
 
             <!-- 真正会输出的四位值:三个框一样宽,通道名标在下面,不挤 -->
-            <TextBlock Classes="panelTitle" Text="实际输出(四位 0-15)" />
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.ColorPanelOutputTitle}" />
             <Grid ColumnDefinitions="26,*,*,*" RowDefinitions="Auto,Auto">
                 <Border Width="26"
                         Height="26"
@@ -122,21 +123,21 @@
                         Text="{Binding Color.FourBitBlueText}" />
 
                 <TextBlock Grid.Row="1" Grid.Column="1" Classes="note"
-                           Text="R" HorizontalAlignment="Center" Margin="6,2,0,0" />
+                           Text="{x:Static res:Strings.ColorChannelRed}" HorizontalAlignment="Center" Margin="6,2,0,0" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Classes="note"
-                           Text="G" HorizontalAlignment="Center" Margin="6,2,0,0" />
+                           Text="{x:Static res:Strings.ColorChannelGreen}" HorizontalAlignment="Center" Margin="6,2,0,0" />
                 <TextBlock Grid.Row="1" Grid.Column="3" Classes="note"
-                           Text="B" HorizontalAlignment="Center" Margin="6,2,0,0" />
+                           Text="{x:Static res:Strings.ColorChannelBlue}" HorizontalAlignment="Center" Margin="6,2,0,0" />
             </Grid>
 
-            <Button Content="应用到选中帧"
+            <Button Content="{x:Static res:Strings.ColorPanelApplyButton}"
                     Margin="0,4,0,0"
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
                     Command="{Binding ApplyEditorColorCommand}" />
 
             <TextBlock Classes="note"
-                       Text="选中的是哪几帧、哪几个通道,就改哪些;模式保持原样,可以 Ctrl+Z 撤销。" />
+                       Text="{x:Static res:Strings.ColorPanelApplyHint}" />
         </StackPanel>
     </ScrollViewer>
 

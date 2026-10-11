@@ -59,4 +59,7 @@ dotnet run --project src/Exchoribur.App   # 启动应用
 
 ## 许可
 
-尚未决定,当前默认保留所有权利。
+MIT License,全文见 [LICENSE](LICENSE)。分发时保留版权声明与许可文本即可。
+
+功能来源与第三方组件的声明见 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) 和
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

@@ -1,0 +1,717 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Exchoribur</value>
+  </data>
+  <data name="MainStatusEmpty" xml:space="preserve">
+    <value>还没有载入工程文件,用「文件 → 打开」选一个 CSV。</value>
+  </data>
+  <data name="MainWindowTitleFormat" xml:space="preserve">
+    <value>{0} — Exchoribur</value>
+  </data>
+  <data name="MainWindowTitleModifiedFormat" xml:space="preserve">
+    <value>*{0} — Exchoribur</value>
+  </data>
+  <data name="MainLabelUndo" xml:space="preserve">
+    <value>撤销</value>
+  </data>
+  <data name="MainLabelRedo" xml:space="preserve">
+    <value>重做</value>
+  </data>
+  <data name="MainMenuUndoFormat" xml:space="preserve">
+    <value>撤销 {0}</value>
+  </data>
+  <data name="MainMenuRedoFormat" xml:space="preserve">
+    <value>重做 {0}</value>
+  </data>
+  <data name="MainUndoDoneFormat" xml:space="preserve">
+    <value>已撤销:{0}。</value>
+  </data>
+  <data name="MainRedoDoneFormat" xml:space="preserve">
+    <value>已重做:{0}。</value>
+  </data>
+  <data name="MainBlockEditorTitleFormat" xml:space="preserve">
+    <value>{0} · CH{1} · 选中 {2} 帧</value>
+  </data>
+  <data name="MainUpdateAvailableFormat" xml:space="preserve">
+    <value>发现新版本 v{0}</value>
+  </data>
+  <data name="MainUpdateDownloadingFormat" xml:space="preserve">
+    <value>正在下载 v{0}…{1}%</value>
+  </data>
+  <data name="MainUpdateReadyFormat" xml:space="preserve">
+    <value>v{0} 已下载,重启后生效</value>
+  </data>
+  <data name="MainVideoUnavailableFormat" xml:space="preserve">
+    <value>视频预览不可用:{0}</value>
+  </data>
+  <data name="MainVideoOpenFailedFormat" xml:space="preserve">
+    <value>打开视频 {0} 失败。</value>
+  </data>
+  <data name="MainVideoLoadedFormat" xml:space="preserve">
+    <value>已载入参考视频 {0}。</value>
+  </data>
+  <data name="MainHintSelectBlockFirst" xml:space="preserve">
+    <value>先在时间轴上选一个块。</value>
+  </data>
+  <data name="MainHintOpenBlockEditorFirst" xml:space="preserve">
+    <value>先单击一个块,打开下面的块编辑器。</value>
+  </data>
+  <data name="MainHintSelectFramesFirst" xml:space="preserve">
+    <value>先在块编辑器里选几帧。</value>
+  </data>
+  <data name="MainHintPlayheadOutsideBlock" xml:space="preserve">
+    <value>播放头不在这块里,先把它挪进来。</value>
+  </data>
+  <data name="MainHintKeepAtLeastOneFrame" xml:space="preserve">
+    <value>块里至少要留一帧,不能全删。</value>
+  </data>
+  <data name="MainPromptRenameBlock" xml:space="preserve">
+    <value>给这个块起个名字</value>
+  </data>
+  <data name="MainActionNewBlock" xml:space="preserve">
+    <value>新建块</value>
+  </data>
+  <data name="MainActionMoveBlocks" xml:space="preserve">
+    <value>移动块</value>
+  </data>
+  <data name="MainActionDeleteBlocks" xml:space="preserve">
+    <value>删除块</value>
+  </data>
+  <data name="MainActionRenameBlock" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="MainActionCopyToOtherChannels" xml:space="preserve">
+    <value>复制到其他通道</value>
+  </data>
+  <data name="MainActionLinkBlocks" xml:space="preserve">
+    <value>链接块</value>
+  </data>
+  <data name="MainActionUnlinkBlocks" xml:space="preserve">
+    <value>解除链接</value>
+  </data>
+  <data name="MainActionSetColor" xml:space="preserve">
+    <value>设置颜色</value>
+  </data>
+  <data name="MainActionTakePlayheadColor" xml:space="preserve">
+    <value>取播放头颜色</value>
+  </data>
+  <data name="MainActionInsertFrame" xml:space="preserve">
+    <value>插入帧</value>
+  </data>
+  <data name="MainActionDeleteFrames" xml:space="preserve">
+    <value>删除帧</value>
+  </data>
+  <data name="MainStatusBlockCreatedFormat" xml:space="preserve">
+    <value>已在 CH{0} 的 {1} 建了一个块。</value>
+  </data>
+  <data name="MainStatusBlocksMovedFormat" xml:space="preserve">
+    <value>已把 {0} 个块移到 {1}。</value>
+  </data>
+  <data name="MainStatusBlocksDeletedFormat" xml:space="preserve">
+    <value>已删除 {0} 个块。</value>
+  </data>
+  <data name="MainStatusBlockRenamedFormat" xml:space="preserve">
+    <value>块已改名为「{0}」。</value>
+  </data>
+  <data name="MainStatusCopiedToOtherChannelsFormat" xml:space="preserve">
+    <value>已把内容复制到其余 {0} 个通道(共 {1} 个块);和已有块重叠的地方无法播放,画成灰色。</value>
+  </data>
+  <data name="MainStatusLinkRemoved" xml:space="preserve">
+    <value>已解除这些块的链接。</value>
+  </data>
+  <data name="MainStatusLinkedFormat" xml:space="preserve">
+    <value>已把 {0} 个块链接在一起,拖动任意一个会带着其他一起动。</value>
+  </data>
+  <data name="MainStatusColorPaintedFormat" xml:space="preserve">
+    <value>已把 {0} 帧的颜色改成 R{1} G{2} B{3}。</value>
+  </data>
+  <data name="MainStatusFrameInsertedFormat" xml:space="preserve">
+    <value>已在块内 {0} 插入 1 帧。</value>
+  </data>
+  <data name="MainStatusFramesDeletedFormat" xml:space="preserve">
+    <value>已从块里删掉 {0} 帧。</value>
+  </data>
+  <data name="TimelineEmptyHint" xml:space="preserve">
+    <value>双击空白处新建编排块</value>
+  </data>
+  <data name="BlockEditorEmptyHint" xml:space="preserve">
+    <value>单击上面的块,在这里编辑它的灯光</value>
+  </data>
+  <data name="ProjectStatusNoProjectToSave" xml:space="preserve">
+    <value>还没有工程可保存，先打开工程或导入 CSV 或 视频。</value>
+  </data>
+  <data name="ProjectStatusNothingToExport" xml:space="preserve">
+    <value>还没有工程,没什么可导出的。</value>
+  </data>
+  <data name="ProjectStatusOpenedFormat" xml:space="preserve">
+    <value>已打开工程 {0}:{1:N0} 个块,{2:N0} 个标记。</value>
+  </data>
+  <data name="ProjectStatusOpenFailedFormat" xml:space="preserve">
+    <value>打开工程 {0} 失败:{1}</value>
+  </data>
+  <data name="ProjectStatusSavingFormat" xml:space="preserve">
+    <value>正在保存工程 {0}…</value>
+  </data>
+  <data name="ProjectStatusSavedFormat" xml:space="preserve">
+    <value>工程 {0}已保存。</value>
+  </data>
+  <data name="ProjectStatusSavedMissingMediaFormat" xml:space="preserve">
+    <value>工程 {0}已保存,但参考视频 {1} 丢失,视频未打包。</value>
+  </data>
+  <data name="ProjectStatusExportedFormat" xml:space="preserve">
+    <value>已导出 {0}:{1:N0} 个块,{2:N0} 个标记。</value>
+  </data>
+  <data name="ProjectStatusExportFailedFormat" xml:space="preserve">
+    <value>导出 {0} 失败:{1}</value>
+  </data>
+  <data name="ProjectStatusLoadedEmptyFormat" xml:space="preserve">
+    <value>已载入 {0},但里面没有任何灯光内容。</value>
+  </data>
+  <data name="ProjectStatusLoadedFormat" xml:space="preserve">
+    <value>已载入 {0}:{1:N0} 个块,{2:N0} 个标记,时长 {3}。</value>
+  </data>
+  <data name="ProjectStatusLoadFailedFormat" xml:space="preserve">
+    <value>打开 {0} 失败:{1}</value>
+  </data>
+  <data name="ProjectPromptNewTimeline" xml:space="preserve">
+    <value>新建时间线</value>
+  </data>
+  <data name="ProjectSaveProgressMediaFormat" xml:space="preserve">
+    <value>正在保存工程 {0}…打包参考视频 {1:F0}%</value>
+  </data>
+  <data name="ProjectSaveProgressTimelineFormat" xml:space="preserve">
+    <value>正在保存工程 {0}…整理时间轴数据</value>
+  </data>
+  <data name="ProjectSaveFailureInUse" xml:space="preserve">
+    <value>文件正被其他程序占用,关掉占用程序再试</value>
+  </data>
+  <data name="ProjectSaveFailureAccessDenied" xml:space="preserve">
+    <value>文件无法写入,文件可能只读/被占用</value>
+  </data>
+  <data name="ProjectSaveFailureDiskFull" xml:space="preserve">
+    <value>磁盘空间不够</value>
+  </data>
+  <data name="ProjectSaveFailureUnknownFormat" xml:space="preserve">
+    <value>保存工程 {0} 失败:{1}</value>
+  </data>
+  <data name="ProjectSaveFailureKnownFormat" xml:space="preserve">
+    <value>保存工程 {0} 失败:{1}。</value>
+  </data>
+  <data name="FileDialogOpenTimeline" xml:space="preserve">
+    <value>打开时间轴 CSV</value>
+  </data>
+  <data name="FileTypeTimelineCsv" xml:space="preserve">
+    <value>时间轴 CSV</value>
+  </data>
+  <data name="FileDialogImportVideo" xml:space="preserve">
+    <value>导入参考视频</value>
+  </data>
+  <data name="FileTypeVideo" xml:space="preserve">
+    <value>视频</value>
+  </data>
+  <data name="FileDialogOpenProject" xml:space="preserve">
+    <value>打开工程</value>
+  </data>
+  <data name="FileDialogSaveProject" xml:space="preserve">
+    <value>保存工程</value>
+  </data>
+  <data name="FileDialogExportTimeline" xml:space="preserve">
+    <value>导出时间轴 CSV</value>
+  </data>
+  <data name="FileTypeProject" xml:space="preserve">
+    <value>Exchoribur 工程</value>
+  </data>
+  <data name="SettingsGroupGeneral" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="SettingsGroupTimeline" xml:space="preserve">
+    <value>时间轴</value>
+  </data>
+  <data name="SettingsGroupAudio" xml:space="preserve">
+    <value>音频</value>
+  </data>
+  <data name="SettingsGroupExternalDevices" xml:space="preserve">
+    <value>外部设备</value>
+  </data>
+  <data name="SettingsGroupUpdates" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="SettingsPageInput" xml:space="preserve">
+    <value>输入</value>
+  </data>
+  <data name="SettingsPageStorage" xml:space="preserve">
+    <value>存储</value>
+  </data>
+  <data name="SettingsPageTimelineEdit" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="SettingsPageBlocks" xml:space="preserve">
+    <value>块</value>
+  </data>
+  <data name="SettingsPageAudioOutput" xml:space="preserve">
+    <value>输出设备</value>
+  </data>
+  <data name="SettingsPageSerialPort" xml:space="preserve">
+    <value>串口</value>
+  </data>
+  <data name="SettingsPageUpdates" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="SettingsPageAbout" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="SettingsAudioFollowSystemDefault" xml:space="preserve">
+    <value>跟随系统默认</value>
+  </data>
+  <data name="SettingsAudioHintUnavailable" xml:space="preserve">
+    <value>解码器不可用,预览音量和输出设备都不能改。</value>
+  </data>
+  <data name="SettingsAudioHintNoDevices" xml:space="preserve">
+    <value>没有枚举到可选设备,预览会用系统默认设备。</value>
+  </data>
+  <data name="SettingsUndoDepthHintFormat" xml:space="preserve">
+    <value>可填 {0} 到 {1}。</value>
+  </data>
+  <data name="SettingsResetButton" xml:space="preserve">
+    <value>恢复默认设置</value>
+  </data>
+  <data name="SettingsResetButtonConfirm" xml:space="preserve">
+    <value>再点一次确认恢复</value>
+  </data>
+  <data name="SettingsLicenseName" xml:space="preserve">
+    <value>MIT</value>
+  </data>
+  <data name="UpdateStatusUnsupported" xml:space="preserve">
+    <value>当前是开发运行(没有安装信息),不检查更新。</value>
+  </data>
+  <data name="UpdateStatusIdle" xml:space="preserve">
+    <value>还没有检查过。</value>
+  </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>正在检查…</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>已经是最新版本。</value>
+  </data>
+  <data name="UpdateStatusAvailableFormat" xml:space="preserve">
+    <value>发现新版本 v{0},可以下载。</value>
+  </data>
+  <data name="UpdateStatusDownloadingFormat" xml:space="preserve">
+    <value>正在下载 v{0}…{1}%</value>
+  </data>
+  <data name="UpdateStatusReadyFormat" xml:space="preserve">
+    <value>v{0} 已经下载好,重启后生效。</value>
+  </data>
+  <data name="UpdateStatusFailedFormat" xml:space="preserve">
+    <value>更新失败:{0}</value>
+  </data>
+  <data name="CommonCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="MainMenuFile" xml:space="preserve">
+    <value>文件</value>
+  </data>
+  <data name="MainMenuOpenProject" xml:space="preserve">
+    <value>打开工程…</value>
+  </data>
+  <data name="MainMenuSaveProject" xml:space="preserve">
+    <value>保存工程</value>
+  </data>
+  <data name="MainMenuSaveProjectAs" xml:space="preserve">
+    <value>另存为…</value>
+  </data>
+  <data name="MainMenuImportTimeline" xml:space="preserve">
+    <value>导入时间轴 CSV…</value>
+  </data>
+  <data name="MainMenuImportMedia" xml:space="preserve">
+    <value>导入参考媒体…</value>
+  </data>
+  <data name="MainMenuExportTimeline" xml:space="preserve">
+    <value>导出时间轴 CSV…</value>
+  </data>
+  <data name="MainMenuExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="MainMenuEdit" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="MainMenuSelectAll" xml:space="preserve">
+    <value>全选</value>
+  </data>
+  <data name="MainMenuClearSelection" xml:space="preserve">
+    <value>取消选择</value>
+  </data>
+  <data name="MainMenuCopyToOtherChannels" xml:space="preserve">
+    <value>把块复制到其他通道</value>
+  </data>
+  <data name="MainMenuRenameBlock" xml:space="preserve">
+    <value>给块改名…</value>
+  </data>
+  <data name="MainMenuUsePlayheadColor" xml:space="preserve">
+    <value>把块内选中帧设为播放头颜色</value>
+  </data>
+  <data name="MainMenuInsertFrame" xml:space="preserve">
+    <value>在播放头插入一帧</value>
+  </data>
+  <data name="MainMenuDeleteFrames" xml:space="preserve">
+    <value>删除选中帧</value>
+  </data>
+  <data name="MainMenuDeleteBlocks" xml:space="preserve">
+    <value>删除选中块</value>
+  </data>
+  <data name="MainMenuSettings" xml:space="preserve">
+    <value>设置…</value>
+  </data>
+  <data name="MainMenuView" xml:space="preserve">
+    <value>视图</value>
+  </data>
+  <data name="MainMenuHelp" xml:space="preserve">
+    <value>帮助</value>
+  </data>
+  <data name="MainMenuAbout" xml:space="preserve">
+    <value>关于 Exchoribur</value>
+  </data>
+  <data name="MainPanelVideoPreview" xml:space="preserve">
+    <value>视频预览</value>
+  </data>
+  <data name="MainPanelChannelState" xml:space="preserve">
+    <value>通道状态</value>
+  </data>
+  <data name="MainPanelBlockEditor" xml:space="preserve">
+    <value>块编辑器</value>
+  </data>
+  <data name="MainTimelineWheelHint" xml:space="preserve">
+    <value>滚轮:水平平移  Ctrl+滚轮:水平缩放  Shift+滚轮:垂直平移  Ctrl+Shift+滚轮:垂直缩放</value>
+  </data>
+  <data name="MainAudioWaveformPlaceholder" xml:space="preserve">
+    <value>音频波形(待接入)</value>
+  </data>
+  <data name="ColorPanelTitle" xml:space="preserve">
+    <value>颜色</value>
+  </data>
+  <data name="ColorPanelHexLabel" xml:space="preserve">
+    <value>Hex:</value>
+  </data>
+  <data name="ColorPanelHashLabel" xml:space="preserve">
+    <value>#</value>
+  </data>
+  <data name="ColorChannelRed" xml:space="preserve">
+    <value>R</value>
+  </data>
+  <data name="ColorChannelGreen" xml:space="preserve">
+    <value>G</value>
+  </data>
+  <data name="ColorChannelBlue" xml:space="preserve">
+    <value>B</value>
+  </data>
+  <data name="ColorPanelOutputTitle" xml:space="preserve">
+    <value>实际输出(四位 0-15)</value>
+  </data>
+  <data name="ColorPanelApplyButton" xml:space="preserve">
+    <value>应用到选中帧</value>
+  </data>
+  <data name="ColorPanelApplyHint" xml:space="preserve">
+    <value>选中的是哪几帧、哪几个通道,就改哪些;模式保持原样,可以 Ctrl+Z 撤销。</value>
+  </data>
+  <data name="UnsavedChangesTitle" xml:space="preserve">
+    <value>有未保存的改动</value>
+  </data>
+  <data name="UnsavedChangesSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="UnsavedChangesDiscard" xml:space="preserve">
+    <value>不保存</value>
+  </data>
+  <data name="NamePromptTitle" xml:space="preserve">
+    <value>给这条时间线起个名字</value>
+  </data>
+  <data name="NamePromptPlaceholder" xml:space="preserve">
+    <value>例如:乐鸣东方 2026 巡演</value>
+  </data>
+  <data name="NamePromptConfirm" xml:space="preserve">
+    <value>确定</value>
+  </data>
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="SettingsWindowClose" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="SettingsInputInvertWheel" xml:space="preserve">
+    <value>反转鼠标滚轮方向</value>
+  </data>
+  <data name="SettingsInputInvertTouchpad" xml:space="preserve">
+    <value>反转触摸板横向滑动方向</value>
+  </data>
+  <data name="SettingsTimelineUndoDepth" xml:space="preserve">
+    <value>撤销步数</value>
+  </data>
+  <data name="SettingsTimelineUndoDepthNote" xml:space="preserve">
+    <value>一步可能覆盖几万帧,记得太多内存会一直涨;改完立刻生效。</value>
+  </data>
+  <data name="SettingsBlocksDefaultLength" xml:space="preserve">
+    <value>新建块默认长度(毫秒)</value>
+  </data>
+  <data name="SettingsAudioRefreshButton" xml:space="preserve">
+    <value>刷新设备列表</value>
+  </data>
+  <data name="SettingsAudioVolume" xml:space="preserve">
+    <value>预览音量</value>
+  </data>
+  <data name="SettingsDevicesOutputTitle" xml:space="preserve">
+    <value>灯光设备输出</value>
+  </data>
+  <data name="SettingsDevicesOutputNote" xml:space="preserve">
+    <value>发送侧的协议层(帧打包、压缩、组装)已经写好并有测试,连接、握手和播放时吐帧还没做。这一页先占位,做完再接进来。</value>
+  </data>
+  <data name="SettingsDevicesPlannedTitle" xml:space="preserve">
+    <value>计划支持的接口</value>
+  </data>
+  <data name="SettingsDevicesSerial" xml:space="preserve">
+    <value>串口 — 尚未实现</value>
+  </data>
+  <data name="SettingsDevicesBle" xml:space="preserve">
+    <value>BLE — 尚未实现</value>
+  </data>
+  <data name="SettingsDevicesUdp" xml:space="preserve">
+    <value>UDP / Wi-Fi — 尚未实现</value>
+  </data>
+  <data name="SettingsStorageFilePath" xml:space="preserve">
+    <value>设置文件位置</value>
+  </data>
+  <data name="SettingsStorageOpenFolder" xml:space="preserve">
+    <value>打开所在文件夹</value>
+  </data>
+  <data name="SettingsStorageResetNote" xml:space="preserve">
+    <value>点击两次确认取消</value>
+  </data>
+  <data name="SettingsUpdatesCurrentVersion" xml:space="preserve">
+    <value>当前版本</value>
+  </data>
+  <data name="SettingsUpdatesUnsupportedNote" xml:space="preserve">
+    <value>当前是开发运行(没有安装信息),自动更新不可用。装上安装包或解压便携版之后才生效。</value>
+  </data>
+  <data name="SettingsUpdatesCheckOnStartup" xml:space="preserve">
+    <value>启动时检查更新</value>
+  </data>
+  <data name="SettingsUpdatesAutoDownload" xml:space="preserve">
+    <value>发现新版本后自动下载</value>
+  </data>
+  <data name="SettingsUpdatesPrerelease" xml:space="preserve">
+    <value>接收预发布版本(-beta 之类)</value>
+  </data>
+  <data name="SettingsUpdatesStatus" xml:space="preserve">
+    <value>状态</value>
+  </data>
+  <data name="SettingsUpdatesCheckButton" xml:space="preserve">
+    <value>立即检查更新</value>
+  </data>
+  <data name="SettingsUpdatesDownloadButton" xml:space="preserve">
+    <value>下载</value>
+  </data>
+  <data name="SettingsUpdatesApplyButton" xml:space="preserve">
+    <value>重启并安装</value>
+  </data>
+  <data name="SettingsAboutVersion" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="SettingsAboutBuildConfiguration" xml:space="preserve">
+    <value>构建配置</value>
+  </data>
+  <data name="SettingsAboutLicense" xml:space="preserve">
+    <value>许可</value>
+  </data>
+  <data name="SettingsAboutCopyright" xml:space="preserve">
+    <value>版权</value>
+  </data>
+  <data name="SettingsAboutLinksTitle" xml:space="preserve">
+    <value>链接与声明</value>
+  </data>
+  <data name="SettingsAboutProjectUrl" xml:space="preserve">
+    <value>打开项目主页</value>
+  </data>
+  <data name="SettingsAboutLicenseFile" xml:space="preserve">
+    <value>许可证全文</value>
+  </data>
+  <data name="SettingsAboutNotices" xml:space="preserve">
+    <value>第三方组件声明</value>
+  </data>
+  <data name="MainTooltipApplyUpdate" xml:space="preserve">
+    <value>重启并安装更新</value>
+  </data>
+  <data name="MainTooltipGoToStart" xml:space="preserve">
+    <value>回到开头</value>
+  </data>
+  <data name="MainTooltipPreviousFrame" xml:space="preserve">
+    <value>上一帧</value>
+  </data>
+  <data name="MainTooltipNextFrame" xml:space="preserve">
+    <value>下一帧</value>
+  </data>
+  <data name="MainTooltipGoToEnd" xml:space="preserve">
+    <value>跳到结尾</value>
+  </data>
+  <data name="MainTooltipPlayPause" xml:space="preserve">
+    <value>播放 / 暂停</value>
+  </data>
+  <data name="MainTooltipStop" xml:space="preserve">
+    <value>停止</value>
+  </data>
+  <data name="MainTooltipLoop" xml:space="preserve">
+    <value>循环播放</value>
+  </data>
+  <data name="MainTooltipLink" xml:space="preserve">
+    <value>链接选中的块:拖动其中一个,整组按相同偏移一起动</value>
+  </data>
+  <data name="MainTooltipZoomIn" xml:space="preserve">
+    <value>放大(Ctrl + 滚轮向上)</value>
+  </data>
+  <data name="MainTooltipZoomOut" xml:space="preserve">
+    <value>缩小(Ctrl + 滚轮向下)</value>
+  </data>
+  <data name="MainTooltipFitAll" xml:space="preserve">
+    <value>适配全部</value>
+  </data>
+  <data name="ColorPresetWhite" xml:space="preserve">
+    <value>白色</value>
+  </data>
+  <data name="ColorPresetYellow" xml:space="preserve">
+    <value>黄色</value>
+  </data>
+  <data name="ColorPresetBlue" xml:space="preserve">
+    <value>蓝色</value>
+  </data>
+  <data name="ColorPresetOrange" xml:space="preserve">
+    <value>橙色</value>
+  </data>
+  <data name="ColorPresetGreen" xml:space="preserve">
+    <value>绿色</value>
+  </data>
+  <data name="ColorPresetRed" xml:space="preserve">
+    <value>红色</value>
+  </data>
+  <data name="ColorPresetBlack" xml:space="preserve">
+    <value>黑色</value>
+  </data>
+  <data name="ColorPresetGray" xml:space="preserve">
+    <value>灰色</value>
+  </data>
+</root>

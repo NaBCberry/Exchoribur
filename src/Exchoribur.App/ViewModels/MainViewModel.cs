@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.DesignTime;
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.Core;
@@ -22,7 +23,7 @@ namespace Exchoribur.App.ViewModels;
 /// </summary>
 public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 {
-    private const string EmptyStatusText = "还没有载入工程文件,用「文件 → 打开」选一个 CSV。";
+    private static string EmptyStatusText => Strings.MainStatusEmpty;
 
     private readonly INamePrompt? _namePrompt;
     private readonly IAudioDeviceController _audio;
@@ -115,8 +116,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         Timeline = DesignTimeTimeline.Current;
         StatusText = EmptyStatusText;
         WindowTitle = "Exchoribur";
-        UndoLabel = "撤销";
-        RedoLabel = "重做";
+        UndoLabel = Strings.MainLabelUndo;
+        RedoLabel = Strings.MainLabelRedo;
 
     }
 
@@ -196,7 +197,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
     /// <summary>块编辑器标题栏上那行字。</summary>
     public string CurrentBlockTitle => CurrentBlock is { } block
-        ? $"{block.Name} · CH{block.Channel} · 选中 {SelectedFrames.Count} 帧"
+        ? string.Format(Strings.MainBlockEditorTitleFormat, block.Name, block.Channel, SelectedFrames.Count)
         : string.Empty;
 
     /// <summary>块编辑器自己的取景框,和主时间轴互不影响。</summary>
@@ -330,8 +331,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
     private void UpdateWindowTitle()
         => WindowTitle = Document is null
-            ? "Exchoribur"
-            : $"{(IsModified ? "*" : string.Empty)}{TimelineName} — Exchoribur";
+            ? Strings.AppName
+            : string.Format(
+                IsModified ? Strings.MainWindowTitleModifiedFormat : Strings.MainWindowTitleFormat,
+                TimelineName);
 
     /// <summary>当前打开的时间轴。换文件时整个对象都会换掉,所以是可观察属性。</summary>
     [ObservableProperty]
@@ -439,9 +442,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
         UpdateBannerText = state.Stage switch
         {
-            UpdateStage.Available => $"发现新版本 v{state.Version}",
-            UpdateStage.Downloading => $"正在下载 v{state.Version}…{state.ProgressPercent}%",
-            UpdateStage.Ready => $"v{state.Version} 已下载,重启后生效",
+            UpdateStage.Available => string.Format(Strings.MainUpdateAvailableFormat, state.Version),
+            UpdateStage.Downloading => string.Format(
+                Strings.MainUpdateDownloadingFormat,
+                state.Version,
+                state.ProgressPercent),
+            UpdateStage.Ready => string.Format(Strings.MainUpdateReadyFormat, state.Version),
             _ => string.Empty,
         };
     }
@@ -510,7 +516,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         if (!Video.IsAvailable)
         {
             HasError = true;
-            StatusText = $"视频预览不可用:{Video.ErrorMessage}";
+            StatusText = string.Format(Strings.MainVideoUnavailableFormat, Video.ErrorMessage);
             return false;
         }
 
@@ -518,13 +524,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         if (!Video.Load(path))
         {
             HasError = true;
-            StatusText = $"打开视频 {fileName} 失败。";
+            StatusText = string.Format(Strings.MainVideoOpenFailedFormat, fileName);
             return false;
         }
 
         HasVideo = true;
         HasError = false;
-        StatusText = $"已载入参考视频 {fileName}。";
+        StatusText = string.Format(Strings.MainVideoLoadedFormat, fileName);
 
         return true;
     }
@@ -578,8 +584,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         CanUndo = _editing.CanUndo;
         CanRedo = _editing.CanRedo;
-        UndoLabel = _editing.UndoName is { } undoName ? $"撤销 {undoName}" : "撤销";
-        RedoLabel = _editing.RedoName is { } redoName ? $"重做 {redoName}" : "重做";
+        UndoLabel = _editing.UndoName is { } undoName
+            ? string.Format(Strings.MainMenuUndoFormat, undoName)
+            : Strings.MainLabelUndo;
+        RedoLabel = _editing.RedoName is { } redoName
+            ? string.Format(Strings.MainMenuRedoFormat, redoName)
+            : Strings.MainLabelRedo;
     }
 
     partial void OnPlayheadTimeChanged(TimeSpan value)
@@ -755,7 +765,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         PausePlayback();
         _editing.Undo();
         PublishEditorTimeline();
-        Report($"已撤销:{_editing.RedoName}。");
+        Report(string.Format(Strings.MainUndoDoneFormat, _editing.RedoName));
     }
 
     /// <summary>重做上一步被撤销的编辑。</summary>
@@ -770,7 +780,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         PausePlayback();
         _editing.Redo();
         PublishEditorTimeline();
-        Report($"已重做:{_editing.UndoName}。");
+        Report(string.Format(Strings.MainRedoDoneFormat, _editing.UndoName));
     }
 
     /// <summary>选中全部块。</summary>
@@ -805,10 +815,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             Settings.DefaultBlockLength,
             [new BlockFrame(TimeSpan.Zero, state)]);
 
-        ApplyEdit(new BlockSetEdit("新建块", [], [block]));
+        ApplyEdit(new BlockSetEdit(Strings.MainActionNewBlock, [], [block]));
         SetBlockSelection([block]);
         OpenBlockEditor(block);
-        Report($"已在 CH{channel} 的 {Timecode.Format(start)} 建了一个块。");
+        Report(string.Format(Strings.MainStatusBlockCreatedFormat, channel, Timecode.Format(start)));
     }
 
     /// <summary>主时间轴拖动块:整体平移时间,并按上下方向换通道。</summary>
@@ -841,9 +851,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             return;
         }
 
-        ApplyEdit(new BlockSetEdit("移动块", before, after));
+        ApplyEdit(new BlockSetEdit(Strings.MainActionMoveBlocks, before, after));
         SetBlockSelection(after);
-        Report($"已把 {after.Count} 个块移到 {Timecode.Format(after[0].Start)}。");
+        Report(string.Format(
+            Strings.MainStatusBlocksMovedFormat,
+            after.Count,
+            Timecode.Format(after[0].Start)));
     }
 
     /// <summary>删除选中的块(内容一起删,块外自动回落)。</summary>
@@ -852,17 +865,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
-            Report("先在时间轴上选一个块。", error: true);
+            Report(Strings.MainHintSelectBlockFirst, error: true);
             return;
         }
 
         var removed = SelectedBlocks.ToList();
 
-        ApplyEdit(new BlockSetEdit("删除块", removed, []));
+        ApplyEdit(new BlockSetEdit(Strings.MainActionDeleteBlocks, removed, []));
         SetBlockSelection([]);
         CurrentBlock = null;
         SelectedFrames = BlockFrameRange.Empty;
-        Report($"已删除 {removed.Count} 个块。");
+        Report(string.Format(Strings.MainStatusBlocksDeletedFormat, removed.Count));
     }
 
     /// <summary>给选中的块改名。</summary>
@@ -871,14 +884,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
-            Report("先在时间轴上选一个块。", error: true);
+            Report(Strings.MainHintSelectBlockFirst, error: true);
             return;
         }
 
         var block = SelectedBlocks[0];
         var name = _namePrompt is null
             ? block.Name
-            : await _namePrompt.AskAsync("给这个块起个名字", block.Name);
+            : await _namePrompt.AskAsync(Strings.MainPromptRenameBlock, block.Name);
 
         if (string.IsNullOrWhiteSpace(name) || name == block.Name)
         {
@@ -887,10 +900,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
         var renamed = block.Renamed(name);
 
-        ApplyEdit(new BlockSetEdit("重命名", [block], [renamed]));
+        ApplyEdit(new BlockSetEdit(Strings.MainActionRenameBlock, [block], [renamed]));
         SetBlockSelection([renamed]);
         CurrentBlock = renamed;
-        Report($"块已改名为「{renamed.Name}」。");
+        Report(string.Format(Strings.MainStatusBlockRenamedFormat, renamed.Name));
     }
 
     /// <summary>把选中的块内容复制到其余全部通道。</summary>
@@ -899,7 +912,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (!_editing.IsActive || Document is null || SelectedBlocks.Count == 0)
         {
-            Report("先在时间轴上选一个块。", error: true);
+            Report(Strings.MainHintSelectBlockFirst, error: true);
             return;
         }
 
@@ -924,9 +937,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             }
         }
 
-        ApplyEdit(new BlockSetEdit("复制到其他通道", [], added));
-        Report($"已把内容复制到其余 {Frame.ChannelCount - 1} 个通道(共 {added.Count} 个块);"
-            + "和已有块重叠的地方无法播放,画成灰色。");
+        ApplyEdit(new BlockSetEdit(Strings.MainActionCopyToOtherChannels, [], added));
+        Report(string.Format(
+            Strings.MainStatusCopiedToOtherChannelsFormat,
+            Frame.ChannelCount - 1,
+            added.Count));
     }
 
     /// <summary>点链接图标:白/紫时把选中的块链成一伙,黄色时解除。</summary>
@@ -941,12 +956,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         if (LinkState == LinkIndicator.Linked)
         {
             ApplyLinkGroup(null);
-            Report("已解除这些块的链接。");
+            Report(Strings.MainStatusLinkRemoved);
             return;
         }
 
         ApplyLinkGroup(Block.NewId());
-        Report($"已把 {SelectedBlocks.Count} 个块链接在一起,拖动任意一个会带着其他一起动。");
+        Report(string.Format(Strings.MainStatusLinkedFormat, SelectedBlocks.Count));
     }
 
     /// <summary>把选中的块设成同一组;传 null 就是解散。</summary>
@@ -971,7 +986,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             return;
         }
 
-        ApplyEdit(new BlockSetEdit(groupId is null ? "解除链接" : "链接块", before, after));
+        ApplyEdit(new BlockSetEdit(
+            groupId is null ? Strings.MainActionUnlinkBlocks : Strings.MainActionLinkBlocks,
+            before,
+            after));
         SetBlockSelection(after);
     }
 
@@ -995,11 +1013,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (CurrentBlock is not { } block)
         {
-            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            Report(Strings.MainHintOpenBlockEditorFirst, error: true);
             return;
         }
 
-        PaintBlockFrames(block, Color.OutputColor, "设置颜色");
+        PaintBlockFrames(block, Color.OutputColor, Strings.MainActionSetColor);
     }
 
     /// <summary>把块内选中的帧设成播放头此刻该通道的颜色。</summary>
@@ -1008,12 +1026,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (CurrentBlock is not { } block)
         {
-            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            Report(Strings.MainHintOpenBlockEditorFirst, error: true);
             return;
         }
 
         var color = BlockSampler.SampleChannels(Timeline, PlayheadTime)[block.Channel].Color;
-        PaintBlockFrames(block, color, "取播放头颜色");
+        PaintBlockFrames(block, color, Strings.MainActionTakePlayheadColor);
     }
 
     /// <summary>把颜色刷进块里选中的那几帧;一帧都没选就是整块。</summary>
@@ -1031,7 +1049,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         }
 
         ApplyBlockContent(block, painted.Frames, actionName);
-        Report($"已把 {painted.PaintedCount} 帧的颜色改成 R{color.Red} G{color.Green} B{color.Blue}。");
+        Report(string.Format(
+            Strings.MainStatusColorPaintedFormat,
+            painted.PaintedCount,
+            color.Red,
+            color.Green,
+            color.Blue));
     }
 
     /// <summary>在播放头处往当前块里插一帧,默认沿用那一刻的状态。</summary>
@@ -1040,7 +1063,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
-            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            Report(Strings.MainHintOpenBlockEditorFirst, error: true);
             return;
         }
 
@@ -1048,7 +1071,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
 
         if (offset < TimeSpan.Zero || offset >= block.Length)
         {
-            Report("播放头不在这块里,先把它挪进来。", error: true);
+            Report(Strings.MainHintPlayheadOutsideBlock, error: true);
             return;
         }
 
@@ -1065,8 +1088,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             frames.Insert(insertAt, new BlockFrame(offset, state));
         }
 
-        ApplyBlockContent(block, frames, "插入帧");
-        Report($"已在块内 {Timecode.Format(offset)} 插入 1 帧。");
+        ApplyBlockContent(block, frames, Strings.MainActionInsertFrame);
+        Report(string.Format(Strings.MainStatusFrameInsertedFormat, Timecode.Format(offset)));
     }
 
     /// <summary>删掉块编辑器里选中的那几帧。</summary>
@@ -1075,13 +1098,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     {
         if (!_editing.IsActive || Document is null || CurrentBlock is not { } block)
         {
-            Report("先单击一个块,打开下面的块编辑器。", error: true);
+            Report(Strings.MainHintOpenBlockEditorFirst, error: true);
             return;
         }
 
         if (SelectedFrames.IsEmpty)
         {
-            Report("先在块编辑器里选几帧。", error: true);
+            Report(Strings.MainHintSelectFramesFirst, error: true);
             return;
         }
 
@@ -1092,15 +1115,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         // 一个块至少要留一帧,不然它就没有内容了。
         if (count >= frames.Count)
         {
-            Report("块里至少要留一帧,不能全删。", error: true);
+            Report(Strings.MainHintKeepAtLeastOneFrame, error: true);
             return;
         }
 
         frames.RemoveRange(SelectedFrames.First, count);
 
-        ApplyBlockContent(block, frames, "删除帧");
+        ApplyBlockContent(block, frames, Strings.MainActionDeleteFrames);
         SelectedFrames = BlockFrameRange.Empty;
-        Report($"已从块里删掉 {count} 帧。");
+        Report(string.Format(Strings.MainStatusFramesDeletedFormat, count));
     }
 
     /// <summary>换掉当前块的内容;新帧超出原长度时自动把块延长到刚好装下。</summary>

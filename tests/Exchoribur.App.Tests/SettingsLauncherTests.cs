@@ -51,6 +51,18 @@ public sealed class SettingsLauncherTests : IDisposable
     }
 
     [Fact]
+    public async Task The_license_is_opened_from_the_program_directory()
+    {
+        var launcher = new StubLauncher();
+        var viewModel = CreateViewModel(launcher);
+
+        await viewModel.OpenLicenseCommand.ExecuteAsync(null);
+
+        var path = Assert.Single(launcher.OpenedPaths);
+        Assert.Equal("LICENSE", Path.GetFileName(path));
+    }
+
+    [Fact]
     public async Task Without_a_launcher_the_commands_do_nothing()
     {
         var viewModel = new SettingsViewModel(Path.Combine(_directory, "settings.json"));
@@ -58,6 +70,7 @@ public sealed class SettingsLauncherTests : IDisposable
         await viewModel.OpenProjectUrlCommand.ExecuteAsync(null);
         await viewModel.OpenSettingsFolderCommand.ExecuteAsync(null);
         await viewModel.OpenNoticesCommand.ExecuteAsync(null);
+        await viewModel.OpenLicenseCommand.ExecuteAsync(null);
     }
 
     private SettingsViewModel CreateViewModel(IExternalLauncher launcher)
