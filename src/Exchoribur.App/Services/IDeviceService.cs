@@ -26,6 +26,9 @@ public interface IDeviceService
 
     DateTimeOffset? LastSentAt { get; }
 
+    /// <summary>设备日志(发射器每帧回一行)写到哪个文件;没配就是 null。</summary>
+    string? DeviceLogPath { get; }
+
     /// <summary>当前系统上的串口名。现场随时可能插拔,所以每次现取。</summary>
     IReadOnlyList<string> SerialPorts();
 

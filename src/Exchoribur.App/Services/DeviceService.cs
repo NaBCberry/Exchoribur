@@ -10,11 +10,21 @@ namespace Exchoribur.App.Services;
 /// </summary>
 public sealed class DeviceService : IDeviceService, IDisposable
 {
-    private readonly IDeviceChannels _channels = new SystemDeviceChannels();
+    private readonly IDeviceChannels _channels;
     private readonly DeviceLink _link;
+    private readonly string? _deviceLogPath;
 
-    public DeviceService()
+    /// <summary>正式运行走这个:串口收到的设备日志写到 <paramref name="serialLogPath"/>(null = 只读不记)。</summary>
+    public DeviceService(string? serialLogPath = null)
+        : this(new SystemDeviceChannels(serialLogPath), serialLogPath)
     {
+    }
+
+    /// <summary>测试用:自己给一套通道,不碰真串口。</summary>
+    internal DeviceService(IDeviceChannels channels, string? deviceLogPath = null)
+    {
+        _channels = channels;
+        _deviceLogPath = deviceLogPath;
         _link = new DeviceLink(_channels);
         _link.Changed += OnLinkChanged;
     }
@@ -34,6 +44,8 @@ public sealed class DeviceService : IDeviceService, IDisposable
     public long Failures => _link.Failures;
 
     public DateTimeOffset? LastSentAt => _link.LastSentAt;
+
+    public string? DeviceLogPath => _deviceLogPath;
 
     public IReadOnlyList<string> SerialPorts() => _channels.SerialPorts();
 

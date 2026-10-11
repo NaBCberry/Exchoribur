@@ -237,6 +237,7 @@ internal static class Strings
     public static string DeviceStatsFailures => Get(nameof(DeviceStatsFailures));
     public static string DeviceStatsLastSent => Get(nameof(DeviceStatsLastSent));
     public static string DeviceNeverSent => Get(nameof(DeviceNeverSent));
+    public static string DeviceOpenLogButton => Get(nameof(DeviceOpenLogButton));
     public static string DeviceLicenseNotConfigured => Get(nameof(DeviceLicenseNotConfigured));
     public static string DeviceLicenseInvalidFormat => Get(nameof(DeviceLicenseInvalidFormat));
     public static string DeviceLicenseValidFormat => Get(nameof(DeviceLicenseValidFormat));

@@ -795,6 +795,9 @@
   <data name="DeviceNeverSent" xml:space="preserve">
     <value>还没发过</value>
   </data>
+  <data name="DeviceOpenLogButton" xml:space="preserve">
+    <value>打开设备日志</value>
+  </data>
   <data name="DeviceLicenseNotConfigured" xml:space="preserve">
     <value>设置里没填许可串,设备可能不接受。</value>
   </data>

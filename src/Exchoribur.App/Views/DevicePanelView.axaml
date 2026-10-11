@@ -152,6 +152,21 @@
                 <TextBlock Grid.Row="2" Classes="note" Text="{x:Static res:Strings.DeviceStatsLastSent}" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Classes="note" Text="{Binding Device.LastSentText}" />
             </Grid>
+
+            <!--
+                发射器每帧回一行日志。串口必须有人读:不读的话设备侧发送缓冲迟早写满,
+                固件会卡在打日志上(表现就是"发一阵子之后突然卡住")。日志落在文件里,点这里打开。
+            -->
+            <Button Content="{x:Static res:Strings.DeviceOpenLogButton}"
+                    Margin="0,4,0,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    IsVisible="{Binding Device.HasDeviceLog}"
+                    Command="{Binding Device.OpenDeviceLogCommand}" />
+
+            <TextBlock Classes="note"
+                       IsVisible="{Binding Device.HasDeviceLog}"
+                       Text="{Binding Device.DeviceLogPath}" />
         </StackPanel>
     </ScrollViewer>
 

@@ -24,6 +24,7 @@ public sealed partial class DeviceSection : ObservableObject
     private readonly IDeviceService? _service;
     private readonly SettingsViewModel _settings;
     private readonly IDeviceHost? _host;
+    private readonly IExternalLauncher? _launcher;
 
     /// <summary>最近一次播放头位置:改亮度时要按同一时刻重发一帧。</summary>
     private TimeSpan _lastPosition;
@@ -31,11 +32,13 @@ public sealed partial class DeviceSection : ObservableObject
     /// <summary>本地就发现的问题(参数没填对、许可串读不出来),显示在状态行上。</summary>
     private string? _problem;
 
-    internal DeviceSection(IDeviceService? service, SettingsViewModel settings, IDeviceHost? host)
+    internal DeviceSection(IDeviceService? service, SettingsViewModel settings, IDeviceHost? host,
+                           IExternalLauncher? launcher = null)
     {
         _service = service;
         _settings = settings;
         _host = host;
+        _launcher = launcher;
 
         if (_service is not null)
         {
@@ -144,6 +147,22 @@ public sealed partial class DeviceSection : ObservableObject
 
     /// <summary>许可串现在是什么情况(面板上只读显示,填的地方在设置页)。</summary>
     public string LicenseText => DeviceLicenseSummary.Describe(_settings.DeviceLicenseText, DateTimeOffset.Now);
+
+    /// <summary>设备日志文件(发射器每帧回一行,读下来带时间戳写进去)。</summary>
+    public string? DeviceLogPath => _service?.DeviceLogPath;
+
+    /// <summary>日志文件已经出现(连过一次串口就有),面板上据此决定要不要给"打开日志"按钮。</summary>
+    public bool HasDeviceLog => DeviceLogPath is { Length: > 0 } path && File.Exists(path);
+
+    /// <summary>用系统默认程序打开设备日志。</summary>
+    [RelayCommand]
+    private async Task OpenDeviceLogAsync()
+    {
+        if (_launcher is { } launcher && DeviceLogPath is { Length: > 0 } path && File.Exists(path))
+        {
+            await launcher.OpenFileAsync(path);
+        }
+    }
 
     /// <summary>该显示的问题:本地发现的优先,其次是服务记下的失败原因。</summary>
     private string? Problem => !string.IsNullOrEmpty(_problem) ? _problem : _service?.LastError;
@@ -310,5 +329,6 @@ public sealed partial class DeviceSection : ObservableObject
         OnPropertyChanged(nameof(Failures));
         OnPropertyChanged(nameof(LastSentText));
         OnPropertyChanged(nameof(LicenseText));
+        OnPropertyChanged(nameof(HasDeviceLog));
     }
 }

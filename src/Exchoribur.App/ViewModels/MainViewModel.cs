@@ -108,7 +108,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
 
         // 场控设备这条线:面板上的连接状态与发包统计都归它,默认参数从设置页现取。
         _deviceService = device;
-        Device = new DeviceSection(device, Settings, this);
+        Device = new DeviceSection(device, Settings, this, externalLauncher);
 
         // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
         _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);

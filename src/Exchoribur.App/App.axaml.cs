@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.App.Views;
+using Exchoribur.Core.Settings;
 
 namespace Exchoribur.App;
 
@@ -20,6 +21,13 @@ public partial class App : Application
         {
             // 先造窗口,再把窗口交给文件选择器——它要实现弹系统对话框那一半。
             var window = new MainWindow();
+
+            // 发射器每帧往串口回一行日志。放在设置文件旁边,方便和 SDR 录音对齐着看;
+            // 更关键的是:串口必须有人读,不然设备侧缓冲写满会把固件堵住。
+            var deviceLogPath = Path.Combine(
+                Path.GetDirectoryName(SettingsStore.DefaultPath)!,
+                "device-serial.log");
+
             var viewModel = new MainViewModel(
                 new StorageProviderFilePicker(window),
                 new DispatcherPlaybackClock(),
@@ -30,7 +38,7 @@ public partial class App : Application
                 updateFeed: null,
                 externalLauncher: new TopLevelExternalLauncher(window),
                 videoFactory: null,
-                device: new DeviceService());
+                device: new DeviceService(deviceLogPath));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;
