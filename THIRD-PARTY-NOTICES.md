@@ -88,19 +88,15 @@
   自己的构建。Linux 上由发行版提供,不随本项目分发。随包附带的插件里有一
   部分另有许可(多为 GPLv2 及以上),同样是上游原样分发。
 
-## 安装与更新
-
-### Velopack
-
-- 用途:生成安装包、便携包与增量更新清单
-- 许可:MIT License
-- 版权:Velopack Ltd、Caelan Sayler、Kevin Bost(完整声明见上游 LICENSE)
-- 来源:<https://github.com/velopack/velopack>
-
 ## 未随产物分发
 
 测试与构建期依赖(xunit、coverlet、Microsoft.NET.Test.Sdk) 仅在开发和 CI 里
-使用
+使用。
+
+安装包由 Inno Setup 生成,它只参与构建,不作为运行期组件随程序分发;生成的安装器
+可以免版税分发。中文界面用的 `packaging/inno/ChineseSimplified.isl` 是社区翻译
+(来源:<https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation>),
+按上游 Inno Setup 语言文件的许可随仓库保存。
 
 ## 许可文本
 

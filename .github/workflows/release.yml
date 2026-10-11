@@ -44,8 +44,8 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   AVALONIA_TELEMETRY_OPTOUT: 1
-  # 与 Exchoribur.App.csproj 里的 Velopack 包版本保持一致
-  VPK_VERSION: 1.2.161
+  # 与 build/inno/ChineseSimplified.isl 对得上的编译器版本:6.5 以上都不会有回落英文的警告
+  INNO_SETUP_VERSION: 6.7.3
 
 jobs:
   prepare:
@@ -141,14 +141,22 @@ jobs:
       - name: Test
         run: dotnet test Exchoribur.slnx --configuration Release --no-build
 
-      - name: Install vpk
-        run: dotnet tool install --global vpk --version ${{ env.VPK_VERSION }}
+      - name: Install Inno Setup
+        shell: pwsh
+        env:
+          VERSION: ${{ env.INNO_SETUP_VERSION }}
+        run: |
+          $tag = 'is-' + ($env:VERSION -replace '\.', '_')
+          $url = "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$($env:VERSION).exe"
+          $installer = Join-Path $env:TEMP 'innosetup.exe'
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          Start-Process $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait
 
       - name: Package
         shell: pwsh
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: ./scripts/package-win.ps1 -Version $env:VERSION -ReleaseNotes artifacts/release-notes.md
+        run: ./scripts/package-win.ps1 -Version $env:VERSION
 
       - uses: actions/upload-artifact@v7
         with:
@@ -185,20 +193,13 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Install vpk
-        run: dotnet tool install --global vpk --version ${{ env.VPK_VERSION }}
-
-      # vpk 负责按更新清单该有的样子传资产;它没有发布说明参数,正文随后补
-      - name: Upload assets
+      # 资产就是安装包和便携包两个;gh 自带,不需要额外装工具
+      - name: Publish release and upload assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -206,48 +207,41 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         run: |
-          # 附件下载下来的目录层级不保证和上传时一致,自己找一遍更稳
-          $setup = Get-ChildItem -Path artifacts -Recurse -File -Filter '*Setup.exe' | Select-Object -First 1
-          if (-not $setup) {
-            throw '没找到安装包,附件可能没传成功。'
-          }
-          Write-Host "资产目录:$($setup.DirectoryName)"
+          $repo = '${{ github.repository }}'
+          $title = "Release v$($env:VERSION)"
 
-          $arguments = @(
-            'upload', 'github',
-            '--repoUrl', 'https://github.com/${{ github.repository }}',
-            '--token', $env:GH_TOKEN,
-            '--outputDir', $setup.DirectoryName,
-            '--tag', $env:TAG,
-            '--releaseName', "Release v$($env:VERSION)",
-            '--publish',
-            # 重跑时 Release 已经存在,不加这个会直接失败
-            '--merge'
-          )
-          if ($env:PRERELEASE -eq 'true') {
-            $arguments += '--pre'
-          }
-
-          & vpk @arguments
-          if ($LASTEXITCODE -ne 0) {
-            throw "vpk upload github 失败(退出码 $LASTEXITCODE)"
-          }
-
-      - name: Attach release notes
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
           $notes = Get-ChildItem -Path artifacts -Recurse -File -Filter 'release-notes.md' | Select-Object -First 1
           if (-not $notes) {
             throw '没找到发布说明文件。'
           }
 
-          # 这一步没有 checkout,gh 认不出当前仓库,必须显式指定
-          & gh release edit $env:TAG --repo ${{ github.repository }} --notes-file $notes.FullName
+          $common = @('--repo', $repo, '--title', $title, '--notes-file', $notes.FullName)
+          if ($env:PRERELEASE -eq 'true') {
+            $common += '--prerelease'
+          }
+
+          # 重跑同一个标签时 Release 已经存在,改成更新它
+          & gh release view $env:TAG --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $($env:TAG) 已经存在,更新标题与说明。"
+            & gh release edit $env:TAG @common
+          }
+          else {
+            & gh release create $env:TAG @common
+          }
           if ($LASTEXITCODE -ne 0) {
-            throw "写入发布说明失败(退出码 $LASTEXITCODE)"
+            throw "创建或更新 Release 失败(退出码 $LASTEXITCODE)"
+          }
+
+          $assets = Get-ChildItem -Path artifacts/releases -File | Select-Object -ExpandProperty FullName
+          if (-not $assets) {
+            throw '没找到打包产物。'
+          }
+
+          # --clobber:重跑时覆盖同名资产
+          & gh release upload $env:TAG @assets --repo $repo --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "上传资产失败(退出码 $LASTEXITCODE)"
           }
 
       - name: Write release summary
