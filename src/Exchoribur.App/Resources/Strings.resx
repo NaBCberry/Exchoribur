@@ -514,7 +514,7 @@
     <value>音频波形(待接入)</value>
   </data>
   <data name="ColorPanelTitle" xml:space="preserve">
-    <value>颜色</value>
+    <value>调色盘</value>
   </data>
   <data name="ColorPanelHexLabel" xml:space="preserve">
     <value>Hex:</value>

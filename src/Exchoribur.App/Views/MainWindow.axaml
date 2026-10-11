@@ -341,125 +341,137 @@
                 </Border>
             </Grid>
 
-            <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形,最右边是颜色面板 -->
-            <DockPanel Grid.Column="1" Margin="0,8,8,8">
-                <!-- 右边这一列是颜色面板:先把它停靠好,剩下的地方留给时间轴 -->
-                <Border DockPanel.Dock="Right"
-                        Classes="panel"
-                        Width="220"
-                        Margin="8,0,0,0">
-                    <views:ColorPanelView />
-                </Border>
+            <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形;调色盘是浮在时间轴上的弹出面板 -->
+            <Grid Grid.Column="1" Margin="0,8,8,8" RowDefinitions="*,110">
+                <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
+                    <DockPanel>
+                        <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
+                        <Border DockPanel.Dock="Bottom"
+                                Height="26"
+                                Background="{DynamicResource ChromeBackgroundBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,3,3">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <!-- 滚轮分工提示:窗口窄的时候省略号收尾,不挤走右边的按钮 -->
+                                <TextBlock Grid.Column="0"
+                                           Margin="8,0"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource DimTextBrush}"
+                                           FontSize="12"
+                                           Text="{x:Static res:Strings.MainTimelineWheelHint}" />
 
-                <Grid RowDefinitions="*,110">
-                    <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
-                        <DockPanel>
-                            <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
-                            <Border DockPanel.Dock="Bottom"
-                                    Height="26"
-                                    Background="{DynamicResource ChromeBackgroundBrush}"
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Spacing="2"
+                                            Margin="0,0,6,0">
+                                    <Button Classes="transport"
+                                            ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomIn}"
+                                            Command="{Binding ZoomInCommand}">
+                                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
+                                    </Button>
+                                    <Button Classes="transport"
+                                            ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomOut}"
+                                            Command="{Binding ZoomOutCommand}">
+                                        <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
+                                    </Button>
+                                    <Button Classes="transport"
+                                            ToolTip.Tip="{x:Static res:Strings.MainTooltipFitAll}"
+                                            Command="{Binding FitAllCommand}">
+                                        <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!--
+                            刻度、标记、十条轨道、播放头都在同一个控件里画,
+                            免得滚动时各层落在不同的合成帧上对不齐。
+                            两行这样切:上面那行给轨道,下面那行的高度就是块编辑器的高度,
+                            调色盘浮在上面那行里,所以不会盖住编辑器。
+                        -->
+                        <Grid ClipToBounds="True" RowDefinitions="*,Auto">
+                            <timeline:TimelineControl
+                                Grid.RowSpan="2"
+                                Blocks="{Binding Blocks}"
+                                Markers="{Binding Markers}"
+                                Viewport="{Binding Viewport}"
+                                PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                                SelectedBlocks="{Binding SelectedBlocks, Mode=TwoWay}"
+                                CurrentBlockId="{Binding CurrentBlockId}"
+                                BottomOverlayHeight="{Binding EditorOverlayHeight}"
+                                EnsureVisibleChannel="{Binding CurrentBlockChannel}"
+                                InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
+                                InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
+                                BlockCreateRequested="OnBlockCreateRequested"
+                                BlockMoveRequested="OnBlockMoveRequested"
+                                BlockOpenRequested="OnBlockOpenRequested"
+                                Cursor="Hand" />
+
+                            <!--
+                                调色盘:编辑窗打开时浮到轨道右上角,编辑器收起就跟着收回,
+                                不再常年占着右栏。做成浮层是为了不改时间轴的宽度。
+                            -->
+                            <Border Grid.Row="0"
+                                    HorizontalAlignment="Right"
+                                    Width="220"
+                                    Margin="0,8,8,8"
+                                    IsVisible="{Binding HasCurrentBlock}"
+                                    Background="{DynamicResource PanelBackgroundBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    BoxShadow="-8 0 18 0 #88000000">
+                                <views:ColorPanelView />
+                            </Border>
+
+                            <!-- 块编辑器:盖在轨道上面(不挤压轨道),打开时主时间轴会把选中的块滚到它上面 -->
+                            <Border Grid.Row="1"
+                                    Height="{Binding EditorOverlayHeight}"
+                                    IsVisible="{Binding HasCurrentBlock}"
+                                    Background="{DynamicResource PanelBackgroundBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="0,1,0,0"
-                                    CornerRadius="0,0,3,3">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <!-- 滚轮分工提示:窗口窄的时候省略号收尾,不挤走右边的按钮 -->
-                                    <TextBlock Grid.Column="0"
-                                               Margin="8,0"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"
-                                               Foreground="{DynamicResource DimTextBrush}"
-                                               FontSize="12"
-                                               Text="{x:Static res:Strings.MainTimelineWheelHint}" />
-
-                                    <StackPanel Grid.Column="1"
+                                    BoxShadow="0 -8 18 0 #88000000">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top"
                                                 Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center"
-                                                Spacing="2"
-                                                Margin="0,0,6,0">
-                                        <Button Classes="transport"
-                                                ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomIn}"
-                                                Command="{Binding ZoomInCommand}">
-                                            <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
-                                        </Button>
-                                        <Button Classes="transport"
-                                                ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomOut}"
-                                                Command="{Binding ZoomOutCommand}">
-                                            <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
-                                        </Button>
-                                        <Button Classes="transport"
-                                                ToolTip.Tip="{x:Static res:Strings.MainTooltipFitAll}"
-                                                Command="{Binding FitAllCommand}">
-                                            <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
-                                        </Button>
+                                                Spacing="6"
+                                                Margin="10,6,0,2">
+                                        <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
+                                        <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.MainPanelBlockEditor}" />
+                                        <TextBlock Classes="panelTitle" Text="{Binding CurrentBlockTitle}" />
                                     </StackPanel>
-                                </Grid>
+
+                                    <timeline:BlockEditorControl
+                                        Blocks="{Binding Blocks}"
+                                        CurrentBlock="{Binding CurrentBlock}"
+                                        Viewport="{Binding BlockEditorViewport}"
+                                        PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                                        SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
+                                        FocusTime="{Binding CurrentBlockFocus}"
+                                        FocusSpacing="{Binding CurrentBlockSpacing}"
+                                        InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
+                                        InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}" />
+                                </DockPanel>
                             </Border>
-    
-                            <!-- 刻度、标记、十条轨道、播放头都在同一个控件里画,
-                                 免得滚动时各层落在不同的合成帧上对不齐。 -->
-                            <Grid ClipToBounds="True">
-                                <timeline:TimelineControl
-                                    Blocks="{Binding Blocks}"
-                                    Markers="{Binding Markers}"
-                                    Viewport="{Binding Viewport}"
-                                    PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
-                                    SelectedBlocks="{Binding SelectedBlocks, Mode=TwoWay}"
-                                    CurrentBlockId="{Binding CurrentBlockId}"
-                                    BottomOverlayHeight="{Binding EditorOverlayHeight}"
-                                    EnsureVisibleChannel="{Binding CurrentBlockChannel}"
-                                    InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
-                                    InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
-                                    BlockCreateRequested="OnBlockCreateRequested"
-                                    BlockMoveRequested="OnBlockMoveRequested"
-                                    BlockOpenRequested="OnBlockOpenRequested"
-                                    Cursor="Hand" />
+                        </Grid>
+                    </DockPanel>
+                </Border>
 
-                                <!-- 块编辑器:盖在轨道上面(不挤压轨道),打开时主时间轴会把选中的块滚到它上面 -->
-                                <Border VerticalAlignment="Bottom"
-                                        Height="{Binding EditorOverlayHeight}"
-                                        IsVisible="{Binding HasCurrentBlock}"
-                                        Background="{DynamicResource PanelBackgroundBrush}"
-                                        BorderBrush="{DynamicResource PanelBorderBrush}"
-                                        BorderThickness="0,1,0,0"
-                                        BoxShadow="0 -8 18 0 #88000000">
-                                    <DockPanel>
-                                        <StackPanel DockPanel.Dock="Top"
-                                                    Orientation="Horizontal"
-                                                    Spacing="6"
-                                                    Margin="10,6,0,2">
-                                            <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
-                                            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.MainPanelBlockEditor}" />
-                                            <TextBlock Classes="panelTitle" Text="{Binding CurrentBlockTitle}" />
-                                        </StackPanel>
-
-                                        <timeline:BlockEditorControl
-                                            Blocks="{Binding Blocks}"
-                                            CurrentBlock="{Binding CurrentBlock}"
-                                            Viewport="{Binding BlockEditorViewport}"
-                                            PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
-                                            SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
-                                            FocusTime="{Binding CurrentBlockFocus}"
-                                            FocusSpacing="{Binding CurrentBlockSpacing}"
-                                            InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
-                                            InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}" />
-                                    </DockPanel>
-                                </Border>
-                            </Grid>
-                        </DockPanel>
-                    </Border>
-    
                 <Border Grid.Row="1" Classes="panel">
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Spacing="7">
-                            <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
-                            <TextBlock Classes="hint" Text="{x:Static res:Strings.MainAudioWaveformPlaceholder}" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </DockPanel>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="7">
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
+                        <TextBlock Classes="hint" Text="{x:Static res:Strings.MainAudioWaveformPlaceholder}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </DockPanel>
 
