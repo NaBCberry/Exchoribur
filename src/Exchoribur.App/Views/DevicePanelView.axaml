@@ -1,0 +1,158 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Exchoribur.App.Controls"
+             xmlns:services="using:Exchoribur.App.Services"
+             xmlns:vm="using:Exchoribur.App.ViewModels"
+             xmlns:res="using:Exchoribur.App.Resources"
+             mc:Ignorable="d" d:DesignWidth="248" d:DesignHeight="560"
+             x:Class="Exchoribur.App.Views.DevicePanelView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Styles>
+        <!-- 地址框做成小方框,和调色盘那边的输入框一个尺寸 -->
+        <Style Selector="TextBox.device">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer>
+        <StackPanel Margin="10" Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Classes="icon title" Data="{x:Static controls:Icons.SerialPort}" />
+                <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.DevicePanelTitle}" />
+            </StackPanel>
+
+            <!-- 连接状态:圆点 + 一句话。红/绿/灰由样式类决定 -->
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Classes="deviceDot"
+                        Classes.connected="{Binding Device.IsConnected}"
+                        Classes.failed="{Binding Device.HasFailure}" />
+                <TextBlock Classes="status"
+                           TextWrapping="Wrap"
+                           Classes.error="{Binding Device.HasFailure}"
+                           Text="{Binding Device.ConnectionText}" />
+            </StackPanel>
+
+            <!-- 连到哪儿 -->
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.DeviceSectionConnection}" />
+
+            <ComboBox HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding Device.Transports}"
+                      SelectedItem="{Binding Device.SelectedTransport}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="services:DeviceTransportOption">
+                        <TextBlock Text="{Binding Description}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Device.IsSerial}">
+                <ComboBox Grid.Column="0"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Device.SerialPorts}"
+                          SelectedItem="{Binding Device.SelectedSerialPort}" />
+                <Button Grid.Column="1"
+                        Classes="transport"
+                        Margin="4,0,0,0"
+                        ToolTip.Tip="{x:Static res:Strings.DeviceTooltipRefreshPorts}"
+                        Command="{Binding Device.RefreshSerialPortsCommand}">
+                    <Path Classes="icon" Data="{x:Static controls:Icons.Refresh}" />
+                </Button>
+            </Grid>
+
+            <TextBlock Classes="note"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding Device.HasNoSerialPorts}"
+                       Text="{x:Static res:Strings.DeviceNoSerialPorts}" />
+
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding Device.IsSerial}">
+                <TextBlock Classes="note"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"
+                           Text="{x:Static res:Strings.DeviceBaudLabel}" />
+                <ComboBox Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Device.BaudRates}"
+                          SelectedItem="{Binding Device.BaudRate}" />
+            </Grid>
+
+            <TextBox Classes="device"
+                     IsVisible="{Binding Device.IsUdp}"
+                     PlaceholderText="{x:Static res:Strings.DeviceUdpHostWatermark}"
+                     Text="{Binding Device.UdpHost}" />
+
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding Device.IsUdp}">
+                <TextBlock Classes="note"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"
+                           Text="{x:Static res:Strings.DeviceUdpRepeatsLabel}" />
+                <ComboBox Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Device.UdpStreamRepeatOptions}"
+                          SelectedItem="{Binding Device.UdpStreamRepeats}" />
+            </Grid>
+
+            <TextBlock Classes="note"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding Device.IsBle}"
+                       Text="{x:Static res:Strings.DeviceTransportBleNote}" />
+
+            <Button HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Content="{x:Static res:Strings.DeviceConnectButton}"
+                    IsVisible="{Binding Device.CanConnect}"
+                    Command="{Binding Device.ConnectCommand}" />
+
+            <Button HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Content="{x:Static res:Strings.DeviceDisconnectButton}"
+                    IsVisible="{Binding Device.CanDisconnect}"
+                    Command="{Binding Device.DisconnectCommand}" />
+
+            <TextBlock Classes="note"
+                       TextWrapping="Wrap"
+                       Text="{Binding Device.LicenseText}" />
+
+            <!-- 现场要调的 -->
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.DeviceSectionLive}" />
+
+            <CheckBox Content="{x:Static res:Strings.DeviceBrightnessEnabled}"
+                      IsChecked="{Binding Device.IsBrightnessEnabled}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Slider Grid.Column="0"
+                        Minimum="0"
+                        Maximum="100"
+                        IsEnabled="{Binding Device.IsBrightnessEnabled}"
+                        Value="{Binding Device.BrightnessPercent}" />
+                <TextBlock Grid.Column="1"
+                           Classes="note"
+                           Width="40"
+                           VerticalAlignment="Center"
+                           TextAlignment="Right"
+                           Text="{Binding Device.BrightnessText}" />
+            </Grid>
+
+            <!-- 发包统计 -->
+            <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.DeviceSectionStats}" />
+
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                <TextBlock Classes="note" Text="{x:Static res:Strings.DeviceStatsFramesSent}" />
+                <TextBlock Grid.Column="1" Classes="note" Text="{Binding Device.FramesSent}" />
+
+                <TextBlock Grid.Row="1" Classes="note" Text="{x:Static res:Strings.DeviceStatsFailures}" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="note" Text="{Binding Device.Failures}" />
+
+                <TextBlock Grid.Row="2" Classes="note" Text="{x:Static res:Strings.DeviceStatsLastSent}" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="note" Text="{Binding Device.LastSentText}" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

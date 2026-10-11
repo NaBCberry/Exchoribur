@@ -582,23 +582,53 @@
   <data name="SettingsAudioVolume" xml:space="preserve">
     <value>预览音量</value>
   </data>
-  <data name="SettingsDevicesOutputTitle" xml:space="preserve">
-    <value>灯光设备输出</value>
+  <data name="SettingsDevicesDefaultsTitle" xml:space="preserve">
+    <value>默认连接</value>
   </data>
-  <data name="SettingsDevicesOutputNote" xml:space="preserve">
-    <value>发送侧的协议层(帧打包、压缩、组装)已经写好并有测试,连接、握手和播放时吐帧还没做。这一页先占位,做完再接进来。</value>
+  <data name="SettingsDevicesTransport" xml:space="preserve">
+    <value>传输方式</value>
   </data>
-  <data name="SettingsDevicesPlannedTitle" xml:space="preserve">
-    <value>计划支持的接口</value>
+  <data name="SettingsDevicesSerialPort" xml:space="preserve">
+    <value>默认串口</value>
   </data>
-  <data name="SettingsDevicesSerial" xml:space="preserve">
-    <value>串口 — 尚未实现</value>
+  <data name="SettingsDevicesBaud" xml:space="preserve">
+    <value>默认波特率</value>
   </data>
-  <data name="SettingsDevicesBle" xml:space="preserve">
-    <value>BLE — 尚未实现</value>
+  <data name="SettingsDevicesUdpHost" xml:space="preserve">
+    <value>默认目标地址</value>
   </data>
-  <data name="SettingsDevicesUdp" xml:space="preserve">
-    <value>UDP / Wi-Fi — 尚未实现</value>
+  <data name="SettingsDevicesUdpRepeats" xml:space="preserve">
+    <value>默认重发次数</value>
+  </data>
+  <data name="SettingsDevicesSendTitle" xml:space="preserve">
+    <value>发送</value>
+  </data>
+  <data name="SettingsDevicesBrightness" xml:space="preserve">
+    <value>默认亮度</value>
+  </data>
+  <data name="SettingsDevicesBrightnessEnabled" xml:space="preserve">
+    <value>打开软件时启用全局亮度</value>
+  </data>
+  <data name="SettingsDevicesFrameAdvance" xml:space="preserve">
+    <value>取帧提前量</value>
+  </data>
+  <data name="SettingsDevicesFrameAdvanceNote" xml:space="preserve">
+    <value>提前这么久去取帧再发出去,用来补发射器到灯之间的延迟。</value>
+  </data>
+  <data name="SettingsDevicesLicenseTitle" xml:space="preserve">
+    <value>设备许可</value>
+  </data>
+  <data name="SettingsDevicesLicenseWatermark" xml:space="preserve">
+    <value>设备MAC|到期时间|签名</value>
+  </data>
+  <data name="SettingsDevicesLicenseNote" xml:space="preserve">
+    <value>留空就不发 AUTH:有些发射器不校验许可。</value>
+  </data>
+  <data name="SettingsDevicesRefreshPorts" xml:space="preserve">
+    <value>刷新串口列表</value>
+  </data>
+  <data name="SettingsDevicesLiveNote" xml:space="preserve">
+    <value>面板上改的连接参数只在本次运行里生效,这里改的是它每次打开时的起点。</value>
   </data>
   <data name="SettingsStorageFilePath" xml:space="preserve">
     <value>设置文件位置</value>
@@ -686,6 +716,96 @@
   </data>
   <data name="MainTooltipLink" xml:space="preserve">
     <value>链接选中的块:拖动其中一个,整组按相同偏移一起动</value>
+  </data>
+  <data name="MainTooltipDevicePanel" xml:space="preserve">
+    <value>场控设备</value>
+  </data>
+  <data name="DevicePanelTitle" xml:space="preserve">
+    <value>场控设备</value>
+  </data>
+  <data name="DeviceSectionConnection" xml:space="preserve">
+    <value>连到哪儿</value>
+  </data>
+  <data name="DeviceSectionLive" xml:space="preserve">
+    <value>现场微调</value>
+  </data>
+  <data name="DeviceSectionStats" xml:space="preserve">
+    <value>发包统计</value>
+  </data>
+  <data name="DeviceTransportSerial" xml:space="preserve">
+    <value>串口</value>
+  </data>
+  <data name="DeviceTransportUdp" xml:space="preserve">
+    <value>UDP</value>
+  </data>
+  <data name="DeviceTransportBle" xml:space="preserve">
+    <value>蓝牙(未接入)</value>
+  </data>
+  <data name="DeviceTransportBleNote" xml:space="preserve">
+    <value>蓝牙要在三个平台各写一套原生接口,还没做。先用串口或 UDP。</value>
+  </data>
+  <data name="DeviceBaudLabel" xml:space="preserve">
+    <value>波特率</value>
+  </data>
+  <data name="DeviceUdpHostWatermark" xml:space="preserve">
+    <value>192.168.19.123</value>
+  </data>
+  <data name="DeviceUdpRepeatsLabel" xml:space="preserve">
+    <value>每帧重发</value>
+  </data>
+  <data name="DeviceConnectButton" xml:space="preserve">
+    <value>连接</value>
+  </data>
+  <data name="DeviceDisconnectButton" xml:space="preserve">
+    <value>断开</value>
+  </data>
+  <data name="DeviceStatusDisconnected" xml:space="preserve">
+    <value>未连接</value>
+  </data>
+  <data name="DeviceStatusConnecting" xml:space="preserve">
+    <value>连接中…</value>
+  </data>
+  <data name="DeviceStatusConnectedFormat" xml:space="preserve">
+    <value>已连接:{0}</value>
+  </data>
+  <data name="DeviceStatusFailedFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="DeviceServiceUnavailable" xml:space="preserve">
+    <value>这次运行没有接上设备服务。</value>
+  </data>
+  <data name="DeviceBrightnessEnabled" xml:space="preserve">
+    <value>全局亮度(只作用在发出去的帧上)</value>
+  </data>
+  <data name="DeviceNoSerialPorts" xml:space="preserve">
+    <value>没有枚举到串口。插上发射器再点一次刷新。</value>
+  </data>
+  <data name="DeviceTooltipRefreshPorts" xml:space="preserve">
+    <value>重新枚举串口</value>
+  </data>
+  <data name="DeviceStatsFramesSent" xml:space="preserve">
+    <value>已发帧数</value>
+  </data>
+  <data name="DeviceStatsFailures" xml:space="preserve">
+    <value>发送失败</value>
+  </data>
+  <data name="DeviceStatsLastSent" xml:space="preserve">
+    <value>最近发送</value>
+  </data>
+  <data name="DeviceNeverSent" xml:space="preserve">
+    <value>还没发过</value>
+  </data>
+  <data name="DeviceLicenseNotConfigured" xml:space="preserve">
+    <value>设置里没填许可串,设备可能不接受。</value>
+  </data>
+  <data name="DeviceLicenseInvalidFormat" xml:space="preserve">
+    <value>许可串读不出来:{0}</value>
+  </data>
+  <data name="DeviceLicenseValidFormat" xml:space="preserve">
+    <value>许可有效,{0} 到期</value>
+  </data>
+  <data name="DeviceLicenseExpiredFormat" xml:space="preserve">
+    <value>许可已过期({0})</value>
   </data>
   <data name="MainTooltipZoomIn" xml:space="preserve">
     <value>放大(Ctrl + 滚轮向上)</value>

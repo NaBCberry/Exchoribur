@@ -1,27 +1,129 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="using:Exchoribur.App.Services"
              xmlns:vm="using:Exchoribur.App.ViewModels"
              xmlns:res="using:Exchoribur.App.Resources"
              x:Class="Exchoribur.App.Views.Settings.ExternalDevicesPage"
              x:DataType="vm:SettingsViewModel">
 
     <StackPanel Spacing="10">
+        <!-- 默认连接 -->
         <Border Classes="settingsGroup">
             <StackPanel Spacing="6">
-                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesOutputTitle}" />
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesDefaultsTitle}" />
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesTransport}" />
+                    <ComboBox Grid.Column="1"
+                              Width="280"
+                              ItemsSource="{Binding DeviceTransports}"
+                              SelectedItem="{Binding SelectedDeviceTransport}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:DeviceTransportOption">
+                                <TextBlock Text="{Binding Description}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceSerial}">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesSerialPort}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <ComboBox Width="220"
+                                  ItemsSource="{Binding DeviceSerialPorts}"
+                                  SelectedItem="{Binding DeviceSerialPort}" />
+                        <Button Content="{x:Static res:Strings.SettingsDevicesRefreshPorts}"
+                                Command="{Binding RefreshDeviceSerialPortsCommand}"
+                                Padding="12,4" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceSerial}">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesBaud}" />
+                    <ComboBox Grid.Column="1"
+                              Width="280"
+                              ItemsSource="{Binding DeviceBaudRates}"
+                              SelectedItem="{Binding DeviceBaudRate}" />
+                </Grid>
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceUdp}">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesUdpHost}" />
+                    <TextBox Grid.Column="1"
+                             Width="280"
+                             Text="{Binding DeviceUdpHost}"
+                             PlaceholderText="{x:Static res:Strings.DeviceUdpHostWatermark}" />
+                </Grid>
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceUdp}">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesUdpRepeats}" />
+                    <ComboBox Grid.Column="1"
+                              Width="280"
+                              ItemsSource="{Binding DeviceUdpStreamRepeatOptions}"
+                              SelectedItem="{Binding DeviceUdpStreamRepeats}" />
+                </Grid>
+
                 <TextBlock Classes="note"
-                           Text="{x:Static res:Strings.SettingsDevicesOutputNote}" />
+                           IsVisible="{Binding IsDeviceBle}"
+                           Text="{x:Static res:Strings.DeviceTransportBleNote}" />
             </StackPanel>
         </Border>
 
+        <!-- 发送 -->
         <Border Classes="settingsGroup">
-            <StackPanel Spacing="4">
-                <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.SettingsDevicesPlannedTitle}" />
-                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesSerial}" />
-                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesBle}" />
-                <TextBlock Classes="rowValue" Text="{x:Static res:Strings.SettingsDevicesUdp}" />
+            <StackPanel Spacing="6">
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesSendTitle}" />
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesBrightness}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Slider Width="200"
+                                Minimum="0"
+                                Maximum="100"
+                                IsEnabled="{Binding DeviceBrightnessEnabled}"
+                                Value="{Binding DeviceBrightnessPercent}" />
+                        <TextBlock Classes="rowValue"
+                                   Width="44"
+                                   Text="{Binding DeviceBrightnessText}" />
+                    </StackPanel>
+                </Grid>
+
+                <CheckBox Content="{x:Static res:Strings.SettingsDevicesBrightnessEnabled}"
+                          IsChecked="{Binding DeviceBrightnessEnabled}" />
+
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesFrameAdvance}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Slider Width="200"
+                                Minimum="0"
+                                Maximum="{Binding DeviceFrameAdvanceMaximum}"
+                                Value="{Binding DeviceFrameAdvanceMilliseconds}" />
+                        <TextBlock Classes="rowValue"
+                                   Width="64"
+                                   Text="{Binding DeviceFrameAdvanceText}" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesFrameAdvanceNote}" />
             </StackPanel>
         </Border>
+
+        <!-- 设备许可 -->
+        <Border Classes="settingsGroup">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesLicenseTitle}" />
+
+                <TextBox AcceptsReturn="True"
+                         Height="64"
+                         TextWrapping="Wrap"
+                         Text="{Binding DeviceLicenseText}"
+                         PlaceholderText="{x:Static res:Strings.SettingsDevicesLicenseWatermark}" />
+
+                <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesLicenseNote}" />
+                <TextBlock Classes="note" Text="{Binding DeviceLicenseHint}" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesLiveNote}" />
     </StackPanel>
 
 </UserControl>

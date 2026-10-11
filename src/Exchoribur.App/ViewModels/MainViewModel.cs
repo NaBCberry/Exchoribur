@@ -21,7 +21,7 @@ namespace Exchoribur.App.ViewModels;
 /// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
 /// 界面只管把这些属性画出来,不直接读文件。
 /// </summary>
-public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
+public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, IDeviceHost
 {
     private static string EmptyStatusText => Strings.MainStatusEmpty;
 
@@ -30,6 +30,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     private readonly UpdateCoordinator _updates;
     private readonly PlaybackController _playback;
     private readonly ProjectSession _projects;
+    private readonly IDeviceService? _deviceService;
 
     /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
     private bool _disposed;
@@ -63,7 +64,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             audio,
             updateFeed,
             externalLauncher: null,
-            videoFactory: null)
+            videoFactory: null,
+            device: null)
     {
     }
 
@@ -80,7 +82,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         IAudioDeviceController? audio,
         IUpdateFeed? updateFeed,
         IExternalLauncher? externalLauncher,
-        Func<IVideoService>? videoFactory)
+        Func<IVideoService>? videoFactory,
+        IDeviceService? device = null)
     {
         _namePrompt = namePrompt;
 
@@ -98,10 +101,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         _updates.Changed += OnUpdatesChanged;
 
         Settings = settings
-            ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates, externalLauncher);
+            ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates, externalLauncher, device);
         currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();
+
+        // 场控设备这条线:面板上的连接状态与发包统计都归它,默认参数从设置页现取。
+        _deviceService = device;
+        Device = new DeviceSection(device, Settings, this);
 
         // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
         _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
@@ -140,6 +147,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
         _updates.Changed -= OnUpdatesChanged;
         Settings.PropertyChanged -= OnSettingsChanged;
 
+        // 还连着设备就把串口/socket 关掉,别攥着不放。
+        (_deviceService as IDisposable)?.Dispose();
+
         _video?.Dispose();
         _video = null;
 
@@ -163,6 +173,20 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>跟上次保存相比有没有改动,标题上用 * 提示。</summary>
     [ObservableProperty]
     public partial bool IsModified { get; set; }
+
+    /// <summary>场控设备面板弹出来没有。底部工具栏上那个按钮管它,和设备本身的状态无关。</summary>
+    [ObservableProperty]
+    public partial bool IsDevicePanelOpen { get; set; }
+
+    partial void OnIsDevicePanelOpenChanged(bool value)
+    {
+        // 面板自己什么都不存:每次打开都按设置页那份默认参数填一遍。
+        // 已经连着就别动现场参数了,那会把正在跑的东西改掉。
+        if (value && !Device.IsConnected)
+        {
+            Device.Reload();
+        }
+    }
 
     /// <summary>主时间轴上选中的块。</summary>
     [ObservableProperty]
@@ -493,7 +517,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
     /// <summary>右侧编辑面板里正在挑的颜色。</summary>
     public ColorEditorViewModel Color { get; } = new();
 
+    /// <summary>场控设备面板:连接状态、发包统计、现场亮度。</summary>
+    public DeviceSection Device { get; }
+
     private readonly Func<IVideoService> _videoFactory;
+
+    /// <summary>按工程的取样规则取某个时刻的十个通道状态,设备吐帧用。</summary>
+    Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Timeline, time);
 
     private IVideoService? _video;
 
@@ -646,6 +676,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost
             _playback.SeekTo(value);
             _playback.FollowPosition(value);
         }
+
+        // 设备跟着播放头走:这一刻该亮的灯和上次发出去的不一样,才真的发一帧。
+        Device.FollowPosition(value);
     }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>

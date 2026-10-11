@@ -122,6 +122,23 @@
         <Setter Property="CornerRadius" Value="3" />
     </Style>
 
+    <!-- 场控设备面板上的状态圆点:灰=没连上,绿=连着,红=出过问题 -->
+    <Style Selector="Border.deviceDot">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource DimTextBrush}" />
+    </Style>
+
+    <Style Selector="Border.deviceDot.connected">
+        <Setter Property="Background" Value="#5CCB5F" />
+    </Style>
+
+    <Style Selector="Border.deviceDot.failed">
+        <Setter Property="Background" Value="#E0574B" />
+    </Style>
+
     <!--
         颜色面板里的常用色块:颜色直接按在按钮自己的 Background 上,
         再把悬停和按下的底色钉回按钮自己的颜色,免得被主题的底色盖掉。
@@ -191,15 +208,15 @@
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
-    <Style Selector="ToggleButton.transport.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.transport:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
-    <Style Selector="ToggleButton.transport.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.transport:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
-    <Style Selector="ToggleButton.transport.primary:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.transport:checked /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
@@ -220,6 +237,15 @@
 
     <Style Selector="ToggleButton.transport.primary.loop:checked Path.icon.loop">
         <Setter Property="Stroke" Value="#E8A33D" />
+    </Style>
+
+    <!-- 场控设备:面板收着是白色,弹出来了用强调色 -->
+    <Style Selector="ToggleButton.transport.device Path.icon.device">
+        <Setter Property="Stroke" Value="#FFFFFF" />
+    </Style>
+
+    <Style Selector="ToggleButton.transport.device:checked Path.icon.device">
+        <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
     </Style>
 
 </Styles>

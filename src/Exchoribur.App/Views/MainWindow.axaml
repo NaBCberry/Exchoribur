@@ -292,6 +292,13 @@
                           Data="{x:Static controls:Icons.Link}"
                           Stroke="{Binding LinkIconBrush}" />
                 </Button>
+
+                <!-- 场控设备:白色=面板收着,强调色=面板弹出来了 -->
+                <ToggleButton Classes="transport device"
+                              ToolTip.Tip="{x:Static res:Strings.MainTooltipDevicePanel}"
+                              IsChecked="{Binding IsDevicePanelOpen}">
+                    <Path Classes="icon big device" Data="{x:Static controls:Icons.SerialPort}" />
+                </ToggleButton>
                 </StackPanel>
 
                 <!-- 右槽位:以后摆在按钮组右边的显示面板加在这里 -->
@@ -391,9 +398,12 @@
                             刻度、标记、十条轨道、播放头都在同一个控件里画,
                             免得滚动时各层落在不同的合成帧上对不齐。
                             两行这样切:上面那行给轨道,下面那行的高度就是块编辑器的高度。
-                            右列是调色盘,编辑窗打开时它才占位,轨道跟着让出这块宽度,谁都不挡谁。
+                            右边两列是调色盘和场控设备面板:各自弹出来时占一列,
+                            轨道跟着让出这块宽度,谁都不挡谁;都不显示时时间轴是整宽的。
                         -->
-                        <Grid ClipToBounds="True" ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+                        <Grid ClipToBounds="True"
+                              ColumnDefinitions="*,Auto,Auto"
+                              RowDefinitions="*,Auto">
                             <timeline:TimelineControl
                                 Grid.RowSpan="2"
                                 Grid.Column="0"
@@ -424,6 +434,20 @@
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="1,0,0,0">
                                 <views:ColorPanelView />
+                            </Border>
+
+                            <!--
+                                场控设备面板:底部工具栏那个按钮开关它。位置在调色盘右边、贴着窗口最右,
+                                这样调色盘开合不会推着它动。
+                            -->
+                            <Border Grid.Column="2"
+                                    Grid.RowSpan="2"
+                                    Width="260"
+                                    IsVisible="{Binding IsDevicePanelOpen}"
+                                    Background="{DynamicResource PanelBackgroundBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1,0,0,0">
+                                <views:DevicePanelView />
                             </Border>
 
                             <!-- 块编辑器:盖在轨道上面(不挤压轨道),打开时主时间轴会把选中的块滚到它上面 -->

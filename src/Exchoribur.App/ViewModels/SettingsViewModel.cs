@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.Core.Devices;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Settings;
 using Exchoribur.Core.Updates;
@@ -19,6 +20,7 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly string _path;
     private readonly IExternalLauncher? _externalLauncher;
+    private readonly IDeviceService? _deviceService;
     private readonly AudioDeviceSection _audioSection;
     private readonly UpdateSection _updateSection;
 
@@ -50,10 +52,12 @@ public partial class SettingsViewModel : ViewModelBase
         string path,
         IAudioDeviceController? audio,
         UpdateCoordinator? updates,
-        IExternalLauncher? externalLauncher)
+        IExternalLauncher? externalLauncher,
+        IDeviceService? device = null)
     {
         _path = path;
         _externalLauncher = externalLauncher;
+        _deviceService = device;
         _audioSection = new AudioDeviceSection(audio);
 
         // 更新那一块自己管状态:它一变就把通知转发给界面,不用在这里逐个搬字段。
@@ -74,6 +78,18 @@ public partial class SettingsViewModel : ViewModelBase
         IncludePrereleaseVersions = settings.IncludePrereleaseVersions;
 
         RefreshAudioDevices(settings.AudioOutputDeviceId);
+
+        SelectedDeviceTransport = DeviceTransports
+            .FirstOrDefault(option => option.Kind == settings.DeviceTransport) ?? DeviceTransports[0];
+        DeviceSerialPort = settings.DeviceSerialPort;
+        DeviceBaudRate = settings.DeviceBaudRateOrDefault;
+        DeviceUdpHost = settings.DeviceUdpHost ?? string.Empty;
+        DeviceUdpStreamRepeats = settings.DeviceUdpStreamRepeatsOrDefault;
+        DeviceBrightnessEnabled = settings.DeviceBrightnessEnabled;
+        DeviceBrightnessPercent = settings.DeviceBrightnessOrDefault;
+        DeviceFrameAdvanceMilliseconds = settings.DeviceFrameAdvance.TotalMilliseconds;
+        DeviceLicenseText = settings.DeviceLicenseText ?? string.Empty;
+        FillDeviceSerialPorts(settings.DeviceSerialPort);
 
         _initializing = false;
     }
@@ -251,6 +267,102 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasAudioDeviceHint));
     }
 
+    // ---- 外部设备(默认参数) ----
+    //
+    // 这里存的是"面板每次打开时的起点";现场真正在用的连接参数在设备面板上改,不写回这里。
+
+    /// <summary>可选传输方式。</summary>
+    public IReadOnlyList<DeviceTransportOption> DeviceTransports { get; } =
+    [
+        new(DeviceTransport.Serial, Strings.DeviceTransportSerial),
+        new(DeviceTransport.Udp, Strings.DeviceTransportUdp),
+        new(DeviceTransport.Ble, Strings.DeviceTransportBle),
+    ];
+
+    /// <summary>可选的串口名。</summary>
+    public ObservableCollection<string> DeviceSerialPorts { get; } = [];
+
+    [ObservableProperty]
+    public partial DeviceTransportOption? SelectedDeviceTransport { get; set; }
+
+    [ObservableProperty]
+    public partial string? DeviceSerialPort { get; set; }
+
+    [ObservableProperty]
+    public partial int DeviceBaudRate { get; set; } = DeviceProtocol.DefaultBaudRate;
+
+    public IReadOnlyList<int> DeviceBaudRates => DeviceProtocol.BaudRates;
+
+    [ObservableProperty]
+    public partial string DeviceUdpHost { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int DeviceUdpStreamRepeats { get; set; } = DeviceProtocol.StreamRepeatsDefault;
+
+    public IReadOnlyList<int> DeviceUdpStreamRepeatOptions { get; } =
+        [.. Enumerable.Range(DeviceProtocol.StreamRepeatsMin, DeviceProtocol.StreamRepeatsMax)];
+
+    [ObservableProperty]
+    public partial bool DeviceBrightnessEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial double DeviceBrightnessPercent { get; set; } = 100;
+
+    public string DeviceBrightnessText => $"{Math.Round(DeviceBrightnessPercent)}%";
+
+    [ObservableProperty]
+    public partial double DeviceFrameAdvanceMilliseconds { get; set; } =
+        AppSettings.DefaultDeviceFrameAdvanceMilliseconds;
+
+    public double DeviceFrameAdvanceMaximum => AppSettings.MaxDeviceFrameAdvanceMilliseconds;
+
+    public string DeviceFrameAdvanceText => $"{Math.Round(DeviceFrameAdvanceMilliseconds)} ms";
+
+    [ObservableProperty]
+    public partial string DeviceLicenseText { get; set; } = string.Empty;
+
+    /// <summary>许可串的解析结果;和面板上那句是同一份说法。</summary>
+    public string DeviceLicenseHint => DeviceLicenseSummary.Describe(DeviceLicenseText, DateTimeOffset.Now);
+
+    /// <summary>取帧提前量,给吐帧的地方用。</summary>
+    public TimeSpan DeviceFrameAdvance => TimeSpan.FromMilliseconds(
+        DeviceFrameAdvanceMilliseconds is >= 0 and <= AppSettings.MaxDeviceFrameAdvanceMilliseconds
+            ? DeviceFrameAdvanceMilliseconds
+            : AppSettings.DefaultDeviceFrameAdvanceMilliseconds);
+
+    public bool IsDeviceSerial => SelectedDeviceTransport?.Kind == DeviceTransport.Serial;
+
+    public bool IsDeviceUdp => SelectedDeviceTransport?.Kind == DeviceTransport.Udp;
+
+    public bool IsDeviceBle => SelectedDeviceTransport?.Kind == DeviceTransport.Ble;
+
+    [RelayCommand]
+    private void RefreshDeviceSerialPorts() => FillDeviceSerialPorts(DeviceSerialPort);
+
+    /// <summary>
+    /// 填串口下拉。存着的那个口现在可能没插上,也一并放进列表:
+    /// 这一页存的是默认值,不该因为设备没插就被悄悄改掉。
+    /// </summary>
+    private void FillDeviceSerialPorts(string? preferred)
+    {
+        DeviceSerialPorts.Clear();
+
+        if (!string.IsNullOrWhiteSpace(preferred))
+        {
+            DeviceSerialPorts.Add(preferred);
+        }
+
+        foreach (var port in _deviceService?.SerialPorts() ?? [])
+        {
+            if (!DeviceSerialPorts.Contains(port))
+            {
+                DeviceSerialPorts.Add(port);
+            }
+        }
+
+        DeviceSerialPort = preferred ?? DeviceSerialPorts.FirstOrDefault();
+    }
+
     // ---- 更新 ----
 
     /// <summary>当前版本,写不上 Velopack 信息时用编译进程序集的那个。</summary>
@@ -337,6 +449,17 @@ public partial class SettingsViewModel : ViewModelBase
         IncludePrereleaseVersions = defaults.IncludePrereleaseVersions;
         RefreshAudioDevices(defaults.AudioOutputDeviceId);
 
+        SelectedDeviceTransport = DeviceTransports
+            .FirstOrDefault(option => option.Kind == defaults.DeviceTransport) ?? DeviceTransports[0];
+        DeviceSerialPort = defaults.DeviceSerialPort;
+        DeviceBaudRate = defaults.DeviceBaudRateOrDefault;
+        DeviceUdpHost = defaults.DeviceUdpHost ?? string.Empty;
+        DeviceUdpStreamRepeats = defaults.DeviceUdpStreamRepeatsOrDefault;
+        DeviceBrightnessEnabled = defaults.DeviceBrightnessEnabled;
+        DeviceBrightnessPercent = defaults.DeviceBrightnessOrDefault;
+        DeviceFrameAdvanceMilliseconds = defaults.DeviceFrameAdvance.TotalMilliseconds;
+        DeviceLicenseText = defaults.DeviceLicenseText ?? string.Empty;
+
         _initializing = false;
         Save();
     }
@@ -402,6 +525,42 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAutoDownloadUpdatesChanged(bool value) => Save();
     partial void OnIncludePrereleaseVersionsChanged(bool value) => Save();
 
+    partial void OnSelectedDeviceTransportChanged(DeviceTransportOption? value)
+    {
+        OnPropertyChanged(nameof(IsDeviceSerial));
+        OnPropertyChanged(nameof(IsDeviceUdp));
+        OnPropertyChanged(nameof(IsDeviceBle));
+        Save();
+    }
+
+    partial void OnDeviceSerialPortChanged(string? value) => Save();
+
+    partial void OnDeviceBaudRateChanged(int value) => Save();
+
+    partial void OnDeviceUdpHostChanged(string value) => Save();
+
+    partial void OnDeviceUdpStreamRepeatsChanged(int value) => Save();
+
+    partial void OnDeviceBrightnessEnabledChanged(bool value) => Save();
+
+    partial void OnDeviceBrightnessPercentChanged(double value)
+    {
+        OnPropertyChanged(nameof(DeviceBrightnessText));
+        Save();
+    }
+
+    partial void OnDeviceFrameAdvanceMillisecondsChanged(double value)
+    {
+        OnPropertyChanged(nameof(DeviceFrameAdvanceText));
+        Save();
+    }
+
+    partial void OnDeviceLicenseTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(DeviceLicenseHint));
+        Save();
+    }
+
     private void ApplyAudioSettings() => _audioSection.Apply(SelectedAudioDevice?.Id, AudioVolume);
 
     private void Save()
@@ -424,6 +583,15 @@ public partial class SettingsViewModel : ViewModelBase
                 CheckForUpdatesOnStartup = CheckForUpdatesOnStartup,
                 AutoDownloadUpdates = AutoDownloadUpdates,
                 IncludePrereleaseVersions = IncludePrereleaseVersions,
+                DeviceTransport = SelectedDeviceTransport?.Kind ?? DeviceTransport.Serial,
+                DeviceSerialPort = DeviceSerialPort,
+                DeviceBaudRate = DeviceBaudRate,
+                DeviceUdpHost = DeviceUdpHost,
+                DeviceUdpStreamRepeats = DeviceUdpStreamRepeats,
+                DeviceBrightnessEnabled = DeviceBrightnessEnabled,
+                DeviceBrightnessPercent = DeviceBrightnessPercent,
+                DeviceFrameAdvanceMilliseconds = DeviceFrameAdvanceMilliseconds,
+                DeviceLicenseText = DeviceLicenseText,
             });
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
