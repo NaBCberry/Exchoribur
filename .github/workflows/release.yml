@@ -233,7 +233,10 @@ jobs:
             throw "创建或更新 Release 失败(退出码 $LASTEXITCODE)"
           }
 
-          $assets = Get-ChildItem -Path artifacts/releases -File | Select-Object -ExpandProperty FullName
+          # 附件下载下来是扁平的(文件直接落在 artifacts 下),所以按名字找而不是按目录
+          $assets = Get-ChildItem -Path artifacts -Recurse -File |
+            Where-Object { $_.Name -like 'Exchoribur-win-*' } |
+            Select-Object -ExpandProperty FullName
           if (-not $assets) {
             throw '没找到打包产物。'
           }
