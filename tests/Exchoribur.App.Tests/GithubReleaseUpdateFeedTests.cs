@@ -72,7 +72,7 @@ public sealed class GithubReleaseUpdateFeedTests : IDisposable
             GithubReleaseUpdateFeed.BuildInstallerUrl(version));
     }
 
-    [Fact]
+    [WindowsFact]
     public void A_copy_without_the_install_marker_does_not_self_update()
     {
         Directory.CreateDirectory(_directory);
@@ -82,7 +82,7 @@ public sealed class GithubReleaseUpdateFeedTests : IDisposable
         Assert.False(feed.IsSupported);
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task An_installed_copy_finds_a_newer_release_through_the_feed()
     {
         var feed = CreateInstalledFeed(BuildAtom("v0.0.1", "v9.9.9", "v9.9.10-beta.1"), currentVersion: "0.1.1-beta.1");
@@ -92,7 +92,7 @@ public sealed class GithubReleaseUpdateFeedTests : IDisposable
         Assert.Equal("9.9.10-beta.1", await feed.FindUpdateAsync(includePrerelease: true));
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task An_installed_copy_reports_no_update_when_it_is_already_newest()
     {
         var feed = CreateInstalledFeed(BuildAtom("v0.0.1", "v0.0.2"), currentVersion: "0.9.9");
