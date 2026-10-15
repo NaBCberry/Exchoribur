@@ -8,8 +8,8 @@ LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间�
 
 ## 当前状态
 
-早期搭建阶段。工程骨架已建立并能通过编译,tests 中的用例可运行。
-界面尚未开始设计。
+已实现时间轴与编排块编辑、工程读写、视频预览、串口 / UDP 输出和 Windows
+安装版更新。工程采用四层结构,领域、应用流程、外部实现和桌面界面分别维护。
 
 ## 技术栈
 
@@ -18,7 +18,7 @@ LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间�
 | 运行时 | .NET 10 | SDK 10.0.401 已安装 |
 | 界面 | Avalonia 12.1.3 | 已引入,含 Fluent 主题与 Inter 字体 |
 | MVVM | CommunityToolkit.Mvvm 8.4.2 | 已引入 |
-| 媒体播放 | LibVLCSharp | 待评估 |
+| 媒体播放 | LibVLCSharp | 已接入,原生解码与界面位图分离 |
 | 音频分析 | FFT + 自建 mel 滤波器组 | 待评估 |
 | 测试 | xUnit 2.9.3 | 已建立 |
 
@@ -26,10 +26,20 @@ LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间�
 
 ```
 Exchoribur.slnx
-src/Exchoribur.Core/       领域模型、撤销栈、特效运算、设备协议、音频分析
-src/Exchoribur.App/        Avalonia 界面(引用 Core,反过来不成立)
-tests/Exchoribur.Core.Tests/  Core 的单元测试
+src/Exchoribur.Core/             灯光模型、编辑规则、协议、时间格式
+src/Exchoribur.Application/      应用接口、设备/播放/工程/更新流程、设置模型
+src/Exchoribur.Infrastructure/   串口、UDP、媒体解码、文件存储、更新源与平台实现
+src/Exchoribur.App/              Avalonia 界面、交互服务与启动装配
+tests/Exchoribur.Core.Tests/
+tests/Exchoribur.Application.Tests/
+tests/Exchoribur.Infrastructure.Tests/
+tests/Exchoribur.App.Tests/
+scripts/                        构建发布脚本
+packaging/                      安装器配置
+docs/                           架构与发布说明
 ```
+
+依赖方向、代码归属与媒体帧生命周期见 [docs/architecture.md](docs/architecture.md)。
 
 ## 里程碑
 
@@ -63,3 +73,13 @@ MIT License,全文见 [LICENSE](LICENSE)。分发时保留版权声明与许可�
 
 功能来源与第三方组件的声明见 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) 和
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=nabcberry%2Fexchoribur&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=nabcberry/exchoribur&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=nabcberry/exchoribur&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=nabcberry/exchoribur&type=date&legend=top-left" />
+ </picture>
+</a>
