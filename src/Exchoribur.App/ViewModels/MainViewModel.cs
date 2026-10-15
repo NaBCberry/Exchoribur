@@ -3,17 +3,16 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Exchoribur.App.Controls;
 using Exchoribur.App.DesignTime;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
-using Exchoribur.Core;
+using Exchoribur.Application.Abstractions;
+using Exchoribur.Application.Playback;
+using Exchoribur.Application.Updates;
 using Exchoribur.Core.Editing;
+using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Settings;
-using Exchoribur.Core.Storage;
-using Exchoribur.Core.Updates;
 
 namespace Exchoribur.App.ViewModels;
 
@@ -83,25 +82,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
         IUpdateFeed? updateFeed,
         IExternalLauncher? externalLauncher,
         Func<IVideoService>? videoFactory,
-        IDeviceService? device = null)
+        IDeviceService? device = null,
+        IProjectStore? projectStore = null)
     {
         _namePrompt = namePrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
-        _videoFactory = videoFactory ?? (() => new VideoService());
+        _videoFactory = videoFactory ?? AppServices.CreateVideo;
         _audio = audio ?? new VideoAudioDeviceController(() => _video);
 
         // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
         // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
         SettingsViewModel? currentSettings = null;
         _updates = new UpdateCoordinator(
-            updateFeed ?? new GithubReleaseUpdateFeed(),
+            updateFeed ?? AppServices.CreateUpdateFeed(),
             () => currentSettings?.AutoDownloadUpdates ?? false,
             () => currentSettings?.IncludePrereleaseVersions ?? false);
         _updates.Changed += OnUpdatesChanged;
 
         Settings = settings
-            ?? new SettingsViewModel(SettingsStore.DefaultPath, _audio, _updates, externalLauncher, device);
+            ?? new SettingsViewModel(AppServices.CreateSettingsStore().DefaultPath, _audio, _updates, externalLauncher, device);
         currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
         RefreshUpdateBanner();
@@ -117,7 +117,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
         _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
 
         // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
-        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt);
+        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt, projectStore ?? AppServices.CreateProjectStore());
 
         SelectedBlocks = [];
         SelectedFrames = BlockFrameRange.Empty;

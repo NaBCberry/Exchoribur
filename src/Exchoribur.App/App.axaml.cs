@@ -1,14 +1,12 @@
-using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.App.Views;
-using Exchoribur.Core.Settings;
 
 namespace Exchoribur.App;
 
-public partial class App : Application
+public partial class App : Avalonia.Application
 {
     public override void Initialize()
     {
@@ -25,7 +23,7 @@ public partial class App : Application
             // 发射器每帧往串口回一行日志。放在设置文件旁边,方便和 SDR 录音对齐着看;
             // 更关键的是:串口必须有人读,不然设备侧缓冲写满会把固件堵住。
             var deviceLogPath = Path.Combine(
-                Path.GetDirectoryName(SettingsStore.DefaultPath)!,
+                Path.GetDirectoryName(AppServices.CreateSettingsStore().DefaultPath)!,
                 "device-serial.log");
 
             var viewModel = new MainViewModel(
@@ -38,7 +36,7 @@ public partial class App : Application
                 updateFeed: null,
                 externalLauncher: new TopLevelExternalLauncher(window),
                 videoFactory: null,
-                device: new DeviceService(deviceLogPath));
+                device: AppServices.CreateDevice(deviceLogPath));
             window.DataContext = viewModel;
 
             desktop.MainWindow = window;

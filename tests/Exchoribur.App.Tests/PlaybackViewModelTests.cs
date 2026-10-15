@@ -1,5 +1,6 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
+using Exchoribur.Application.Abstractions;
 
 namespace Exchoribur.App.Tests;
 

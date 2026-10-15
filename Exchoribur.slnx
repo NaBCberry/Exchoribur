@@ -1,10 +1,14 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Exchoribur.App/Exchoribur.App.csproj" />
     <Project Path="src/Exchoribur.Core/Exchoribur.Core.csproj" />
+    <Project Path="src/Exchoribur.Application/Exchoribur.Application.csproj" />
+    <Project Path="src/Exchoribur.Infrastructure/Exchoribur.Infrastructure.csproj" />
+    <Project Path="src/Exchoribur.App/Exchoribur.App.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Exchoribur.App.Tests/Exchoribur.App.Tests.csproj" />
     <Project Path="tests/Exchoribur.Core.Tests/Exchoribur.Core.Tests.csproj" />
+    <Project Path="tests/Exchoribur.Application.Tests/Exchoribur.Application.Tests.csproj" />
+    <Project Path="tests/Exchoribur.Infrastructure.Tests/Exchoribur.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Exchoribur.App.Tests/Exchoribur.App.Tests.csproj" />
   </Folder>
 </Solution>

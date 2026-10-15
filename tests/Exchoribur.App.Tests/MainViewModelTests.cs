@@ -1,7 +1,7 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
+using Exchoribur.Application.Projects;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.Tests;
 

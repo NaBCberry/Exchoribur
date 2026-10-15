@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Exchoribur.App.Resources;
-using Exchoribur.App.Services;
-using Exchoribur.Core.Updates;
+using Exchoribur.Application.Updates;
 
 namespace Exchoribur.App.ViewModels;
 

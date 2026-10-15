@@ -82,8 +82,8 @@ Release 标题统一写成 `Release vX.Y.Z`。
 | `Exchoribur-win-Portable.zip` | 便携包,解压即用,不自动更新 |
 
 打包脚本:`scripts/package-win.ps1 -Version <版本>`。本地和 CI 共用它。
-安装器由 `packaging/inno/Exchoribur.iss` 描述,中文界面用随仓库保存的
-`packaging/inno/ChineseSimplified.isl`。
+安装器由 `packaging/windows/inno/Exchoribur.iss` 描述,中文界面用随仓库保存的
+`packaging/windows/inno/ChineseSimplified.isl`。
 
 产物里体积的大头是 libvlc 和 .NET 运行时:发布时只保留目标架构那一套 libvlc
 (默认会带上 x64/x86/arm64 三套,多出近 180 MB),并删掉发布目录里的原生符号
@@ -130,7 +130,7 @@ Release 标题统一写成 `Release vX.Y.Z`。
 ## 已知限制
 
 - 没有代码签名,Windows SmartScreen 可能给出警告。
-- 打包需要 **Inno Setup 6.7.3**(版本要和 `packaging/inno/ChineseSimplified.isl` 对得上,
+- 打包需要 **Inno Setup 6.7.3**(版本要和 `packaging/windows/inno/ChineseSimplified.isl` 对得上,
   6.5 以上的编译器配它都不会出现回落英文的警告):`winget install JRSoftware.InnoSetup`,
   CI 里按固定版本下载安装。
 - 安装包与安装器都是 Windows 专属,更新也只有这一条路。

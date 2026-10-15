@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Exchoribur.App.Resources;
-using Exchoribur.Core.Storage;
+using Exchoribur.Application.Projects;
 
 namespace Exchoribur.App.Services;
 

@@ -44,7 +44,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   AVALONIA_TELEMETRY_OPTOUT: 1
-  # 与 build/inno/ChineseSimplified.isl 对得上的编译器版本:6.5 以上都不会有回落英文的警告
+  # 与 packaging/windows/inno/ChineseSimplified.isl 对得上的编译器版本:6.5 以上不会回落英文
   INNO_SETUP_VERSION: 6.7.3
 
 jobs:

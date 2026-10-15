@@ -1,7 +1,9 @@
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.Application.Abstractions;
+using Exchoribur.Application.Projects;
+using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.ViewModels;
 
@@ -14,7 +16,8 @@ internal sealed class ProjectSession(
     IProjectHost host,
     IFilePicker? filePicker,
     INamePrompt? namePrompt,
-    IUnsavedChangesPrompt? unsavedPrompt)
+    IUnsavedChangesPrompt? unsavedPrompt,
+    IProjectStore store)
 {
     /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
     private string? _projectPath;
@@ -176,7 +179,7 @@ internal sealed class ProjectSession(
                 host.LoadProgress = report.Fraction * 100;
             });
 
-            var document = await ProjectFile.LoadAsync(path, progress);
+            var document = await store.LoadAsync(path, progress);
 
             _projectPath = path;
             host.Document = document;
@@ -245,7 +248,7 @@ internal sealed class ProjectSession(
                 host.SaveProgress = report.Fraction * 100;
             });
 
-            var result = await ProjectFile.SaveAsync(path, document, progress);
+            var result = await store.SaveAsync(path, document, progress);
 
             _projectPath = path;
             document.MarkSaved();
@@ -299,7 +302,7 @@ internal sealed class ProjectSession(
 
         try
         {
-            TimelineCsvFile.Save(path, host.Timeline);
+            store.ExportTimeline(path, host.Timeline);
 
             host.Report(string.Format(
                 Strings.ProjectStatusExportedFormat,
@@ -359,20 +362,10 @@ internal sealed class ProjectSession(
         {
             // 已有工程:这是把里面的时间轴换掉;没有工程:用文件名兜底新建。
             // 用户在命名对话框里起的名字优先。
-            var existing = host.Document;
-            var name = documentName ?? existing?.Name ?? Path.GetFileNameWithoutExtension(fileName);
-
-            // 导入进来的帧会按通道切成块,块就用工程名命名。
-            var timeline = await TimelineCsvFile.LoadAsync(path, name);
-
+            var document = await new ProjectService(store).ImportAsync(path, host.Document, documentName);
+            var timeline = document.Timeline;
             host.Timeline = timeline;
-            host.Document = new TimelineDocument(name, timeline, existing?.MediaPath);
-
-            // 只有"往已有工程里换数据"才算改动;新建工程不算。
-            if (existing is not null && documentName is null)
-            {
-                host.Document.MarkModified();
-            }
+            host.Document = document;
 
             host.TimelineName = host.Document.Name;
             host.IsModified = host.Document.IsModified;

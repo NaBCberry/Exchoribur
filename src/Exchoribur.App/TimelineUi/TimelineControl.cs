@@ -5,10 +5,9 @@ using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Styling;
-using Exchoribur.App.Controls;
 using Exchoribur.App.Resources;
+using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Storage;
 
 namespace Exchoribur.App.TimelineUi;
 

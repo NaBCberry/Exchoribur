@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Exchoribur.App.Resources;
-using Exchoribur.App.Services;
+using Exchoribur.Application.Abstractions;
+using Exchoribur.Application.Playback;
 
 namespace Exchoribur.App.ViewModels;
 

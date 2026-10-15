@@ -35,7 +35,9 @@ tests/Exchoribur.Application.Tests/
 tests/Exchoribur.Infrastructure.Tests/
 tests/Exchoribur.App.Tests/
 scripts/                        构建发布脚本
-packaging/                      安装器配置
+packaging/windows/              Windows 打包配置与 Inno Setup 文件
+packaging/macos/                macOS 打包材料（预留）
+packaging/linux/                Linux 打包材料（预留）
 docs/                           架构与发布说明
 ```
 

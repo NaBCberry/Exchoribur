@@ -5,10 +5,11 @@ using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.Application.Abstractions;
+using Exchoribur.Application.Playback;
+using Exchoribur.Application.Settings;
+using Exchoribur.Application.Updates;
 using Exchoribur.Core.Devices;
-using Exchoribur.Core.Editing;
-using Exchoribur.Core.Settings;
-using Exchoribur.Core.Updates;
 
 namespace Exchoribur.App.ViewModels;
 
@@ -19,6 +20,7 @@ namespace Exchoribur.App.ViewModels;
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly string _path;
+    private readonly ISettingsStore _store;
     private readonly IExternalLauncher? _externalLauncher;
     private readonly IDeviceService? _deviceService;
     private readonly AudioDeviceSection _audioSection;
@@ -32,7 +34,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     /// <summary>正式运行走这个:读写当前用户的默认设置文件。</summary>
     public SettingsViewModel()
-        : this(SettingsStore.DefaultPath, audio: null, updates: null)
+        : this(AppServices.CreateSettingsStore().DefaultPath, audio: null, updates: null)
     {
     }
 
@@ -53,9 +55,11 @@ public partial class SettingsViewModel : ViewModelBase
         IAudioDeviceController? audio,
         UpdateCoordinator? updates,
         IExternalLauncher? externalLauncher,
-        IDeviceService? device = null)
+        IDeviceService? device = null,
+        ISettingsStore? store = null)
     {
         _path = path;
+        _store = store ?? AppServices.CreateSettingsStore();
         _externalLauncher = externalLauncher;
         _deviceService = device;
         _audioSection = new AudioDeviceSection(audio);
@@ -67,7 +71,7 @@ public partial class SettingsViewModel : ViewModelBase
         Groups = BuildGroups();
         SelectGroup(Groups[0]);
 
-        var settings = SettingsStore.Load(path);
+        var settings = _store.Load(path);
         InvertMouseWheel = settings.InvertMouseWheel;
         InvertTouchpadScroll = settings.InvertTouchpadScroll;
         DefaultBlockLengthMilliseconds = settings.DefaultBlockLength.TotalMilliseconds;
@@ -501,7 +505,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     public string AppName => Strings.AppName;
     public string BuildConfigurationText => AppVersion.Configuration;
-    public string ProjectUrl => GithubReleaseUpdateFeed.RepositoryUrl;
+    public string ProjectUrl => ReleaseSource.RepositoryUrl;
     public string LicenseText => Strings.SettingsLicenseName;
     public string CopyrightText => "© 2026 NaBCberry";
 
@@ -605,7 +609,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         try
         {
-            SettingsStore.Save(_path, new AppSettings
+            _store.Save(_path, new AppSettings
             {
                 InvertMouseWheel = InvertMouseWheel,
                 InvertTouchpadScroll = InvertTouchpadScroll,

@@ -1,6 +1,7 @@
 using Exchoribur.App.Resources;
-using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
+using Exchoribur.Application.Abstractions;
+using Exchoribur.Application.Playback;
 
 namespace Exchoribur.App.Tests;
 

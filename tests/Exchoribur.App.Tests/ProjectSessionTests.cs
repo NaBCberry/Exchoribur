@@ -1,7 +1,7 @@
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
-using Exchoribur.Core.Storage;
+using Exchoribur.Infrastructure.Storage;
 
 namespace Exchoribur.App.Tests;
 
@@ -101,7 +101,7 @@ public sealed class ProjectSessionTests : IDisposable
         FakeHost host,
         StubFilePicker? picker = null,
         INamePrompt? namePrompt = null)
-        => new(host, picker, namePrompt, unsavedPrompt: null);
+        => new(host, picker, namePrompt, unsavedPrompt: null, store: new ProjectStore());
 
     private string WriteCsv(string name)
     {

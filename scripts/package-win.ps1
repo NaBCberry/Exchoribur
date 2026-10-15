@@ -10,7 +10,7 @@
   Exchoribur-win-Portable.zip       便携包(解压即用,不自动更新)
 
 安装包的名字不要改:应用内自动更新按固定名字去 Release 里下载它(见
-src/Exchoribur.App/Services/GithubReleaseUpdateFeed.cs)。
+src/Exchoribur.Infrastructure/Updates/GithubReleaseUpdateFeed.cs)。
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +31,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $publishDir = Join-Path $repoRoot (Join-Path $OutputRoot "publish-$Runtime")
 $releaseDir = Join-Path $repoRoot (Join-Path $OutputRoot 'releases')
-$scriptFile = Join-Path $repoRoot 'packaging/inno/Exchoribur.iss'
+$scriptFile = Join-Path $repoRoot 'packaging/windows/inno/Exchoribur.iss'
 
 function Get-IsccPath {
     # winget 装的是每用户副本(版本新),官方安装器和 choco 装在 Program Files;

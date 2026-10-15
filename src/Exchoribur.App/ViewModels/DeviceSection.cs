@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.Application.Abstractions;
 using Exchoribur.Core.Devices;
 using Exchoribur.Core.Models;
 
@@ -25,6 +26,7 @@ public sealed partial class DeviceSection : ObservableObject
     private readonly SettingsViewModel _settings;
     private readonly IDeviceHost? _host;
     private readonly IExternalLauncher? _launcher;
+    private readonly IFileAccess _files;
 
     /// <summary>最近一次播放头位置:改亮度时要按同一时刻重发一帧。</summary>
     private TimeSpan _lastPosition;
@@ -33,12 +35,13 @@ public sealed partial class DeviceSection : ObservableObject
     private string? _problem;
 
     internal DeviceSection(IDeviceService? service, SettingsViewModel settings, IDeviceHost? host,
-                           IExternalLauncher? launcher = null)
+                           IExternalLauncher? launcher = null, IFileAccess? files = null)
     {
         _service = service;
         _settings = settings;
         _host = host;
         _launcher = launcher;
+        _files = files ?? AppServices.CreateFileAccess();
 
         if (_service is not null)
         {
@@ -152,13 +155,13 @@ public sealed partial class DeviceSection : ObservableObject
     public string? DeviceLogPath => _service?.DeviceLogPath;
 
     /// <summary>日志文件已经出现(连过一次串口就有),面板上据此决定要不要给"打开日志"按钮。</summary>
-    public bool HasDeviceLog => DeviceLogPath is { Length: > 0 } path && File.Exists(path);
+    public bool HasDeviceLog => DeviceLogPath is { Length: > 0 } path && _files.Exists(path);
 
     /// <summary>用系统默认程序打开设备日志。</summary>
     [RelayCommand]
     private async Task OpenDeviceLogAsync()
     {
-        if (_launcher is { } launcher && DeviceLogPath is { Length: > 0 } path && File.Exists(path))
+        if (_launcher is { } launcher && DeviceLogPath is { Length: > 0 } path && _files.Exists(path))
         {
             await launcher.OpenFileAsync(path);
         }

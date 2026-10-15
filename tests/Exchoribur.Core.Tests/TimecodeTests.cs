@@ -1,4 +1,4 @@
-using Exchoribur.Core.Storage;
+using Exchoribur.Core.Formatting;
 
 namespace Exchoribur.Core.Tests;
 
