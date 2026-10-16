@@ -125,7 +125,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         Playback.ViewportRequested += OnPlaybackViewportRequested;
 
         // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
-        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt, projectStore ?? AppServices.CreateProjectStore());
+        _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt, projectStore ?? AppServices.CreateProjectStore(), () => !_disposed);
 
 
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
@@ -149,6 +149,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         }
 
         _disposed = true;
+        NewProjectCommand.NotifyCanExecuteChanged();
 
         Editing.EditStarting -= Playback.PausePlayback;
         Editing.TimelineChanged -= OnEditingTimelineChanged;
@@ -239,6 +240,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// <summary>忙碌状态变了:要不要显示进度条、显示到哪儿,都得让界面知道。</summary>
     private void NotifyBusyStateChanged()
     {
+        NewProjectCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsBusy));
         OnPropertyChanged(nameof(BusyProgress));
     }
@@ -295,6 +297,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Editing.Timeline, time);
     bool IProjectHost.OpenVideo(string path) => Preview.OpenVideo(path);
+    void IProjectHost.ClearVideo()
+    {
+        Playback.PausePlayback();
+        Preview.Clear();
+    }
     private void ApplyAudioSettings() => _audio.Apply(Settings.Audio.AudioOutputDeviceId, Settings.Audio.AudioVolume);
 
     private void OnEditingTimelineChanged(bool reset) => Playback.RefreshTimeline(reset);
@@ -330,6 +337,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             Editing.Viewport.EnsureVisible(value);
         }
     }
+
+    private bool CanCreateProject() => !_disposed && !IsBusy;
+
+    /// <summary>菜单「文件 → 新建工程」和 Ctrl+N 共用工程创建流程。</summary>
+    [RelayCommand(CanExecute = nameof(CanCreateProject))]
+    private Task NewProjectAsync() => CanCreateProject() ? _projects.NewProjectAsync() : Task.CompletedTask;
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
     [RelayCommand]

@@ -17,10 +17,34 @@ internal sealed class ProjectSession(
     IFilePicker? filePicker,
     INamePrompt? namePrompt,
     IUnsavedChangesPrompt? unsavedPrompt,
-    IProjectStore store)
+    IProjectStore store,
+    Func<bool>? isActive = null)
 {
     /// <summary>当前工程文件的路径。没打开过也没保存过时是 null。</summary>
     private string? _projectPath;
+
+    private bool _creatingProject;
+
+    /// <summary>新建空工程。对话框取消或保存失败时保留当前内容与保存路径。</summary>
+    public async Task NewProjectAsync()
+    {
+        if (_creatingProject || host.IsSaving || host.IsLoading || isActive?.Invoke() == false) return;
+        _creatingProject = true;
+        try
+        {
+            if (!await ConfirmDiscardChangesAsync() || isActive?.Invoke() == false) return;
+            var name = namePrompt is null ? Strings.ProjectDefaultName
+                : await namePrompt.AskAsync(Strings.ProjectPromptNewProject, Strings.ProjectDefaultName);
+            if (name is null || host.IsSaving || host.IsLoading || isActive?.Invoke() == false) return;
+
+            host.ClearVideo();
+            _projectPath = null;
+            CreateDocument(name);
+            host.Timeline = Timeline.Empty;
+            host.Report(string.Format(Strings.ProjectStatusCreatedFormat, host.TimelineName), error: false);
+        }
+        finally { _creatingProject = false; }
+    }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
     public async Task OpenAsync()

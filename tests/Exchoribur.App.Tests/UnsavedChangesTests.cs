@@ -109,6 +109,37 @@ public sealed class UnsavedChangesTests : IDisposable
         Assert.False(viewModel.HasError);
     }
 
+    [Theory]
+    [InlineData(UnsavedChangesChoice.Cancel)]
+    [InlineData(UnsavedChangesChoice.Save)]
+    public async Task New_project_keeps_unsaved_edits_when_cancelled_or_save_dialog_is_cancelled(UnsavedChangesChoice choice)
+    {
+        var (model, _, _) = await SetUpDirtyProjectAsync(choice);
+        using (model)
+        {
+            var original = model.Document;
+            await model.NewProjectCommand.ExecuteAsync(null);
+            Assert.Same(original, model.Document);
+            Assert.Equal(2, Assert.Single(model.Editing.Blocks).Frames.Count);
+            Assert.True(model.IsModified);
+        }
+    }
+
+    [Fact]
+    public async Task New_project_saves_the_old_edits_before_creating_an_empty_document()
+    {
+        var path = Path.Combine(_directory, "saved.exb");
+        var (model, _, _) = await SetUpDirtyProjectAsync(UnsavedChangesChoice.Save, path);
+        using (model)
+        {
+            await model.NewProjectCommand.ExecuteAsync(null);
+            Assert.True(File.Exists(path));
+            Assert.Empty(model.Editing.Blocks);
+            Assert.NotNull(model.Document);
+            Assert.False(model.IsModified);
+        }
+    }
+
     /// <summary>造一个"已经改了但没保存"的工程,并装好问话用的假对话框。</summary>
     private async Task<(MainViewModel ViewModel, StubFilePicker Picker, StubUnsavedPrompt Prompt)>
         SetUpDirtyProjectAsync(UnsavedChangesChoice choice, string? projectPath = null)

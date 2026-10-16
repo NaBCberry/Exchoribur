@@ -42,6 +42,9 @@ internal interface IProjectHost
     /// <summary>打开参考视频;解码器不可用或文件打不开时返回 false。</summary>
     bool OpenVideo(string path);
 
+    /// <summary>暂停播放并清理当前参考视频,不创建新的播放器。</summary>
+    void ClearVideo();
+
     /// <summary>
     /// 往状态栏写一句结果。error 传 null 表示"保持当前是不是报错的标记不变"——
     /// 打开工程时状态栏要显示正文,同时保留视频打不开留下的报错标记。

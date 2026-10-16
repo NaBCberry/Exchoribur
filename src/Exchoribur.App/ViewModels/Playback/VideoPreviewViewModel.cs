@@ -19,7 +19,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
 
     internal IVideoService? CreatedService => _video;
 
-    public WriteableBitmap? VideoFrame => _disposed ? null : Video.Frame;
+    public WriteableBitmap? VideoFrame => _disposed ? null : _video?.Frame;
 
     [ObservableProperty]
     public partial int VideoFrameVersion { get; set; }
@@ -44,7 +44,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
 
     private void OnFrameUpdated(object? sender, EventArgs e)
     {
-        if (_disposed) return;
+        if (_disposed || !ReferenceEquals(sender, _video)) return;
         if (!ReferenceEquals(_lastFrame, _video?.Frame))
         {
             _lastFrame = _video?.Frame;
@@ -75,6 +75,20 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         StatusReported?.Invoke(string.Format(Strings.MainVideoLoadedFormat, fileName), false);
 
         return true;
+    }
+
+    /// <summary>新建工程时移除参考视频;模型仍可用于下一次导入。</summary>
+    public void Clear()
+    {
+        if (_disposed) return;
+        var video = _video;
+        _video = null;
+        _lastFrame = null;
+        if (video is not null) video.FrameUpdated -= OnFrameUpdated;
+        HasVideo = false;
+        VideoFrameVersion = 0;
+        OnPropertyChanged(nameof(VideoFrame));
+        video?.Dispose();
     }
 
     public void Dispose()

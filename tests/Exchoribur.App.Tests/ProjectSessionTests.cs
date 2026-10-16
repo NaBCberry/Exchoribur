@@ -167,6 +167,7 @@ public sealed class ProjectSessionTests : IDisposable
         public int TitleRefreshCount { get; private set; }
 
         public bool OpenVideo(string path) => false;
+        public void ClearVideo() { }
 
         public void Report(string text, bool? error = null)
         {

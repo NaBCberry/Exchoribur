@@ -24,6 +24,7 @@
     </Design.DataContext>
 
     <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding NewProjectCommand}" />
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveProjectCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveProjectAsCommand}" />
@@ -41,6 +42,12 @@
         <!-- 顶部菜单 -->
         <Menu DockPanel.Dock="Top" Background="{DynamicResource ChromeBackgroundBrush}">
             <MenuItem Header="{x:Static res:Strings.MainMenuFile}">
+                <MenuItem Header="{x:Static res:Strings.MainMenuNewProject}"
+                          Command="{Binding NewProjectCommand}" InputGesture="Ctrl+N">
+                    <MenuItem.Icon>
+                        <Path Classes="icon title" Data="{x:Static controls:Icons.NewProject}" />
+                    </MenuItem.Icon>
+                </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuOpenProject}" Command="{Binding OpenProjectCommand}">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.OpenProject}" />

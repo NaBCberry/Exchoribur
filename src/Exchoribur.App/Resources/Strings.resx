@@ -121,7 +121,7 @@
     <value>Exchoribur</value>
   </data>
   <data name="MainStatusEmpty" xml:space="preserve">
-    <value>还没有载入工程文件,用「文件 → 打开」选一个 CSV。</value>
+    <value>还没有工程，可通过「文件 → 新建工程」开始，或打开已有工程。</value>
   </data>
   <data name="MainWindowTitleFormat" xml:space="preserve">
     <value>{0} — Exchoribur</value>
@@ -902,5 +902,17 @@
   </data>
   <data name="VideoPreviewExitFullscreen" xml:space="preserve">
     <value>退出全屏</value>
+  </data>
+  <data name="MainMenuNewProject" xml:space="preserve">
+    <value>新建工程…</value>
+  </data>
+  <data name="ProjectPromptNewProject" xml:space="preserve">
+    <value>新建工程</value>
+  </data>
+  <data name="ProjectDefaultName" xml:space="preserve">
+    <value>未命名工程</value>
+  </data>
+  <data name="ProjectStatusCreatedFormat" xml:space="preserve">
+    <value>已新建工程「{0}」。</value>
   </data>
 </root>
