@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.DesignTime;
@@ -8,7 +7,6 @@ using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.Application.Abstractions;
-using Exchoribur.Application.Playback;
 using Exchoribur.Application.Updates;
 using Exchoribur.Core.Editing;
 using Exchoribur.Core.Formatting;
@@ -27,7 +25,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     private readonly INamePrompt? _namePrompt;
     private readonly IAudioDeviceController _audio;
     public UpdateViewModel Updates { get; }
-    private readonly PlaybackController _playback;
+    public PlaybackViewModel Playback { get; }
+    public VideoPreviewViewModel Preview { get; }
     private readonly ProjectSession _projects;
     private readonly IDeviceService? _deviceService;
 
@@ -89,8 +88,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         _namePrompt = namePrompt;
 
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
-        _videoFactory = videoFactory ?? AppServices.CreateVideo;
-        _audio = audio ?? new VideoAudioDeviceController(() => _video);
+        Preview = new VideoPreviewViewModel(videoFactory ?? AppServices.CreateVideo);
+        Preview.ServiceCreated += ApplyAudioSettings;
+        Preview.StatusReported += Report;
+        _audio = audio ?? new VideoAudioDeviceController(() => Preview.CreatedService);
 
         // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
         // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
@@ -113,7 +114,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         Device = new DeviceSection(device, Settings, this, externalLauncher);
 
         // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
-        _playback = new PlaybackController(clock, () => HasVideo, () => _video, SyncPlaybackFlags);
+        Playback = new PlaybackViewModel(clock, () => Timeline, Preview);
+        Playback.PositionChanged += OnPlaybackPositionChanged;
+        Playback.ViewportRequested += OnPlaybackViewportRequested;
 
         // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
         _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt, projectStore ?? AppServices.CreateProjectStore());
@@ -145,7 +148,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
         _disposed = true;
 
-        _playback.Pause();
+        Playback.Dispose();
+        Playback.PositionChanged -= OnPlaybackPositionChanged;
+        Playback.ViewportRequested -= OnPlaybackViewportRequested;
         Device.Dispose();
 
         Updates.ExitRequested -= OnUpdateExitRequested;
@@ -156,8 +161,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         // 发起后台停机;真实关窗路径通过 DisposeAsync 等待,不阻塞界面线程。
         _deviceShutdown = _deviceService?.DisposeAsync().AsTask() ?? Task.CompletedTask;
 
-        _video?.Dispose();
-        _video = null;
+        Preview.ServiceCreated -= ApplyAudioSettings;
+        Preview.StatusReported -= Report;
+        Preview.Dispose();
 
         GC.SuppressFinalize(this);
     }
@@ -167,13 +173,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         Dispose();
         return new ValueTask(_deviceShutdown);
     }
-
-    /// <summary>预览用的当前帧画面。</summary>
-    public WriteableBitmap? VideoFrame => Video.Frame;
-
-    /// <summary>视频帧序号,每来一帧加一,给画面控件当刷新信号。</summary>
-    [ObservableProperty]
-    public partial int VideoFrameVersion { get; set; }
 
     /// <summary>当前工程。还没导入任何东西时是 null。</summary>
     public TimelineDocument? Document { get; private set; }
@@ -254,8 +253,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// 用户刚做的缩放平移就被冲掉了(播放时的跟随由 PageTo 负责)。
     /// </summary>
     public TimeSpan CurrentBlockFocus
-        => CurrentBlock is { } block && PlayheadTime > block.Start && PlayheadTime < block.End
-            ? PlayheadTime
+        => CurrentBlock is { } block && Playback.PlayheadTime > block.Start && Playback.PlayheadTime < block.End
+            ? Playback.PlayheadTime
             : CurrentBlock?.Start ?? TimeSpan.Zero;
 
     /// <summary>聚焦那一帧到下一帧的间隔;没有下一帧就用块剩下的长度,再不行给 1 秒。</summary>
@@ -406,15 +405,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     public partial Timeline Timeline { get; set; }
 
     [ObservableProperty]
-    public partial TimeSpan PlayheadTime { get; set; }
-
-    /// <summary>播放条左边那块走带时间,固定写成 hh:mm:ss.mmm。</summary>
-    public string PlayheadText => Timecode.FormatClock(PlayheadTime);
-
-    [ObservableProperty]
-    public partial Frame? CurrentFrame { get; set; }
-
-    [ObservableProperty]
     public partial string StatusText { get; set; }
 
     /// <summary>状态栏这句是提示还是报错,决定它的颜色。</summary>
@@ -436,30 +426,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// 那一段显示得出来但播不了(见 TimelineControl 里的灰色蒙版)。
     /// </summary>
     public TimeSpan TimelineStart => Timeline.Start;
-
-    /// <summary>
-    /// 能播多长:有时间轴按时间轴算,只有视频就按视频算,两边都有时取长的那个。
-    /// 这样"只导入视频、还没导入灯光数据"时也能按播放预览视频。
-    /// </summary>
-    private TimeSpan PlaybackLength
-    {
-        get
-        {
-            var length = Duration;
-
-            // 长度在媒体还没读出来之前是 0,这时不算数。
-            if (HasVideo && Video.Length > TimeSpan.Zero)
-            {
-                var videoLength = Video.Length;
-                if (videoLength > length)
-                {
-                    length = videoLength;
-                }
-            }
-
-            return length;
-        }
-    }
 
     /// <summary>
     /// 时间轴的取景框:现在看哪一段、放大到多少。
@@ -493,79 +459,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// <summary>场控设备面板:连接状态、发包统计、现场亮度。</summary>
     public DeviceSection Device { get; }
 
-    private readonly Func<IVideoService> _videoFactory;
-
-    /// <summary>按工程的取样规则取某个时刻的十个通道状态,设备吐帧用。</summary>
     Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Timeline, time);
-
-    private IVideoService? _video;
-
-    /// <summary>
-    /// 视频预览用的播放器。第一次真正用到时才创建:它会加载 libvlc(重、会起线程),
-    /// 没导入视频的场合没必要付这个代价。
-    /// </summary>
-    public IVideoService Video
-    {
-        get
-        {
-            if (_video is null)
-            {
-                _video = _videoFactory();
-                // 每解出一帧抬一次序号;位图是同一个对象,界面靠它知道内容变了。
-                _video.FrameUpdated += (_, _) => VideoFrameVersion++;
-                // 播放器刚建出来,把设置里的音量与输出设备应用上去。
-                _audio.Apply(Settings.AudioOutputDeviceId, Settings.AudioVolume);
-            }
-
-            return _video;
-        }
-    }
-
-    /// <summary>是否已经载入了参考视频,用来决定预览框是显示画面还是提示文字。</summary>
-    [ObservableProperty]
-    public partial bool HasVideo { get; set; }
-
-    /// <summary>是不是正在播放。播放/暂停那个按钮的图标跟着它换。</summary>
-    [ObservableProperty]
-    public partial bool IsPlaying { get; set; }
-
-    /// <summary>取反给界面用:一个按钮里放两个图标,靠这两个布尔量切换显隐。</summary>
-    public bool IsPaused => !IsPlaying;
-
-    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(IsPaused));
-
-    /// <summary>播到结尾要不要绕回开头接着播。</summary>
-    [ObservableProperty]
-    public partial bool IsLooping { get; set; }
-
-    partial void OnIsLoopingChanged(bool value) => _playback.Loop = value;
-
-    /// <summary>打开参考视频。解码器不可用或文件打不开时只改状态栏,不动已经打开的内容。</summary>
-    public bool OpenVideo(string path)
-    {
-        var fileName = Path.GetFileName(path);
-
-        if (!Video.IsAvailable)
-        {
-            HasError = true;
-            StatusText = string.Format(Strings.MainVideoUnavailableFormat, Video.ErrorMessage);
-            return false;
-        }
-
-        // 导入后先停在播放头位置:正在播放的话就让它跟着播,否则停住等按播放。
-        if (!Video.Load(path))
-        {
-            HasError = true;
-            StatusText = string.Format(Strings.MainVideoOpenFailedFormat, fileName);
-            return false;
-        }
-
-        HasVideo = true;
-        HasError = false;
-        StatusText = string.Format(Strings.MainVideoLoadedFormat, fileName);
-
-        return true;
-    }
+    bool IProjectHost.OpenVideo(string path) => Preview.OpenVideo(path);
+    private void ApplyAudioSettings() => _audio.Apply(Settings.AudioOutputDeviceId, Settings.AudioVolume);
 
     partial void OnTimelineChanged(Timeline value)
     {
@@ -576,7 +472,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         OnPropertyChanged(nameof(TimelineStart));
 
         // 播放头位置没变,但那一刻的灯光可能换了,得重算一次。
-        CurrentFrame = BlockSampler.Sample(value, PlayheadTime);
+        Playback.RefreshTimeline(reset: false);
 
         // 编辑每次都会换一个新的 Timeline 对象,但播放头、视口、块选中、撤销历史
         // 都该留在原地;只有换成另一条时间轴(打开、导入、新建)才从头开始。
@@ -599,13 +495,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         SyncEditorState();
 
         // 这里必须显式重算一次,因为播放头本来就是 0 的时候 setter 不会触发变更回调。
-        PlayheadTime = TimeSpan.Zero;
-        CurrentFrame = BlockSampler.Sample(timeline, PlayheadTime);
+        Playback.RefreshTimeline(reset: true);
 
         // 换文件的瞬间把播放停掉:新时间轴刚载入不该自己跑起来。
         // 视频不动:新数据可能紧接着就要挂上自己的参考媒体。
-        _playback.Reset();
-        _playback.SetLength(PlaybackLength);
+
 
         // 新文件一律先整条铺满,否则上一份文件的缩放位置留着会让新数据莫名其妙。
         Viewport.SetContent(TimelineStart, Duration - TimelineStart);
@@ -624,34 +518,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             : Strings.MainLabelRedo;
     }
 
-    partial void OnPlayheadTimeChanged(TimeSpan value)
+    private void OnPlaybackPositionChanged(TimeSpan value)
     {
-        // 按块的取样规则取这一刻的灯光:落在块之间就是黑场。
-        CurrentFrame = BlockSampler.Sample(Timeline, value);
-
-        OnPropertyChanged(nameof(PlayheadText));
-
-        // 块编辑器跟着播放头走:播放时和主时间轴一样整页翻,拖动时只保证露出来就行。
-        if (IsPlaying)
-        {
-            BlockEditorViewport.PageTo(value);
-        }
-        else
-        {
-            BlockEditorViewport.EnsureVisible(value);
-        }
-
-        // 这个位置不是播放自己推出来的(用户拖动、点时间轴、跳帧),
-        // 那么播放状态机和视频都要跟过来:视频永远显示播放头所在的那一帧,
-        // 播放也从这里继续。相等时不动,免得播放中每帧都去 seek 把画面弄卡。
-        if (value != _playback.Position)
-        {
-            _playback.SeekTo(value);
-            _playback.FollowPosition(value);
-        }
-
-        // 设备跟着播放头走:这一刻该亮的灯和上次发出去的不一样,才真的发一帧。
+        if (Playback.IsPlaying) BlockEditorViewport.PageTo(value);
+        else BlockEditorViewport.EnsureVisible(value);
         Device.FollowPosition(value);
+    }
+
+    private void OnPlaybackViewportRequested(TimeSpan value, bool page)
+    {
+        if (page) Viewport.PageTo(value);
+        else Viewport.EnsureVisible(value);
     }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
@@ -690,96 +567,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     private Task ImportVideoAsync() => _projects.ImportVideoAsync();
 
     [RelayCommand]
-    private void GoToStart() => Seek(TimeSpan.Zero);
-
-    [RelayCommand]
-    private void GoToEnd() => Seek(Duration);
-
-    /// <summary>播放和暂停合成一个按钮:正在播就暂停,否则从当前位置播。</summary>
-    [RelayCommand]
-    private void TogglePlay()
-    {
-        if (IsPlaying)
-        {
-            PausePlayback();
-        }
-        else
-        {
-            StartPlayback();
-        }
-    }
-
-    [RelayCommand]
-    private void StopPlayback()
-    {
-        _playback.Stop();
-        PlayheadTime = _playback.Position;
-        Viewport.EnsureVisible(PlayheadTime);
-    }
-
-    [RelayCommand]
-    private void PreviousFrame()
-    {
-        PausePlayback();
-        Seek(Timeline.GetPreviousFrameTime(PlayheadTime) ?? TimeSpan.Zero);
-    }
-
-    [RelayCommand]
-    private void NextFrame()
-    {
-        PausePlayback();
-        Seek(Timeline.GetNextFrameTime(PlayheadTime) ?? Duration);
-    }
-
-    /// <summary>
-    /// 时钟每过一帧调一次(测试里直接喂时间)。播放头是主时钟:
-    /// 灯光时间轴跟着它走,视频也跟着它走,所以两边永远是同一条时间线。
-    /// </summary>
-    public void AdvancePlayback(TimeSpan elapsed)
-    {
-        if (!_playback.Advance(elapsed))
-        {
-            return;
-        }
-
-        PlayheadTime = _playback.Position;
-        SyncPlaybackFlags();
-
-        // 播放时让播放头一直留在画面里:跑出画面就整页翻过去,落点在视口左边靠右一点。
-        Viewport.PageTo(PlayheadTime);
-        _playback.CorrectDrift();
-    }
-
-    private void StartPlayback()
-    {
-        _playback.SetLength(PlaybackLength);
-        _playback.Play(AdvancePlayback);
-
-        if (!_playback.IsPlaying)
-        {
-            return; // 没有内容可播
-        }
-
-        PlayheadTime = _playback.Position;
-    }
-
-    private void PausePlayback() => _playback.Pause();
-
-    /// <summary>把播放头挪到指定位置:暂停状态下用,位置、视口、视频一起跟上。</summary>
-    private void Seek(TimeSpan position)
-    {
-        PausePlayback();
-        _playback.SetLength(PlaybackLength);
-        _playback.SeekTo(position);
-
-        PlayheadTime = _playback.Position;
-        Viewport.EnsureVisible(PlayheadTime);
-        _playback.FollowPosition(PlayheadTime);
-    }
-
-    private void SyncPlaybackFlags() => IsPlaying = _playback.IsPlaying;
-
-    [RelayCommand]
     private void ZoomIn() => Viewport.ZoomBy(1.4);
 
     [RelayCommand]
@@ -797,7 +584,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             return;
         }
 
-        PausePlayback();
+        Playback.PausePlayback();
         _editing.Undo();
         PublishEditorTimeline();
         Report(string.Format(Strings.MainUndoDoneFormat, _editing.RedoName));
@@ -812,7 +599,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             return;
         }
 
-        PausePlayback();
+        Playback.PausePlayback();
         _editing.Redo();
         PublishEditorTimeline();
         Report(string.Format(Strings.MainRedoDoneFormat, _editing.UndoName));
@@ -1065,7 +852,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             return;
         }
 
-        var color = BlockSampler.SampleChannels(Timeline, PlayheadTime)[block.Channel].Color;
+        var color = BlockSampler.SampleChannels(Timeline, Playback.PlayheadTime)[block.Channel].Color;
         PaintBlockFrames(block, color, Strings.MainActionTakePlayheadColor);
     }
 
@@ -1102,7 +889,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
             return;
         }
 
-        var offset = PlayheadTime - block.Start;
+        var offset = Playback.PlayheadTime - block.Start;
 
         if (offset < TimeSpan.Zero || offset >= block.Length)
         {
@@ -1181,7 +968,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         }
 
         // 边播边改会让人看不出改的是哪一帧,先停下来。
-        PausePlayback();
+        Playback.PausePlayback();
 
         _editing.Apply(edit);
         PublishEditorTimeline();

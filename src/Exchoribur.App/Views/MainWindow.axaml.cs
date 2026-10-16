@@ -109,7 +109,7 @@ public partial class MainWindow : Window
 
         if (DataContext is MainViewModel viewModel)
         {
-            viewModel.TogglePlayCommand.Execute(null);
+            viewModel.Playback.TogglePlayCommand.Execute(null);
             e.Handled = true;
         }
     }

@@ -24,10 +24,10 @@ public sealed class VideoInjectionTests : IDisposable
         var video = new StubVideoService();
         var viewModel = CreateViewModel(video);
 
-        var loaded = viewModel.OpenVideo(Path.Combine(_directory, "show.mp4"));
+        var loaded = viewModel.Preview.OpenVideo(Path.Combine(_directory, "show.mp4"));
 
         Assert.True(loaded);
-        Assert.True(viewModel.HasVideo);
+        Assert.True(viewModel.Preview.HasVideo);
         Assert.False(viewModel.HasError);
         Assert.Contains("show.mp4", viewModel.StatusText);
         Assert.Equal(Path.Combine(_directory, "show.mp4"), video.LoadedPath);
@@ -43,10 +43,10 @@ public sealed class VideoInjectionTests : IDisposable
         };
         var viewModel = CreateViewModel(video);
 
-        var loaded = viewModel.OpenVideo(Path.Combine(_directory, "show.mp4"));
+        var loaded = viewModel.Preview.OpenVideo(Path.Combine(_directory, "show.mp4"));
 
         Assert.False(loaded);
-        Assert.False(viewModel.HasVideo);
+        Assert.False(viewModel.Preview.HasVideo);
         Assert.True(viewModel.HasError);
         Assert.Contains("解码器没装", viewModel.StatusText);
         Assert.Null(video.LoadedPath);
@@ -58,12 +58,41 @@ public sealed class VideoInjectionTests : IDisposable
         var video = new StubVideoService { LoadResult = false };
         var viewModel = CreateViewModel(video);
 
-        var loaded = viewModel.OpenVideo(Path.Combine(_directory, "show.mp4"));
+        var loaded = viewModel.Preview.OpenVideo(Path.Combine(_directory, "show.mp4"));
 
         Assert.False(loaded);
-        Assert.False(viewModel.HasVideo);
+        Assert.False(viewModel.Preview.HasVideo);
         Assert.True(viewModel.HasError);
         Assert.Contains("show.mp4", viewModel.StatusText);
+    }
+
+    [Fact]
+    public void An_unused_preview_does_not_create_a_player_even_when_disposed()
+    {
+        var created = 0;
+        var preview = new VideoPreviewViewModel(() => { created++; return new StubVideoService(); });
+        preview.Dispose();
+        preview.Dispose();
+        Assert.Equal(0, created);
+        Assert.False(preview.OpenVideo("unused.mp4"));
+        Assert.Null(preview.VideoFrame);
+    }
+
+    [Fact]
+    public void Preview_disposal_detaches_frames_and_ignores_an_already_queued_callback()
+    {
+        var video = new StubVideoService();
+        var preview = new VideoPreviewViewModel(() => video);
+        Assert.True(preview.OpenVideo("show.mp4"));
+        video.Play();
+        Assert.Equal(1, preview.VideoFrameVersion);
+        var queued = video.CaptureFrameCallback();
+        preview.Dispose();
+        preview.Dispose();
+        queued();
+        video.Play();
+        Assert.Equal(1, preview.VideoFrameVersion);
+        Assert.Equal(1, video.DisposeCount);
     }
 
     private MainViewModel CreateViewModel(IVideoService video)
@@ -102,6 +131,12 @@ public sealed class VideoInjectionTests : IDisposable
         public string? LoadedPath { get; private set; }
 
         public event EventHandler? FrameUpdated;
+        public int DisposeCount { get; private set; }
+        public Action CaptureFrameCallback()
+        {
+            var callback = FrameUpdated;
+            return () => callback?.Invoke(this, EventArgs.Empty);
+        }
 
         public IReadOnlyList<AudioDeviceOption> GetAudioDevices() => [];
 
@@ -125,8 +160,6 @@ public sealed class VideoInjectionTests : IDisposable
 
         public void Seek(TimeSpan position) => Position = position;
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() => DisposeCount++;
     }
 }

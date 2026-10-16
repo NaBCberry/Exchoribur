@@ -47,8 +47,8 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal("show", viewModel.TimelineName);
 
         // 播放头回到开头,通道状态也应该跟着换成第一帧。
-        Assert.Equal(TimeSpan.Zero, viewModel.PlayheadTime);
-        var currentFrame = Assert.IsType<Frame>(viewModel.CurrentFrame);
+        Assert.Equal(TimeSpan.Zero, viewModel.Playback.PlayheadTime);
+        var currentFrame = Assert.IsType<Frame>(viewModel.Playback.CurrentFrame);
         Assert.Equal(TimeSpan.Zero, currentFrame.Time);
         Assert.Equal(new LightColor(15, 0, 0), currentFrame.Channels[0].Color);
     }

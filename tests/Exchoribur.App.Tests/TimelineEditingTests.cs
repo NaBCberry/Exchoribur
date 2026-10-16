@@ -224,7 +224,7 @@ public sealed class TimelineEditingTests : IDisposable
 
         viewModel.SelectedBlocks = viewModel.Blocks;
         viewModel.OpenBlockEditor(viewModel.Blocks[0]);
-        viewModel.PlayheadTime = TimeSpan.FromMilliseconds(1000);
+        viewModel.Playback.PlayheadTime = TimeSpan.FromMilliseconds(1000);
 
         viewModel.InsertFrameAtPlayheadCommand.Execute(null);
 

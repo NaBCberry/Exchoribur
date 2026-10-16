@@ -225,7 +225,7 @@
                     <!-- 走带光标所在处的时间,紧贴中间按钮组的左边 -->
                     <Border Classes="readout">
                         <TextBlock Classes="clock"
-                                   Text="{Binding PlayheadText}"
+                                   Text="{Binding Playback.PlayheadText}"
                                    VerticalAlignment="Center" />
                     </Border>
                 </StackPanel>
@@ -237,46 +237,46 @@
                             Spacing="8">
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToStart}"
-                        Command="{Binding GoToStartCommand}">
+                        Command="{Binding Playback.GoToStartCommand}">
                     <Path Classes="icon title" Data="{x:Static controls:Icons.GoToStart}" />
                 </Button>
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipPreviousFrame}"
-                        Command="{Binding PreviousFrameCommand}">
+                        Command="{Binding Playback.PreviousFrameCommand}">
                     <Path Classes="icon title" Data="{x:Static controls:Icons.PreviousFrame}" />
                 </Button>
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipNextFrame}"
-                        Command="{Binding NextFrameCommand}">
+                        Command="{Binding Playback.NextFrameCommand}">
                     <Path Classes="icon title" Data="{x:Static controls:Icons.NextFrame}" />
                 </Button>
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToEnd}"
-                        Command="{Binding GoToEndCommand}">
+                        Command="{Binding Playback.GoToEndCommand}">
                     <Path Classes="icon title" Data="{x:Static controls:Icons.GoToEnd}" />
                 </Button>
 
                 <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
                 <Button Classes="transport primary play"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipPlayPause}"
-                        Command="{Binding TogglePlayCommand}">
+                        Command="{Binding Playback.TogglePlayCommand}">
                     <Panel>
                         <Path Classes="icon big play"
                               Data="{x:Static controls:Icons.Play}"
-                              IsVisible="{Binding IsPaused}" />
+                              IsVisible="{Binding Playback.IsPaused}" />
                         <Path Classes="icon big play"
                               Data="{x:Static controls:Icons.Pause}"
-                              IsVisible="{Binding IsPlaying}" />
+                              IsVisible="{Binding Playback.IsPlaying}" />
                     </Panel>
                 </Button>
                 <Button Classes="transport primary stop"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipStop}"
-                        Command="{Binding StopPlaybackCommand}">
+                        Command="{Binding Playback.StopPlaybackCommand}">
                     <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
                 </Button>
                 <ToggleButton Classes="transport primary loop"
                               ToolTip.Tip="{x:Static res:Strings.MainTooltipLoop}"
-                              IsChecked="{Binding IsLooping}">
+                              IsChecked="{Binding Playback.IsLooping}">
                     <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
                 </ToggleButton>
 
@@ -328,8 +328,8 @@
                         <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
                              等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
                              而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
-                        <controls:VideoSurface Frame="{Binding VideoFrame}"
-                                               FrameVersion="{Binding VideoFrameVersion}" />
+                        <controls:VideoSurface Frame="{Binding Preview.VideoFrame}"
+                                               FrameVersion="{Binding Preview.VideoFrameVersion}" />
                     </DockPanel>
                 </Border>
 
@@ -343,7 +343,7 @@
                             <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.MainPanelChannelState}" />
                         </StackPanel>
 
-                        <controls:LightStatusControl CurrentFrame="{Binding CurrentFrame}" />
+                        <controls:LightStatusControl CurrentFrame="{Binding Playback.CurrentFrame}" />
                     </DockPanel>
                 </Border>
             </Grid>
@@ -410,7 +410,7 @@
                                 Blocks="{Binding Blocks}"
                                 Markers="{Binding Markers}"
                                 Viewport="{Binding Viewport}"
-                                PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                                PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}"
                                 SelectedBlocks="{Binding SelectedBlocks, Mode=TwoWay}"
                                 CurrentBlockId="{Binding CurrentBlockId}"
                                 BottomOverlayHeight="{Binding EditorOverlayHeight}"
@@ -473,7 +473,7 @@
                                         Blocks="{Binding Blocks}"
                                         CurrentBlock="{Binding CurrentBlock}"
                                         Viewport="{Binding BlockEditorViewport}"
-                                        PlayheadTime="{Binding PlayheadTime, Mode=TwoWay}"
+                                        PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}"
                                         SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
                                         FocusTime="{Binding CurrentBlockFocus}"
                                         FocusSpacing="{Binding CurrentBlockSpacing}"

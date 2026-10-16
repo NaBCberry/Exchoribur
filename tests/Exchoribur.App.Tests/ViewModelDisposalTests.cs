@@ -27,7 +27,7 @@ public sealed class ViewModelDisposalTests : IDisposable
         viewModel.Dispose();
         viewModel.Dispose();
 
-        Assert.False(viewModel.HasVideo);
+        Assert.False(viewModel.Preview.HasVideo);
     }
 
     [Fact]

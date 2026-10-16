@@ -23,41 +23,41 @@ public sealed class PlaybackViewModelTests : IDisposable
     {
         var (viewModel, clock) = await CreateAsync();
 
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
-        Assert.True(viewModel.IsPlaying);
-        Assert.False(viewModel.IsPaused);
+        Assert.True(viewModel.Playback.IsPlaying);
+        Assert.False(viewModel.Playback.IsPaused);
         Assert.True(clock.IsRunning);
 
         clock.Tick(TimeSpan.FromMilliseconds(600));
 
-        Assert.Equal(TimeSpan.FromMilliseconds(600), viewModel.PlayheadTime);
-        Assert.True(viewModel.IsPlaying);
+        Assert.Equal(TimeSpan.FromMilliseconds(600), viewModel.Playback.PlayheadTime);
+        Assert.True(viewModel.Playback.IsPlaying);
     }
 
     [Fact]
     public async Task Playing_past_the_end_stops_and_shows_the_play_button_again()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
         clock.Tick(TimeSpan.FromSeconds(5));
 
-        Assert.False(viewModel.IsPlaying);
-        Assert.True(viewModel.IsPaused);
+        Assert.False(viewModel.Playback.IsPlaying);
+        Assert.True(viewModel.Playback.IsPaused);
         Assert.False(clock.IsRunning);
-        Assert.Equal(TimeSpan.FromSeconds(3), viewModel.PlayheadTime);
+        Assert.Equal(TimeSpan.FromSeconds(3), viewModel.Playback.PlayheadTime);
     }
 
     [Fact]
     public async Task Toggling_again_pauses()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
-        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.Playback.IsPlaying);
         Assert.False(clock.IsRunning);
     }
 
@@ -65,14 +65,14 @@ public sealed class PlaybackViewModelTests : IDisposable
     public async Task Stop_rewinds_to_the_beginning()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
         clock.Tick(TimeSpan.FromSeconds(1));
 
-        viewModel.StopPlaybackCommand.Execute(null);
+        viewModel.Playback.StopPlaybackCommand.Execute(null);
 
-        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.Playback.IsPlaying);
         Assert.False(clock.IsRunning);
-        Assert.Equal(TimeSpan.Zero, viewModel.PlayheadTime);
+        Assert.Equal(TimeSpan.Zero, viewModel.Playback.PlayheadTime);
     }
 
     [Fact]
@@ -81,25 +81,25 @@ public sealed class PlaybackViewModelTests : IDisposable
         var (viewModel, _) = await CreateAsync();
 
         // 帧步进走的是"状态变化点":0 → 1s → 2s → 块结束(3s)。
-        viewModel.NextFrameCommand.Execute(null);
-        Assert.Equal(TimeSpan.FromSeconds(1), viewModel.PlayheadTime);
+        viewModel.Playback.NextFrameCommand.Execute(null);
+        Assert.Equal(TimeSpan.FromSeconds(1), viewModel.Playback.PlayheadTime);
 
-        viewModel.NextFrameCommand.Execute(null);
-        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.PlayheadTime);
+        viewModel.Playback.NextFrameCommand.Execute(null);
+        Assert.Equal(TimeSpan.FromSeconds(2), viewModel.Playback.PlayheadTime);
 
-        viewModel.PreviousFrameCommand.Execute(null);
-        Assert.Equal(TimeSpan.FromSeconds(1), viewModel.PlayheadTime);
+        viewModel.Playback.PreviousFrameCommand.Execute(null);
+        Assert.Equal(TimeSpan.FromSeconds(1), viewModel.Playback.PlayheadTime);
     }
 
     [Fact]
     public async Task Stepping_pauses_playback_first()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
-        viewModel.NextFrameCommand.Execute(null);
+        viewModel.Playback.NextFrameCommand.Execute(null);
 
-        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.Playback.IsPlaying);
         Assert.False(clock.IsRunning);
     }
 
@@ -107,28 +107,28 @@ public sealed class PlaybackViewModelTests : IDisposable
     public async Task Looping_wraps_around_instead_of_stopping()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.IsLooping = true;
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.IsLooping = true;
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
         clock.Tick(TimeSpan.FromSeconds(3.5));
 
-        Assert.True(viewModel.IsPlaying);
-        Assert.Equal(TimeSpan.FromMilliseconds(500), viewModel.PlayheadTime);
+        Assert.True(viewModel.Playback.IsPlaying);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), viewModel.Playback.PlayheadTime);
     }
 
     [Fact]
     public async Task Loading_another_file_stops_playback()
     {
         var (viewModel, clock) = await CreateAsync();
-        viewModel.TogglePlayCommand.Execute(null);
+        viewModel.Playback.TogglePlayCommand.Execute(null);
 
         var other = Path.Combine(_directory, "other.csv");
         File.WriteAllText(other, $"{Header}\n0,0,15,0,0,\n500,0,15,0,0,\n");
         await viewModel.LoadAsync(other);
 
-        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.Playback.IsPlaying);
         Assert.False(clock.IsRunning);
-        Assert.Equal(TimeSpan.Zero, viewModel.PlayheadTime);
+        Assert.Equal(TimeSpan.Zero, viewModel.Playback.PlayheadTime);
     }
 
     private async Task<(MainViewModel ViewModel, StubPlaybackClock Clock)> CreateAsync()
