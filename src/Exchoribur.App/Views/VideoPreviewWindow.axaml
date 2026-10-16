@@ -2,16 +2,33 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Exchoribur.App.ViewModels"
         xmlns:controls="using:Exchoribur.App.Controls"
+        xmlns:views="using:Exchoribur.App.Views"
         xmlns:res="using:Exchoribur.App.Resources"
         x:Class="Exchoribur.App.Views.VideoPreviewWindow"
         x:DataType="vm:MainViewModel"
         Title="{x:Static res:Strings.MainPanelVideoPreview}"
-        Width="800"
-        Height="450"
-        Background="Black">
-
-  <controls:VideoSurface
-      Frame="{Binding Preview.VideoFrame}"
-      FrameVersion="{Binding Preview.VideoFrameVersion}" />
-
+        Width="800" Height="450" Background="Black">
+    <Grid ClipToBounds="True">
+        <controls:VideoSurface Frame="{Binding Preview.VideoFrame}"
+                               FrameVersion="{Binding Preview.VideoFrameVersion}" />
+        <!-- 热区始终参与鼠标命中,控制栏隐藏时仍可唤出。 -->
+        <Border x:Name="BottomHotZone" Height="76" Background="Transparent"
+                VerticalAlignment="Bottom" />
+        <Border x:Name="TransportOverlay" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Margin="8,0,8,12" Padding="12,10" CornerRadius="8" Background="#DA202024">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Border.Transitions>
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:PlaybackControlsView DataContext="{Binding Playback}" />
+                    <Button x:Name="FullscreenButton" Classes="transport" Click="OnToggleFullscreen">
+                        <Path x:Name="FullscreenIcon" Classes="icon title" />
+                    </Button>
+                </StackPanel>
+            </Viewbox>
+        </Border>
+    </Grid>
 </Window>

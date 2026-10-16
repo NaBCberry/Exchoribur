@@ -36,6 +36,7 @@ public partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        _videoPreviewWindow?.Close();
         DetachViewModel();
         if (DataContext is not MainViewModel viewModel)
         {
@@ -107,7 +108,7 @@ public partial class MainWindow : Window
 
         _videoPreviewWindow = window;
         window.Closed += OnVideoPreviewWindowClosed;
-        window.Show(this);
+        window.ShowPreview(this);
     }
 
     private void OnVideoPreviewWindowClosed(object? sender, EventArgs e)
@@ -129,6 +130,7 @@ public partial class MainWindow : Window
     /// <summary>窗口关了就放掉懒创建的播放器,别把解码线程和固定住的内存留着。</summary>
     private void OnClosed(object? sender, EventArgs e)
     {
+        _videoPreviewWindow?.Close();
         DetachViewModel();
         (DataContext as MainViewModel)?.Dispose();
     }

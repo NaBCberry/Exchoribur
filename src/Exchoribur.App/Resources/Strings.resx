@@ -897,4 +897,10 @@
   <data name="MainTooltipPopOutVideo" xml:space="preserve">
     <value>弹出独立视频窗口</value>
   </data>
+  <data name="VideoPreviewEnterFullscreen" xml:space="preserve">
+    <value>全屏显示</value>
+  </data>
+  <data name="VideoPreviewExitFullscreen" xml:space="preserve">
+    <value>退出全屏</value>
+  </data>
 </root>
