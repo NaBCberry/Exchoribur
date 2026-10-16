@@ -1,83 +1,258 @@
-# Exchoribur
+<a id="readme-top"></a>
 
-LED 灯光序列编排工具(暂定名),把灯光颜色与节拍对齐到时间轴上,并通过
-串口 / BLE / UDP 输出到灯光设备。
+<div align="center">
+  <a href="https://github.com/NaBCberry/Exchoribur">
+    <img src="artwork/icon/icon-512.png" alt="Exchoribur 项目标志" width="112" height="112" />
+  </a>
 
-本仓库是全新的 C# 实现,不是对现有 Python 项目的移植。功能参考与来源说明
-见 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。
+  <h1>Exchoribur</h1>
 
-## 当前状态
+  <p>面向 433 MHz 灯光设备的时间轴编排与播放控制工具</p>
+  <p>编排灯光 · 同步视频 · 实时设备输出</p>
 
-已实现时间轴与编排块编辑、工程读写、视频预览、串口 / UDP 输出和 Windows
-安装版更新。工程采用四层结构,领域、应用流程、外部实现和桌面界面分别维护。
+  <p>
+    <a href="https://github.com/NaBCberry/Exchoribur/releases"><strong>下载发布版本</strong></a>
+    ·
+    <a href="#getting-started">快速开始</a>
+    ·
+    <a href="https://github.com/NaBCberry/Exchoribur/issues/new">反馈问题 / 功能建议</a>
+  </p>
+</div>
 
-## 技术栈
+<p align="center">
+  <a href="https://github.com/NaBCberry/Exchoribur/actions/workflows/ci.yml"><img alt="构建与测试" src="https://github.com/NaBCberry/Exchoribur/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/NaBCberry/Exchoribur/releases"><img alt="最新版本（含预发布）" src="https://img.shields.io/github/v/release/NaBCberry/Exchoribur?include_prereleases" /></a>
+  <a href="https://github.com/NaBCberry/Exchoribur/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/NaBCberry/Exchoribur?style=flat" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/NaBCberry/Exchoribur" /></a>
+</p>
 
-| 项目 | 选择 | 状态 |
+<details>
+  <summary>目录</summary>
+  <ul>
+    <li><a href="#about">项目介绍</a></li>
+    <li><a href="#platforms">平台支持</a></li>
+    <li><a href="#getting-started">快速开始</a></li>
+    <li><a href="#usage">使用方式</a></li>
+    <li><a href="#development">从源码运行</a></li>
+    <li><a href="#structure">项目结构</a></li>
+    <li><a href="#packaging">打包与发布</a></li>
+    <li><a href="#roadmap">后续方向</a></li>
+    <li><a href="#contributing">参与贡献</a></li>
+    <li><a href="#license">许可与致谢</a></li>
+    <li><a href="#star-history">Star History</a></li>
+  </ul>
+</details>
+
+<a id="about"></a>
+
+## 项目介绍
+
+Exchoribur 是一个使用 C# 与 Avalonia 开发的桌面灯光编排工具。你可以在时间轴上编辑各通道的灯光变化，对照视频预览调整时序，并通过串口或 UDP 向匹配协议的灯光发送设备输出控制数据。
+
+### 已实现功能
+
+- **工程管理**：新建、打开与保存 `.exb` 工程，支持参考媒体打包、另存为和未保存改动确认。
+- **时间轴编辑**：多通道编排块的创建、移动、重命名、删除、链接与跨通道复制，以及撤销和重做。
+- **块内帧编辑**：帧选区、颜色写入、帧插入与删除，与时间轴编辑共用撤销历史。
+- **CSV 交换**：导入灯光时间轴、导出时间轴 CSV，支持拖入 CSV 文件。
+- **媒体同步**：视频预览、音量与音频输出设备设置；播放、跳帧和循环与灯光时间轴协调。
+- **独立视频窗口**：主窗口与弹出窗口同时预览，支持原生分辨率输出、等比缩放、浮动播放栏与全屏切换。
+- **设备输出**：串口 / UDP 连接、灯光预览与发送；后台发送仅保留最新待发送状态，避免旧帧积压。
+- **偏好设置与更新**：编辑偏好即时保存，Windows 安装版支持检查、下载和安装更新。
+
+项目仍在持续开发。BLE 通信、音频波形展示与多语言切换尚未实现。
+
+### 技术栈
+
+| 技术 | 用途 |
+| --- | --- |
+| C# / .NET 10 | 核心模型、应用流程与桌面程序 |
+| Avalonia | 跨平台界面与自绘时间轴 |
+| CommunityToolkit.Mvvm | 界面状态与命令绑定 |
+| LibVLCSharp / LibVLC | 视频解码和媒体播放 |
+| xUnit | 自动化测试 |
+| Inno Setup | Windows 安装包 |
+
+<a id="platforms"></a>
+
+## 平台支持
+
+| 平台 | 编译与测试 | 分发与运行状态 |
 | --- | --- | --- |
-| 运行时 | .NET 10 | SDK 10.0.401 已安装 |
-| 界面 | Avalonia 12.1.3 | 已引入,含 Fluent 主题与 Inter 字体 |
-| MVVM | CommunityToolkit.Mvvm 8.4.2 | 已引入 |
-| 媒体播放 | LibVLCSharp | 已接入,原生解码与界面位图分离 |
-| 音频分析 | FFT + 自建 mel 滤波器组 | 待评估 |
-| 测试 | xUnit 2.9.3 | 已建立 |
+| Windows | 已配置 CI | 提供 x64 安装包和便携包 |
+| macOS | 已配置 CI | 打包流程待接入，媒体、设备和界面仍需真机验证 |
+| Linux | 已配置 CI | 打包流程待接入，媒体、设备和界面仍需真机验证 |
 
-## 目录结构
+三平台编译与测试通过不等于完成三平台硬件验收。设备控制需要使用协议匹配的发送设备；软件不会直接通过电脑无线硬件发射 433 MHz 信号。
 
+<a id="getting-started"></a>
+
+## 快速开始
+
+前往 [Releases](https://github.com/NaBCberry/Exchoribur/releases) 选择版本并下载 Windows 产物。带 `beta` 等后缀的版本属于预发布版本。
+
+| 文件 | 使用方式 | 应用内更新 |
+| --- | --- | --- |
+| `Exchoribur-win-Setup.exe` | 运行安装向导，可选择目录和桌面快捷方式 | 支持 |
+| `Exchoribur-win-Portable.zip` | 完整解压后运行 `Exchoribur.exe` | 手动下载新版 |
+
+Windows 发布包包含 .NET 运行时和 LibVLC，无需另外安装 .NET 或 VLC。便携版需要保留解压目录中的依赖文件。
+
+<a id="usage"></a>
+
+## 使用方式
+
+1. 选择 **文件 → 新建工程** 并输入名称，或通过 **打开工程** 载入已有 `.exb` 文件。
+2. 双击时间轴空白处创建编排块，或通过 **导入时间轴** 载入 CSV。
+3. 双击编排块打开块编辑器，选择帧并设置颜色；使用撤销、重做调整编辑结果。
+4. 按需导入参考媒体，对照视频调整时序。视频可以弹出到独立窗口，并在当前所在屏幕全屏显示。
+5. 打开设备面板，选择串口或 UDP 并配置连接参数，按需使用灯光输出功能。
+6. 保存 `.exb` 工程以便继续编辑；需要交换时间轴数据时导出 CSV。
+
+视频解码保留原始分辨率，显示时按窗口大小等比缩放。高分辨率视频的流畅度还取决于解码性能、内存带宽和帧率。
+
+### 常用快捷键
+
+| 快捷键 | 操作 |
+| --- | --- |
+| `Ctrl+N` | 新建工程 |
+| `Ctrl+O` | 导入时间轴 CSV |
+| `Ctrl+S` | 保存工程 |
+| `Ctrl+Shift+S` | 工程另存为 |
+| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
+| `Ctrl+A` | 选中所有编排块 |
+| `Ctrl+D` | 将选中块复制到其他通道 |
+| `Space` | 播放 / 暂停（主窗口文本输入时不触发） |
+| `Delete` | 删除选中块 |
+| `Insert` / `Shift+Delete` | 在块内插入帧 / 删除选中帧 |
+| `Esc` | 主窗口清除块选区；独立视频窗口退出全屏 |
+
+<a id="development"></a>
+
+## 从源码运行
+
+### 环境要求
+
+- Git。
+- .NET **10.0.4xx SDK**：由 [global.json](global.json) 固定功能系列，允许该系列补丁更新。
+- Linux 开发环境需自行安装发行版提供的 LibVLC 及相关插件；Windows 和 macOS 项目已声明对应的原生媒体包依赖。
+
+### 获取与启动
+
+```sh
+git clone https://github.com/NaBCberry/Exchoribur.git
+cd Exchoribur
+dotnet restore Exchoribur.slnx
+dotnet run --project src/Exchoribur.App
 ```
-Exchoribur.slnx
-src/Exchoribur.Core/             灯光模型、编辑规则、协议、时间格式
-src/Exchoribur.Application/      应用接口、设备/播放/工程/更新流程、设置模型
-src/Exchoribur.Infrastructure/   串口、UDP、媒体解码、文件存储、更新源与平台实现
-src/Exchoribur.App/              Avalonia 界面、交互服务与启动装配
-tests/Exchoribur.Core.Tests/
-tests/Exchoribur.Application.Tests/
-tests/Exchoribur.Infrastructure.Tests/
-tests/Exchoribur.App.Tests/
-scripts/                        构建发布脚本
-packaging/windows/              Windows 打包配置与 Inno Setup 文件
-packaging/macos/                macOS 打包材料（预留）
-packaging/linux/                Linux 打包材料（预留）
-docs/                           架构与发布说明
+
+### 构建与验证
+
+```sh
+dotnet build Exchoribur.slnx -c Release --no-restore
+dotnet test Exchoribur.slnx -c Release --no-build
+dotnet format style Exchoribur.slnx --no-restore --verify-no-changes --diagnostics IDE0005 IDE0161 IDE1006
 ```
 
-依赖方向、代码归属与媒体帧生命周期见 [docs/architecture.md](docs/architecture.md)。
+CI 在 Windows、macOS 和 Linux 上分别执行构建、代码风格检查及测试。开发约定见 [工程规范](docs/engineering-standards.md)。
 
-## 里程碑
+<a id="structure"></a>
 
-1. 骨架打通:应用能启动、能打开数据文件、能渲染时间轴骨架
-2. 编辑闭环:选区、复制粘贴、撤销重做、标记、特效生成
-3. 媒体同步:视频与音频波形跟时间轴对齐
-4. 设备输出:串口 / BLE / UDP 联调
-5. 三平台打包与自动更新
+## 项目结构
 
-## 构建
-
-```bash
-dotnet build Exchoribur.slnx     # 编译
-dotnet test  Exchoribur.slnx     # 运行测试
-dotnet run --project src/Exchoribur.App   # 启动应用
+```text
+Exchoribur/
+├── src/
+│   ├── Exchoribur.Core/             灯光模型、编辑规则、设备协议
+│   ├── Exchoribur.Application/      应用接口与设备、播放、工程、更新流程
+│   ├── Exchoribur.Infrastructure/   串口、UDP、媒体解码、存储及平台适配
+│   └── Exchoribur.App/              Avalonia 界面、界面模型和启动装配
+├── tests/                          四层对应的测试项目
+├── packaging/
+│   ├── windows/                    Inno Setup 安装包配置
+│   ├── macos/                      预留打包材料
+│   └── linux/                      预留打包材料
+├── scripts/                        打包、版本发布与发布说明脚本
+├── docs/                           架构、工程规范、资源与发布文档
+└── Exchoribur.slnx
 ```
 
-需要 .NET 10.0.4xx SDK,允许该系列补丁更新,具体策略以 `global.json` 为准。
-CI 在 Windows、Linux、macOS 三个平台分别编译并测试。
-命名、依赖边界与资源生成步骤见 [docs/engineering-standards.md](docs/engineering-standards.md)。
-添加界面文字与多语言资源见 [docs/localization.md](docs/localization.md)。
+核心层保持独立，外部设备和文件读写由基础设施层实现，界面通过应用接口进行协作。依赖边界及媒体资源生命周期见 [架构说明](docs/architecture.md)。
 
-## 发布
+| 文档 | 内容 |
+| --- | --- |
+| [架构说明](docs/architecture.md) | 分层、界面模型、设备发送与媒体生命周期 |
+| [工程规范](docs/engineering-standards.md) | SDK、命名规则与自动检查 |
+| [界面文案与翻译](docs/localization.md) | 添加资源文字及后续多语言扩展 |
+| [发布流程](docs/release.md) | 版本号、打包、GitHub Release 与自动更新 |
 
-版本号写在 `Directory.Build.props`,标签形如 `v0.1.0`。本地跑
-`pwsh scripts/release.ps1` 交互选版本号即可完成「改版本号 → 提交 → 打标签 →
-推送」,推送后 CI 自动构建 Windows 安装包并创建 Release;也可以直接在 Actions
-里跑 `Release (Manual Bump)` 填版本号。细节见
-[docs/release.md](docs/release.md)。
+<a id="packaging"></a>
 
-## 许可
+## 打包与发布
 
-MIT License,全文见 [LICENSE](LICENSE)。分发时保留版权声明与许可文本即可。
+目前自动打包目标为 **Windows x64**。本地打包需要 Inno Setup：
 
-功能来源与第三方组件的声明见 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) 和
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+```powershell
+# 版本号应与 Directory.Build.props 中的 Version 一致。
+pwsh scripts/package-win.ps1 -Version <版本号>
+```
+
+安装包和便携包输出到 `artifacts/releases/`。打包脚本不代替构建与测试检查。
+
+正式发布支持本地脚本和 GitHub Actions 两种入口。`scripts/release.ps1` 默认会修改版本号、创建提交与标签并推送远端；只查看操作计划可运行：
+
+```powershell
+pwsh scripts/release.ps1 -Bump patch -DryRun
+```
+
+Actions 的 **Release** 支持仅打包、不创建 Release 的 `dry_run` 模式；**Release (Manual Bump)** 会更新版本并发布。完整步骤见 [发布流程](docs/release.md)。
+
+<a id="roadmap"></a>
+
+## 后续方向
+
+- [x] 时间轴、块内帧编辑与统一撤销历史
+- [x] 工程管理、CSV 导入与导出
+- [x] 视频同步预览、独立窗口与全屏播放
+- [x] 串口 / UDP 后台发送与最新状态替换
+- [x] Windows 安装包、便携包与安装版更新
+- [ ] macOS / Linux 打包与真机验收
+- [ ] BLE 设备通信
+- [ ] 音频波形与分析功能
+- [ ] 多语言界面切换
+
+可通过 [Issues](https://github.com/NaBCberry/Exchoribur/issues) 查看和讨论问题及功能建议。
+
+<a id="contributing"></a>
+
+## 参与贡献
+
+欢迎提交问题报告、使用反馈和 Pull Request。反馈问题时，请附上系统、软件版本、复现步骤，以及相关日志或截图；涉及设备时说明连接方式与设备信息。
+
+提交代码前，请阅读 [工程规范](docs/engineering-standards.md)，并完成构建、测试与代码风格检查。提交信息采用中文单行格式，例如：
+
+```text
+feat(timeline): 添加时间轴交互功能
+fix(device): 修复设备连接状态
+```
+
+请使用独立分支提交修改，并通过 Pull Request 说明变更目的与验证结果。
+
+如果这个项目对你有帮助，欢迎点亮 **Star**，也欢迎分享你的编排使用体验。
+
+<a id="license"></a>
+
+## 许可与致谢
+
+本项目采用 [MIT License](LICENSE)。第三方组件有各自的许可要求，分发时请一并保留 [第三方组件声明](THIRD-PARTY-NOTICES.md) 和相应许可文本。
+
+设备输出协议参考了 LumaFlow，具体说明见 [参考与致谢](ACKNOWLEDGEMENTS.md)。Exchoribur 为独立实现，不包含其源代码、界面文案、图形资源或示例数据。
+
+README 的组织形式参考 [Best-README-Template](https://github.com/othneildrew/Best-README-Template)。感谢 Avalonia、CommunityToolkit.Mvvm、LibVLCSharp / LibVLC、Lucide、Inter 及其他开源项目提供的支持。
+
+<p align="right"><a href="#readme-top">返回顶部 ↑</a></p>
+
+<a id="star-history"></a>
 
 ## Star History
 
