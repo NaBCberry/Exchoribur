@@ -10,8 +10,7 @@ namespace Exchoribur.Application.Devices;
 /// 发送失败一律当掉线处理(和驱动那边一致),原因记下来给界面显示。
 /// </summary>
 /// <remarks>
-/// 这些方法都是阻塞的(串口写、连发间隔)。连接过程要放到后台线程去,
-/// 由 DeviceService 调度连接。本轮保留同步发送,调用方仍需注意设备写入可能阻塞。
+/// 这些方法都是阻塞的(串口写、连发间隔),只由 DeviceService 的单个后台任务调用。
 /// </remarks>
 public sealed class DeviceLink(IDeviceChannels channels) : IDisposable
 {

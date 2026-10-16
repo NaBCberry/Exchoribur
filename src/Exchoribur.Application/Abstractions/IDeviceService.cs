@@ -7,7 +7,7 @@ namespace Exchoribur.Application.Abstractions;
 /// 场控设备这条线对界面露出来的东西:连接状态、发包统计、枚举串口、吐帧。
 /// 抽成接口是为了让视图模型能脱离真硬件测试。
 /// </summary>
-public interface IDeviceService
+public interface IDeviceService : IAsyncDisposable
 {
     DeviceLinkState State { get; }
 
@@ -35,10 +35,14 @@ public interface IDeviceService
     /// <summary>连接(含 AUTH)是阻塞的 IO,实现要把它放到后台线程去。</summary>
     Task<bool> ConnectAsync(DeviceTarget target, DeviceLicense? license);
 
-    void Disconnect();
+    /// <summary>停止接收灯光请求,等待当前操作完成后释放连接。</summary>
+    Task DisconnectAsync();
 
-    /// <summary>把一帧发出去;内容(含亮度缩放后的结果)没变就什么都不做。</summary>
-    bool Send(Frame frame, int brightnessPercent);
+    /// <summary>
+    /// 提交后立即返回,等待区只保留最新一帧。实际发送结果通过 Changed 和统计属性通知,
+    /// 相同载荷仍由设备连接去重。提交成功不表示设备已经发送。
+    /// </summary>
+    void RequestSend(Frame frame, int brightnessPercent);
 
     /// <summary>状态或统计变了抬一次。实现负责把通知切到界面线程。</summary>
     event EventHandler? Changed;

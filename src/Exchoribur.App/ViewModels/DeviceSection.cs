@@ -20,13 +20,14 @@ internal interface IDeviceHost
 /// 场控设备面板这一块:连到哪儿、连上没有、发出去了多少帧、现场要调的亮度。
 /// 面板上改的东西只在本次运行里生效,不写回设置——"默认参数"是设置页那一页的活。
 /// </summary>
-public sealed partial class DeviceSection : ObservableObject
+public sealed partial class DeviceSection : ObservableObject, IDisposable
 {
     private readonly IDeviceService? _service;
     private readonly SettingsViewModel _settings;
     private readonly IDeviceHost? _host;
     private readonly IExternalLauncher? _launcher;
     private readonly IFileAccess _files;
+    private bool _disposed;
 
     /// <summary>最近一次播放头位置:改亮度时要按同一时刻重发一帧。</summary>
     private TimeSpan _lastPosition;
@@ -45,7 +46,7 @@ public sealed partial class DeviceSection : ObservableObject
 
         if (_service is not null)
         {
-            _service.Changed += (_, _) => Refresh();
+            _service.Changed += OnServiceChanged;
         }
 
         Transports =
@@ -225,10 +226,13 @@ public sealed partial class DeviceSection : ObservableObject
     }
 
     [RelayCommand]
-    private void Disconnect()
+    private async Task DisconnectAsync()
     {
         _problem = null;
-        _service?.Disconnect();
+        if (_service is not null)
+        {
+            await _service.DisconnectAsync();
+        }
         Refresh();
     }
 
@@ -261,17 +265,14 @@ public sealed partial class DeviceSection : ObservableObject
 
     private void SendAt(TimeSpan position)
     {
-        if (_service is null || !_service.IsConnected || _host is null)
+        if (_disposed || _service is null || !_service.IsConnected || _host is null)
         {
             return;
         }
 
         var frame = _host.SampleFrameAt(position + _settings.DeviceFrameAdvance);
 
-        if (_service.Send(frame, EffectiveBrightness))
-        {
-            Refresh();
-        }
+        _service.RequestSend(frame, EffectiveBrightness);
     }
 
     private DeviceTarget BuildTarget() => new()
@@ -322,6 +323,10 @@ public sealed partial class DeviceSection : ObservableObject
     /// <summary>服务那边变了,或者本地状态变了:整体重发一次通知。</summary>
     private void Refresh()
     {
+        if (_disposed)
+        {
+            return;
+        }
         OnPropertyChanged(nameof(IsConnected));
         OnPropertyChanged(nameof(IsConnecting));
         OnPropertyChanged(nameof(CanConnect));
@@ -333,5 +338,16 @@ public sealed partial class DeviceSection : ObservableObject
         OnPropertyChanged(nameof(LastSentText));
         OnPropertyChanged(nameof(LicenseText));
         OnPropertyChanged(nameof(HasDeviceLog));
+    }
+
+    private void OnServiceChanged(object? sender, EventArgs e) => Refresh();
+
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_service is not null)
+        {
+            _service.Changed -= OnServiceChanged;
+        }
     }
 }

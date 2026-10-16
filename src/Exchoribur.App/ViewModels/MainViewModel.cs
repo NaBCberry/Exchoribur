@@ -20,7 +20,7 @@ namespace Exchoribur.App.ViewModels;
 /// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
 /// 界面只管把这些属性画出来,不直接读文件。
 /// </summary>
-public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, IDeviceHost
+public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposable, IProjectHost, IDeviceHost
 {
     private static string EmptyStatusText => Strings.MainStatusEmpty;
 
@@ -33,6 +33,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
 
     /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
     private bool _disposed;
+    private Task _deviceShutdown = Task.CompletedTask;
 
     /// <summary>块编辑的会话:撤销栈和几条"编辑之后界面怎么变"的规则。</summary>
     private readonly BlockEditingSession _editing = new();
@@ -147,16 +148,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IProjectHost, I
 
         _disposed = true;
 
+        _playback.Pause();
+        Device.Dispose();
+
         _updates.Changed -= OnUpdatesChanged;
         Settings.PropertyChanged -= OnSettingsChanged;
 
-        // 还连着设备就把串口/socket 关掉,别攥着不放。
-        (_deviceService as IDisposable)?.Dispose();
+        // 发起后台停机;真实关窗路径通过 DisposeAsync 等待,不阻塞界面线程。
+        _deviceShutdown = _deviceService?.DisposeAsync().AsTask() ?? Task.CompletedTask;
 
         _video?.Dispose();
         _video = null;
 
         GC.SuppressFinalize(this);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return new ValueTask(_deviceShutdown);
     }
 
     /// <summary>预览用的当前帧画面。</summary>

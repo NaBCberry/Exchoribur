@@ -12,7 +12,7 @@ public sealed class DeviceServiceTests
     {
         var dispatcher = new QueuedDispatcher();
         var channels = new StubChannels();
-        using var service = new DeviceService(channels, dispatcher);
+        await using var service = new DeviceService(channels, dispatcher);
         var notifications = 0;
         service.Changed += (_, _) => notifications++;
 
@@ -27,7 +27,28 @@ public sealed class DeviceServiceTests
         dispatcher.Drain();
         Assert.True(notifications > 0);
 
-        service.Disconnect();
+        await service.DisconnectAsync();
+        Assert.True(channels.Channel.Disposed);
+    }
+
+    [Fact]
+    public async Task Notifications_queued_before_disposal_are_suppressed_after_disposal()
+    {
+        var dispatcher = new QueuedDispatcher();
+        var channels = new StubChannels();
+        await using var service = new DeviceService(channels, dispatcher);
+        var notifications = 0;
+        service.Changed += (_, _) => notifications++;
+        Assert.True(await service.ConnectAsync(new DeviceTarget
+        {
+            Transport = DeviceTransport.Serial,
+            SerialPort = "test-port",
+        }, null));
+
+        await service.DisposeAsync();
+        dispatcher.Drain();
+
+        Assert.Equal(0, notifications);
         Assert.True(channels.Channel.Disposed);
     }
 

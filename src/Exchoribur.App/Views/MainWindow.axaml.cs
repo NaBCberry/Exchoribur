@@ -16,6 +16,8 @@ public partial class MainWindow : Window
 
     /// <summary>已经问过未保存的改动并得到"可以关"的回答,再关就不再拦。</summary>
     private bool _closingConfirmed;
+    private bool _closingInProgress;
+    private bool _skipUnsavedPrompt;
 
     public MainWindow()
     {
@@ -45,7 +47,7 @@ public partial class MainWindow : Window
     /// <summary>装更新:未保存的改动视图模型已经问过了,这里直接关掉自己让安装器接管。</summary>
     private void OnExitRequested()
     {
-        _closingConfirmed = true;
+        _skipUnsavedPrompt = true;
         _settingsWindow?.Close();
         Close();
     }
@@ -187,23 +189,38 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        // 正在保存就先别插话,存完用户再关一次就行,免得弹出两个对话框。
-        if (_closingConfirmed || DataContext is not MainViewModel viewModel
-            || !viewModel.IsModified || viewModel.IsSaving)
+        if (_closingConfirmed || DataContext is not MainViewModel viewModel)
         {
             return;
         }
 
         e.Cancel = true;
+        // 保存或关闭确认尚未结束时不重复启动退出流程。
+        if (viewModel.IsSaving || _closingInProgress)
+        {
+            return;
+        }
+        _closingInProgress = true;
         _ = CloseAfterConfirmAsync(viewModel);
     }
 
     private async Task CloseAfterConfirmAsync(MainViewModel viewModel)
     {
-        if (await viewModel.ConfirmDiscardChangesAsync())
+        // 即使无需确认且设备已停止,也等本次 Closing 事件返回,再重新调用 Close。
+        await Task.Yield();
+        try
         {
-            _closingConfirmed = true;
-            Close();
+            if (_skipUnsavedPrompt || await viewModel.ConfirmDiscardChangesAsync())
+            {
+                await viewModel.DisposeAsync();
+                _closingConfirmed = true;
+                _settingsWindow?.Close();
+                Close();
+            }
+        }
+        finally
+        {
+            _closingInProgress = false;
         }
     }
 

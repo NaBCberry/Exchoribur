@@ -35,6 +35,22 @@ App 中对 Infrastructure 的源代码引用集中在 `AppServices.cs`。
 构造参数注入项目存储、设置存储和播放器等替代实现。设备通知通过
 `ICallbackDispatcher` 回到调用方线程,App 提供 Avalonia 实现。
 
+## 后台设备发送
+
+`DeviceService` 的单个后台任务独占 `DeviceLink`,连接、实际发送和断开不会并行
+操作同一条通道。界面调用 `RequestSend` 只复制十个通道的状态和亮度并提交请求,
+不执行串口/UDP 写入。提交完成不等于实际发送完成,计数与错误由 `Changed` 通知。
+
+待发送队列容量为一,新状态替换尚未取出的旧状态。正在写入的帧继续完成,
+因此拥堵时可能跳过短暂灯光变化,但不会累计播放延迟。连接/断开操作使用独立
+队列,不被灯光帧替换。所有界面状态由不可变快照提供,不会为读取统计等待 I/O。
+
+每次连接、断开或释放都会使旧连接代次失效。后台任务丢弃失效帧,连接过程中
+收到断开/退出请求时,即使底层打开随后成功也会立即关闭,不会发布为已连接。
+同步的驱动写入/打开无法强行取消,`DisconnectAsync` 和 `DisposeAsync` 异步等待
+当前操作结束后清理,关闭窗口前会等待 `MainViewModel.DisposeAsync` 完成。
+这些操作不新增黑场命令,继续保留原有灯光保持行为。
+
 ## 媒体帧与释放
 
 1. `Infrastructure/Media/LibVlcVideoDecoder` 持有 libvlc、播放器和固定的原生
@@ -68,8 +84,8 @@ dotnet test Exchoribur.slnx -c Release
 
 ## 本轮范围
 
-本轮保持文件格式、设备协议、发送策略、设置保存策略和界面文案。
-设备后台发送、连接取消和并发退出问题不在这次结构整理中修复。
+四层整理保持文件格式、设备协议、设置保存策略和界面文案。
+后续已接入后台设备发送、最新待发送状态替换及异步断开/退出协调,规则见上文。
 打包材料分别放在 `packaging/windows/`、`packaging/macos/`、`packaging/linux/`,
 Windows 的 Inno Setup 文件位于 `packaging/windows/inno/`。
 运行时独立适配实现分别放在 `Infrastructure/Platform/Windows/`、`MacOS/`、`Linux/`。
