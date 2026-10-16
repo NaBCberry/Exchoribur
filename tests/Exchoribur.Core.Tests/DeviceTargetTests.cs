@@ -5,6 +5,21 @@ namespace Exchoribur.Core.Tests;
 public class DeviceTargetTests
 {
     [Fact]
+    public void Validation_reports_an_invalid_baud_rate_as_a_code()
+    {
+        var target = new DeviceTarget { Transport = DeviceTransport.Serial, SerialPort = "test-port", BaudRate = 0 };
+        Assert.False(target.TryValidate(out var error));
+        Assert.Equal(DeviceTargetErrorCode.PositiveBaudRateRequired, error!.Value.Code);
+    }
+
+    [Fact]
+    public void Wrong_udp_port_keeps_the_supplied_value_for_the_presentation_layer()
+    {
+        Assert.False(DeviceTarget.TryNormalizeUdpHost("192.168.1.2:1234", out _, out var error));
+        Assert.Equal(new DeviceTargetError(DeviceTargetErrorCode.FixedUdpPortRequired, 1234), error);
+    }
+
+    [Fact]
     public void A_serial_target_describes_itself()
     {
         var target = new DeviceTarget
@@ -25,7 +40,7 @@ public class DeviceTargetTests
         var target = new DeviceTarget { Transport = DeviceTransport.Serial };
 
         Assert.False(target.TryValidate(out var error));
-        Assert.Contains("串口", error!);
+        Assert.Equal(DeviceTargetErrorCode.SerialPortRequired, error!.Value.Code);
     }
 
     [Fact]
@@ -55,21 +70,21 @@ public class DeviceTargetTests
     }
 
     [Theory]
-    [InlineData("", "没有填")]
-    [InlineData("192.168.19.123:1234", "32712")]
-    [InlineData("192.168.19.123:abc", "数字")]
-    [InlineData("not-an-ip", "IP")]
+    [InlineData("", DeviceTargetErrorCode.UdpHostRequired)]
+    [InlineData("192.168.19.123:1234", DeviceTargetErrorCode.FixedUdpPortRequired)]
+    [InlineData("192.168.19.123:abc", DeviceTargetErrorCode.InvalidUdpPort)]
+    [InlineData("not-an-ip", DeviceTargetErrorCode.InvalidUdpAddress)]
     // IPv6 一律不收,带不带方括号都不收。
-    [InlineData("::1", "IPv4")]
-    [InlineData("fe80::1", "IPv4")]
-    [InlineData("[::1]", "IPv4")]
-    [InlineData("[::1]:32712", "IPv4")]
-    public void A_bad_udp_host_explains_what_is_wrong(string text, string expectedFragment)
+    [InlineData("::1", DeviceTargetErrorCode.Ipv4Required)]
+    [InlineData("fe80::1", DeviceTargetErrorCode.Ipv4Required)]
+    [InlineData("[::1]", DeviceTargetErrorCode.Ipv4Required)]
+    [InlineData("[::1]:32712", DeviceTargetErrorCode.Ipv4Required)]
+    public void A_bad_udp_host_explains_what_is_wrong(string text, DeviceTargetErrorCode expected)
     {
         Assert.False(DeviceTarget.TryNormalizeUdpHost(text, out var host, out var error));
 
         Assert.Null(host);
-        Assert.Contains(expectedFragment, error!);
+        Assert.Equal(expected, error!.Value.Code);
     }
 
     [Fact]
@@ -78,6 +93,6 @@ public class DeviceTargetTests
         var target = new DeviceTarget { Transport = DeviceTransport.Udp };
 
         Assert.False(target.TryValidate(out var error));
-        Assert.Contains("UDP", error!);
+        Assert.Equal(DeviceTargetErrorCode.UdpHostRequired, error!.Value.Code);
     }
 }

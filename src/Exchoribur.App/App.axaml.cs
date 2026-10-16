@@ -34,7 +34,7 @@ public partial class App : Avalonia.Application
                 settings: null,
                 audio: null,
                 updateFeed: null,
-                externalLauncher: new TopLevelExternalLauncher(window),
+                externalLauncher: new TopLevelExternalLauncher(window, AppServices.CreateFileAccess()),
                 videoFactory: null,
                 device: AppServices.CreateDevice(deviceLogPath));
             window.DataContext = viewModel;

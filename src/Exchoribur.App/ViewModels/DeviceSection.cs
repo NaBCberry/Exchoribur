@@ -221,7 +221,15 @@ public sealed partial class DeviceSection : ObservableObject, IDisposable
         // 先把"连接中"显示出来,免得连串口那一下看着像没反应。
         Refresh();
 
-        await _service.ConnectAsync(BuildTarget(), license);
+        var target = BuildTarget();
+        if (!target.TryValidate(out var targetError))
+        {
+            _problem = DeviceValidationText.Describe(targetError!.Value);
+            Refresh();
+            return;
+        }
+
+        await _service.ConnectAsync(target, license);
         Refresh();
     }
 
@@ -299,7 +307,7 @@ public sealed partial class DeviceSection : ObservableObject, IDisposable
             return license;
         }
 
-        problem = string.Format(Strings.DeviceLicenseInvalidFormat, error);
+        problem = string.Format(Strings.DeviceLicenseInvalidFormat, DeviceValidationText.Describe(error));
         return null;
     }
 

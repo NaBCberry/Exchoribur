@@ -208,8 +208,6 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool InvertTouchpadScroll { get; set; }
 
-    /// <summary>滚轮分工提示,和缩放按钮那一栏写的是同一套。</summary>
-
     // ---- 时间轴 ----
 
     /// <summary>撤销栈最多记多少步。</summary>
@@ -507,7 +505,7 @@ public partial class SettingsViewModel : ViewModelBase
     public string BuildConfigurationText => AppVersion.Configuration;
     public string ProjectUrl => ReleaseSource.RepositoryUrl;
     public string LicenseText => Strings.SettingsLicenseName;
-    public string CopyrightText => "© 2026 NaBCberry";
+    public string CopyrightText => Strings.AppCopyright;
 
     /// <summary>打开项目主页。</summary>
     [RelayCommand]

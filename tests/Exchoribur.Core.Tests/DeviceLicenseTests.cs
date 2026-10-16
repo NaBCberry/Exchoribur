@@ -11,7 +11,7 @@ public class DeviceLicenseTests
     {
         Assert.True(DeviceLicense.TryParse(Valid, out var license, out var error));
 
-        Assert.Null(error);
+        Assert.Equal(DeviceLicenseError.None, error);
         Assert.NotNull(license);
         Assert.Equal("AA:BB:CC:DD:EE:FF", license.MacText);
         Assert.Equal(1_893_456_000L, license.ExpireUnixTime);
@@ -27,19 +27,19 @@ public class DeviceLicenseTests
     }
 
     [Theory]
-    [InlineData("", "空")]
-    [InlineData("AA:BB:CC:DD:EE:FF|1893456000", "三段")]
-    [InlineData("AA:BB:CC|1893456000|FF", "十二位")]
-    [InlineData("AA:BB:CC:DD:EE:GG|1893456000|FF", "十二位")]
-    [InlineData("AA:BB:CC:DD:EE:FF|abc|FF", "unix")]
-    [InlineData("AA:BB:CC:DD:EE:FF|1893456000|0A1", "偶数位")]
-    [InlineData("AA:BB:CC:DD:EE:FF|1893456000|", "偶数位")]
-    public void A_bad_license_explains_what_is_wrong(string text, string expectedFragment)
+    [InlineData("", DeviceLicenseError.Empty)]
+    [InlineData("AA:BB:CC:DD:EE:FF|1893456000", DeviceLicenseError.InvalidParts)]
+    [InlineData("AA:BB:CC|1893456000|FF", DeviceLicenseError.InvalidMac)]
+    [InlineData("AA:BB:CC:DD:EE:GG|1893456000|FF", DeviceLicenseError.InvalidMac)]
+    [InlineData("AA:BB:CC:DD:EE:FF|abc|FF", DeviceLicenseError.InvalidExpiry)]
+    [InlineData("AA:BB:CC:DD:EE:FF|1893456000|0A1", DeviceLicenseError.InvalidSignature)]
+    [InlineData("AA:BB:CC:DD:EE:FF|1893456000|", DeviceLicenseError.InvalidSignature)]
+    public void A_bad_license_explains_what_is_wrong(string text, DeviceLicenseError expected)
     {
         Assert.False(DeviceLicense.TryParse(text, out var license, out var error));
 
         Assert.Null(license);
-        Assert.Contains(expectedFragment, error!);
+        Assert.Equal(expected, error);
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class DeviceLicenseTests
 
         Assert.False(DeviceLicense.TryParse($"AA:BB:CC:DD:EE:FF|1893456000|{tooLong}", out _, out var error));
 
-        Assert.Contains("72", error!);
+        Assert.Equal(DeviceLicenseError.SignatureTooLong, error);
     }
 
     [Fact]

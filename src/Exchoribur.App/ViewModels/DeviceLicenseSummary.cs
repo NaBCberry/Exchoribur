@@ -16,7 +16,7 @@ internal static class DeviceLicenseSummary
 
         if (!DeviceLicense.TryParse(text, out var license, out var error))
         {
-            return string.Format(Strings.DeviceLicenseInvalidFormat, error);
+            return string.Format(Strings.DeviceLicenseInvalidFormat, DeviceValidationText.Describe(error));
         }
 
         var expiry = license!.ExpireAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);

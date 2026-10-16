@@ -59,7 +59,7 @@ public sealed class DeviceLink(IDeviceChannels channels) : IDisposable
         {
             if (!target.TryValidate(out var invalid))
             {
-                throw new InvalidOperationException(invalid);
+                throw new InvalidOperationException(invalid?.ToString());
             }
 
             channel = channels.Open(target);

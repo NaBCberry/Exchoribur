@@ -12,9 +12,6 @@ public static class ProjectFileFormat
     /// <summary>扩展名:EX + Baton。容器本身是 zip(参考 osu 的 .osz 做法)。</summary>
     public const string Extension = ".exb";
 
-    /// <summary>文件对话框里显示的类型名。</summary>
-    public const string DisplayName = "Exchoribur 工程";
-
     /// <summary>容器里清单文件的固定名字(格式版本、时间线名、媒体文件名)。</summary>
     public const string ManifestName = "manifest.json";
 

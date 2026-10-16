@@ -20,7 +20,7 @@ public sealed class SystemDeviceChannels(string? serialLogPath = null) : IDevice
     {
         if (!target.TryValidate(out var error))
         {
-            throw new InvalidOperationException(error);
+            throw new InvalidOperationException(error?.ToString());
         }
 
         return target.Transport switch

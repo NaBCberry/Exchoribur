@@ -126,7 +126,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         // 设计器预览时铺一点假数据,免得看到的是一片空白;真正跑起来是空的。
         Timeline = DesignTimeTimeline.Current;
         StatusText = EmptyStatusText;
-        WindowTitle = "Exchoribur";
+        WindowTitle = Strings.AppName;
         UndoLabel = Strings.MainLabelUndo;
         RedoLabel = Strings.MainLabelRedo;
 

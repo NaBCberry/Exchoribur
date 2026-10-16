@@ -855,4 +855,46 @@
   <data name="ColorPresetGray" xml:space="preserve">
     <value>灰色</value>
   </data>
+  <data name="AppCopyright" xml:space="preserve">
+    <value>© 2026 NaBCberry</value>
+  </data>
+  <data name="DeviceLicenseErrorEmpty" xml:space="preserve">
+    <value>许可串是空的。</value>
+  </data>
+  <data name="DeviceLicenseErrorParts" xml:space="preserve">
+    <value>许可串要写成 设备MAC|到期时间|签名 三段。</value>
+  </data>
+  <data name="DeviceLicenseErrorMac" xml:space="preserve">
+    <value>设备 MAC 要是十二位十六进制。</value>
+  </data>
+  <data name="DeviceLicenseErrorExpiry" xml:space="preserve">
+    <value>到期时间要是不超过 32 位的十进制 unix 秒。</value>
+  </data>
+  <data name="DeviceLicenseErrorSignature" xml:space="preserve">
+    <value>签名要是不为空的偶数位十六进制。</value>
+  </data>
+  <data name="DeviceLicenseErrorSignatureLengthFormat" xml:space="preserve">
+    <value>签名最长 {0} 字节。</value>
+  </data>
+  <data name="DeviceTargetErrorSerialPort" xml:space="preserve">
+    <value>没有选择串口。</value>
+  </data>
+  <data name="DeviceTargetErrorBaudRate" xml:space="preserve">
+    <value>波特率必须大于 0。</value>
+  </data>
+  <data name="DeviceTargetErrorUdpHost" xml:space="preserve">
+    <value>没有填 UDP 目标地址。</value>
+  </data>
+  <data name="DeviceTargetErrorUdpAddress" xml:space="preserve">
+    <value>UDP 目标地址不是合法的 IP。</value>
+  </data>
+  <data name="DeviceTargetErrorUdpPort" xml:space="preserve">
+    <value>UDP 端口不是数字。</value>
+  </data>
+  <data name="DeviceTargetErrorFixedPortFormat" xml:space="preserve">
+    <value>UDP 端口固定是 {0},不能填 {1}。</value>
+  </data>
+  <data name="DeviceTargetErrorIpv4" xml:space="preserve">
+    <value>UDP 目标地址要写 IPv4,不收 IPv6。</value>
+  </data>
 </root>

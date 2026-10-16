@@ -35,14 +35,14 @@ public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signa
     /// <summary>还剩多久到期;已经过期就是负数。</summary>
     public TimeSpan Remaining(DateTimeOffset now) => ExpireAt - now;
 
-    public static bool TryParse(string? text, out DeviceLicense? license, out string? error)
+    public static bool TryParse(string? text, out DeviceLicense? license, out DeviceLicenseError error)
     {
         license = null;
-        error = null;
+        error = DeviceLicenseError.None;
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            error = "许可串是空的。";
+            error = DeviceLicenseError.Empty;
             return false;
         }
 
@@ -50,7 +50,7 @@ public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signa
 
         if (parts.Length != 3)
         {
-            error = "许可串要写成 设备MAC|到期时间|签名 三段。";
+            error = DeviceLicenseError.InvalidParts;
             return false;
         }
 
@@ -58,13 +58,13 @@ public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signa
 
         if (macDigits.Length != 12 || !macDigits.All(Uri.IsHexDigit))
         {
-            error = "设备 MAC 要是十二位十六进制。";
+            error = DeviceLicenseError.InvalidMac;
             return false;
         }
 
         if (!long.TryParse(parts[1].Trim(), out var expire) || expire < 0 || expire > uint.MaxValue)
         {
-            error = "到期时间要是不超过 32 位的十进制 unix 秒。";
+            error = DeviceLicenseError.InvalidExpiry;
             return false;
         }
 
@@ -73,7 +73,7 @@ public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signa
         if (signatureDigits.Length == 0 || signatureDigits.Length % 2 != 0
             || !signatureDigits.All(Uri.IsHexDigit))
         {
-            error = "签名要是不为空的偶数位十六进制。";
+            error = DeviceLicenseError.InvalidSignature;
             return false;
         }
 
@@ -81,7 +81,7 @@ public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signa
 
         if (signature.Length > MaxSignatureBytes)
         {
-            error = $"签名最长 {MaxSignatureBytes} 字节。";
+            error = DeviceLicenseError.SignatureTooLong;
             return false;
         }
 

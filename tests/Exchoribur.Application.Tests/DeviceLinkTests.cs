@@ -71,7 +71,7 @@ public class DeviceLinkTests
         Assert.False(link.Connect(Serial(port: null), License, HostTime));
 
         Assert.Empty(channels.Opened);
-        Assert.Contains("串口", link.LastError);
+        Assert.Contains(nameof(DeviceTargetErrorCode.SerialPortRequired), link.LastError);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Exchoribur.Application.Abstractions;
 
 namespace Exchoribur.App.Services;
 
@@ -7,7 +8,7 @@ namespace Exchoribur.App.Services;
 /// 真跑起来用的实现:借窗口所在的顶层去调系统"打开方式"。
 /// 目录不存在时先建一个——设置文件还没写过时它的目录本来就不存在。
 /// </summary>
-public sealed class TopLevelExternalLauncher(Window owner) : IExternalLauncher
+public sealed class TopLevelExternalLauncher(Window owner, IFileAccess files) : IExternalLauncher
 {
     public async Task OpenUrlAsync(string url)
     {
@@ -19,12 +20,16 @@ public sealed class TopLevelExternalLauncher(Window owner) : IExternalLauncher
 
     public async Task OpenFileAsync(string path)
     {
-        if (!File.Exists(path) || owner.Launcher is not { } launcher)
+        if (owner.Launcher is not { } launcher)
         {
             return;
         }
 
-        await launcher.LaunchFileInfoAsync(new FileInfo(path));
+        using var file = await owner.StorageProvider.TryGetFileFromPathAsync(path);
+        if (file is not null)
+        {
+            await launcher.LaunchFileAsync(file);
+        }
     }
 
     public async Task OpenFolderAsync(string path)
@@ -34,11 +39,15 @@ public sealed class TopLevelExternalLauncher(Window owner) : IExternalLauncher
             return;
         }
 
-        Directory.CreateDirectory(path);
+        await files.EnsureDirectoryAsync(path);
 
         if (owner.Launcher is { } launcher)
         {
-            await launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
+            using var folder = await owner.StorageProvider.TryGetFolderFromPathAsync(path);
+            if (folder is not null)
+            {
+                await launcher.LaunchFileAsync(folder);
+            }
         }
     }
 }

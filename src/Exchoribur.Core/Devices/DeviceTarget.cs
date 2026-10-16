@@ -31,16 +31,16 @@ public sealed record DeviceTarget
     };
 
     /// <summary>连之前自检一遍:缺什么、写得不对,就把原因说出来。</summary>
-    public bool TryValidate(out string? error)
+    public bool TryValidate(out DeviceTargetError? error)
     {
         switch (Transport)
         {
             case DeviceTransport.Serial when string.IsNullOrWhiteSpace(SerialPort):
-                error = "没有选择串口。";
+                error = new DeviceTargetError(DeviceTargetErrorCode.SerialPortRequired);
                 return false;
 
             case DeviceTransport.Serial when BaudRate <= 0:
-                error = "波特率必须大于 0。";
+                error = new DeviceTargetError(DeviceTargetErrorCode.PositiveBaudRateRequired);
                 return false;
 
             case DeviceTransport.Udp when !TryNormalizeUdpHost(UdpHost, out _, out var hostError):
@@ -57,7 +57,7 @@ public sealed record DeviceTarget
     /// 把用户填的地址理成 IPv4 字面量。顺手认从别处粘过来的 <c>host:port</c>:
     /// 端口写了就必须是协议那个固定端口,写别的直接报错,免得对着错端口发半天。
     /// </summary>
-    public static bool TryNormalizeUdpHost(string? text, out string? host, out string? error)
+    public static bool TryNormalizeUdpHost(string? text, out string? host, out DeviceTargetError? error)
     {
         host = null;
         error = null;
@@ -66,7 +66,7 @@ public sealed record DeviceTarget
 
         if (string.IsNullOrEmpty(trimmed))
         {
-            error = "没有填 UDP 目标地址。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.UdpHostRequired);
             return false;
         }
 
@@ -81,25 +81,25 @@ public sealed record DeviceTarget
 
         if (separator <= 0 || trimmed.IndexOf(':') != separator)
         {
-            error = "UDP 目标地址不是合法的 IP。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.InvalidUdpAddress);
             return false;
         }
 
         if (!int.TryParse(trimmed[(separator + 1)..], out var port))
         {
-            error = "UDP 端口不是数字。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.InvalidUdpPort);
             return false;
         }
 
         if (port != DeviceProtocol.UdpPort)
         {
-            error = $"UDP 端口固定是 {DeviceProtocol.UdpPort},不能填 {port}。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.FixedUdpPortRequired, port);
             return false;
         }
 
         if (!IPAddress.TryParse(trimmed[..separator], out address))
         {
-            error = "UDP 目标地址不是合法的 IP。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.InvalidUdpAddress);
             return false;
         }
 
@@ -107,14 +107,14 @@ public sealed record DeviceTarget
     }
 
     /// <summary>设备那边是 IPv4 的 socket,这里只收 IPv4,IPv6 一律不收。</summary>
-    private static bool Accept(IPAddress address, out string? host, out string? error)
+    private static bool Accept(IPAddress address, out string? host, out DeviceTargetError? error)
     {
         host = null;
         error = null;
 
         if (address.AddressFamily != AddressFamily.InterNetwork)
         {
-            error = "UDP 目标地址要写 IPv4,不收 IPv6。";
+            error = new DeviceTargetError(DeviceTargetErrorCode.Ipv4Required);
             return false;
         }
 
