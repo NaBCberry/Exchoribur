@@ -6,6 +6,9 @@
     <ApplicationIcon>Assets\icon-symbol.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- 编辑器和 dotnet format 的设计时编译也需要资源访问器。 -->
+  <Target Name="PrepareResourceAccessors" BeforeTargets="CoreCompile" DependsOnTargets="PrepareResources" />
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
@@ -17,6 +20,13 @@
     -->
     <EmbeddedResource Update="Resources\Strings.resx">
       <LogicalName>Exchoribur.App.Resources.Strings.resources</LogicalName>
+      <Generator>MSBuild:Compile</Generator>
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedClassName>Strings</StronglyTypedClassName>
+      <StronglyTypedNamespace>Exchoribur.App.Resources</StronglyTypedNamespace>
+      <StronglyTypedFileName>$(IntermediateOutputPath)Strings.g.cs</StronglyTypedFileName>
+      <!-- Avalonia 的 x:Static 需要公开的属性。只从默认资源生成,翻译文件不生成类。 -->
+      <PublicClass>true</PublicClass>
     </EmbeddedResource>
   </ItemGroup>
 

@@ -63,21 +63,14 @@ Application/Core、App → 三个项目。Core 不引用其他业务项目。
 保留用户输入的端口,以便界面格式化提示。核心中的默认工程/块名称属于已有数据
 及文件兼容约定,本轮保留;程序异常和系统诊断也不强行当作可翻译界面文案。
 
-文案来源为 `src/Exchoribur.App/Resources/Strings.resx`:
-
-```sh
-python scripts/generate-strings.py
-python scripts/generate-strings.py --check
-```
-
-生成脚本只使用 Python 标准库,要求 Python 3.10 或更高版本。
-`--check` 不写文件,资源访问器落后时返回失败。CI 使用 Python 3.13 检查同步性,
-测试额外验证资源键、访问器和实际加载的译文一致。无需依赖未纳入版本控制的
-`tools/` 目录。
+文案来源为 `src/Exchoribur.App/Resources/Strings.resx`。MSBuild 在构建时自动生成
+`obj/<配置>/net10.0/Strings.g.cs`,无需额外脚本或 Python。生成文件不提交 Git,
+不手动编辑。测试验证资源键、访问器和实际嵌入的文案一致。
+添加文案与翻译的步骤见 [localization.md](localization.md)。
 
 ## 验证与提交
 
-CI 在 Windows、macOS、Linux 上构建并测试,同时检查资源同步和采用的代码规则。
+CI 在 Windows、macOS、Linux 上构建并测试,同时生成资源访问器并检查采用的代码规则。
 本地测试通过不代表三平台真机、媒体或自绘效果已经验收。
 
 提交使用中文单行摘要:`type(scope): 摘要`,不写 body 和 footer。

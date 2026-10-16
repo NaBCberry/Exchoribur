@@ -62,6 +62,7 @@ dotnet run --project src/Exchoribur.App   # 启动应用
 需要 .NET 10.0.4xx SDK,允许该系列补丁更新,具体策略以 `global.json` 为准。
 CI 在 Windows、Linux、macOS 三个平台分别编译并测试。
 命名、依赖边界与资源生成步骤见 [docs/engineering-standards.md](docs/engineering-standards.md)。
+添加界面文字与多语言资源见 [docs/localization.md](docs/localization.md)。
 
 ## 发布
 
