@@ -85,8 +85,8 @@ public sealed class AudioDeviceSectionTests
             new StubAudioController(),
             updates: null);
 
-        Assert.True(viewModel.HasAudioDeviceHint);
-        Assert.Equal(Strings.SettingsAudioHintNoDevices, viewModel.AudioDeviceHint);
+        Assert.True(viewModel.Audio.HasAudioDeviceHint);
+        Assert.Equal(Strings.SettingsAudioHintNoDevices, viewModel.Audio.AudioDeviceHint);
     }
 
     private sealed class StubAudioController : IAudioDeviceController

@@ -12,22 +12,22 @@
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsUpdatesCurrentVersion}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding UpdateStatus.CurrentVersionText}" />
+                               Text="{Binding Updates.Status.CurrentVersionText}" />
                 </Grid>
 
                 <TextBlock Classes="note"
-                           IsVisible="{Binding !UpdateStatus.IsUpdateSupported}"
+                           IsVisible="{Binding !Updates.Status.IsUpdateSupported}"
                            Text="{x:Static res:Strings.SettingsUpdatesUnsupportedNote}" />
 
                 <CheckBox Content="{x:Static res:Strings.SettingsUpdatesCheckOnStartup}"
-                          IsChecked="{Binding CheckForUpdatesOnStartup}"
-                          IsEnabled="{Binding UpdateStatus.IsUpdateSupported}" />
+                          IsChecked="{Binding Updates.CheckForUpdatesOnStartup}"
+                          IsEnabled="{Binding Updates.Status.IsUpdateSupported}" />
                 <CheckBox Content="{x:Static res:Strings.SettingsUpdatesAutoDownload}"
-                          IsChecked="{Binding AutoDownloadUpdates}"
-                          IsEnabled="{Binding UpdateStatus.IsUpdateSupported}" />
+                          IsChecked="{Binding Updates.AutoDownloadUpdates}"
+                          IsEnabled="{Binding Updates.Status.IsUpdateSupported}" />
                 <CheckBox Content="{x:Static res:Strings.SettingsUpdatesPrerelease}"
-                          IsChecked="{Binding IncludePrereleaseVersions}"
-                          IsEnabled="{Binding UpdateStatus.IsUpdateSupported}" />
+                          IsChecked="{Binding Updates.IncludePrereleaseVersions}"
+                          IsEnabled="{Binding Updates.Status.IsUpdateSupported}" />
             </StackPanel>
         </Border>
 
@@ -39,24 +39,24 @@
                                Classes="rowValue"
                                MaxWidth="380"
                                TextWrapping="Wrap"
-                               Text="{Binding UpdateStatus.UpdateStatusText}" />
+                               Text="{Binding Updates.Status.UpdateStatusText}" />
                 </Grid>
 
                 <ProgressBar Height="4"
                              Minimum="0"
                              Maximum="100"
-                             Value="{Binding UpdateStatus.UpdateProgress}"
-                             IsVisible="{Binding UpdateStatus.IsUpdateProgressVisible}"
+                             Value="{Binding Updates.Status.UpdateProgress}"
+                             IsVisible="{Binding Updates.Status.IsUpdateProgressVisible}"
                              Foreground="{DynamicResource AccentBrush}" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{x:Static res:Strings.SettingsUpdatesCheckButton}"
-                            Command="{Binding UpdateStatus.CheckCommand}"
-                            IsEnabled="{Binding UpdateStatus.IsUpdateSupported}"
+                            Command="{Binding Updates.Status.CheckCommand}"
+                            IsEnabled="{Binding Updates.Status.IsUpdateSupported}"
                             Padding="12,4" />
                     <Button Content="{x:Static res:Strings.SettingsUpdatesInstallButton}"
-                            Command="{Binding UpdateStatus.InstallUpdateCommand}"
-                            IsEnabled="{Binding UpdateStatus.CanInstallUpdate}"
+                            Command="{Binding Updates.Status.InstallUpdateCommand}"
+                            IsEnabled="{Binding Updates.Status.CanInstallUpdate}"
                             Padding="12,4" />
                 </StackPanel>
 

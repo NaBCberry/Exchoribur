@@ -9,10 +9,10 @@
         <Border Classes="settingsGroup">
             <StackPanel Spacing="2">
                 <CheckBox Content="{x:Static res:Strings.SettingsInputInvertWheel}"
-                          IsChecked="{Binding InvertMouseWheel}" />
+                          IsChecked="{Binding Editing.InvertMouseWheel}" />
                 <CheckBox Content="{x:Static res:Strings.SettingsInputInvertTouchpad}"
                           Margin="0,8,0,0"
-                          IsChecked="{Binding InvertTouchpadScroll}" />
+                          IsChecked="{Binding Editing.InvertTouchpadScroll}" />
             </StackPanel>
         </Border>
     </StackPanel>

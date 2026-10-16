@@ -5,37 +5,54 @@ using Exchoribur.Application.Playback;
 using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Playback;
 
 /// <summary>播放头、灯光取样及播放命令的唯一所有者。</summary>
 public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
 {
     private readonly PlaybackController _playback;
+
     private readonly Func<Timeline> _timeline;
+
     private readonly VideoPreviewViewModel _preview;
+
     private bool _disposed;
+
     public event Action<TimeSpan>? PositionChanged;
+
     public event Action<TimeSpan, bool>? ViewportRequested;
+
     public PlaybackViewModel(IPlaybackClock? clock, Func<Timeline> timeline, VideoPreviewViewModel preview)
     {
         _timeline = timeline;
         _preview = preview;
         _playback = new PlaybackController(clock, () => preview.HasVideo, () => preview.CreatedService, SyncPlaybackFlags);
     }
+
     private Timeline Timeline => _timeline();
+
     private TimeSpan Duration => Timeline.Duration;
+
     [ObservableProperty]
     public partial TimeSpan PlayheadTime { get; set; }
+
     public string PlayheadText => Timecode.FormatClock(PlayheadTime);
+
     [ObservableProperty]
     public partial Frame? CurrentFrame { get; private set; }
+
     [ObservableProperty]
     public partial bool IsPlaying { get; private set; }
+
     public bool IsPaused => !IsPlaying;
+
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(IsPaused));
+
     [ObservableProperty]
     public partial bool IsLooping { get; set; }
+
     partial void OnIsLoopingChanged(bool value) => _playback.Loop = value;
+
     partial void OnPlayheadTimeChanged(TimeSpan value)
     {
         if (_disposed) return;
@@ -48,6 +65,7 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
         }
         PositionChanged?.Invoke(value);
     }
+
     public void RefreshTimeline(bool reset)
     {
         if (_disposed) return;
@@ -59,6 +77,7 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
         }
         CurrentFrame = BlockSampler.Sample(Timeline, PlayheadTime);
     }
+
     private TimeSpan PlaybackLength
     {
         get

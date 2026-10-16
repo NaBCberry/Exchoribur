@@ -3,19 +3,26 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Playback;
 
 /// <summary>独占预览播放器和帧通知;未使用时不创建解码器。</summary>
 public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) : ViewModelBase, IDisposable
 {
     private IVideoService? _video;
+
     private bool _disposed;
+
     public event Action? ServiceCreated;
+
     public event Action<string, bool>? StatusReported;
+
     internal IVideoService? CreatedService => _video;
+
     public WriteableBitmap? VideoFrame => _disposed ? null : Video.Frame;
+
     [ObservableProperty]
     public partial int VideoFrameVersion { get; set; }
+
     [ObservableProperty]
     public partial bool HasVideo { get; set; }
 

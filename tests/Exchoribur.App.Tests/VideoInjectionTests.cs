@@ -1,6 +1,7 @@
 using Avalonia.Media.Imaging;
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
+using Exchoribur.App.ViewModels.Playback;
 using Exchoribur.Application.Playback;
 
 namespace Exchoribur.App.Tests;

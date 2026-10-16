@@ -35,6 +35,56 @@ App 中对 Infrastructure 的源代码引用集中在 `AppServices.cs`。
 构造参数注入项目存储、设置存储和播放器等替代实现。设备通知通过
 `ICallbackDispatcher` 回到调用方线程,App 提供 Avalonia 实现。
 
+## 界面模型的职责与绑定
+
+`MainViewModel` 保留工程对象、文件操作命令、修改标记、加载保存进度、状态栏、
+面板开关和退出协调。界面直接绑定子模型,不通过主模型逐个转发属性:
+
+| 绑定入口 | 状态和命令的所有者 |
+| --- | --- |
+| `Editing` | `TimelineEditorViewModel`:时间轴、主视口、块选择、块编辑命令、撤销和重做 |
+| `Editing.BlockEditor` | `BlockEditorViewModel`:当前块、帧选区、块内视口、颜色和帧编辑命令 |
+| `Playback` | `PlaybackViewModel`:唯一播放头、灯光取样、播放状态、跳帧和循环 |
+| `Preview` | `VideoPreviewViewModel`:播放器的惰性创建、视频加载、位图及帧刷新 |
+| `Updates` | `UpdateViewModel`:共享更新状态、主窗口提示条和检查/下载/安装命令 |
+
+新模型分别位于 `ViewModels/Editing`、`Playback`、`Updates`、`Settings`,命名空间与
+目录一致。既有的 `BlockEditingSession`、`ProjectSession`、`ColorEditorViewModel`
+和 `DeviceSection` 继续复用。
+
+编辑只保留一份 `BlockEditingSession` 撤销历史。块内编辑通过
+`IBlockEditingContext` 的统一内容提交入口生成同一条历史中的编辑操作。
+`LoadTimeline` 明确表示打开另一条时间轴,清空历史和选区并重置播放与视口;
+普通编辑发布新的时间轴快照,按块 ID 恢复选择,不会调用 `LoadTimeline`。
+主模型接到 `TimelineEdited` 后更新工程内容和修改标记。
+
+`Playback.PositionChanged` 由主模型连接到块编辑视口和设备跟随;
+`ViewportRequested` 协调主视口的定位或翻页。视频同步仍由 Application 中的
+`PlaybackController` 执行,界面子模型不重复实现播放状态机。
+
+设置窗口根模型保留分类导航、加载、批量恢复默认和唯一保存入口:
+
+| 设置绑定入口 | 职责 |
+| --- | --- |
+| `Settings.Editing` | 输入方向、撤销深度、新建块长度 |
+| `Settings.Audio` | 音量、输出设备、设备列表及提示 |
+| `Settings.DeviceDefaults` | 默认设备连接、亮度、提前量、许可 |
+| `Settings.Updates` | 更新偏好;`Status` 指向主窗口的同一份 `Updates` |
+| `Settings.Storage` | 设置路径、打开目录、恢复默认的两次确认 |
+| `Settings.About` | 程序信息、声明链接和固定版权文本 |
+
+偏好子模型通过 `PreferencesChanged` 请求根模型保存完整 `AppSettings` 快照,
+不持有存储服务。初始化不保存;批量恢复默认期间暂停保存,完成后写一次。
+设备列表重新枚举不重复保存相同偏好,确实改变输出设备时才保存新选择。
+保存失败保留本次运行中的偏好,延续原有处理方式。设备面板只读取
+`DeviceDefaultsViewModel`,现场参数不会写回默认设置。
+
+所有外部事件均使用具名处理方法并退订。根模型拥有子模型生命周期;
+预览模型独占播放器,共享更新模型由主模型释放,设置模型只释放自己创建的
+独立更新模型。主窗口关闭时先停播放、退订,再等待设备异步清理。
+未使用的视频不会为释放而创建播放器,已释放模型忽略迟到的帧或更新通知。
+安装更新沿用未保存确认、下载、安装、请求退出的顺序;取消、失败或释放后不退出。
+
 ## 后台设备发送
 
 `DeviceService` 的单个后台任务独占 `DeviceLink`,连接、实际发送和断开不会并行

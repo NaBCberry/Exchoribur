@@ -16,8 +16,8 @@
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesTransport}" />
                     <ComboBox Grid.Column="1"
                               Width="280"
-                              ItemsSource="{Binding DeviceTransports}"
-                              SelectedItem="{Binding SelectedDeviceTransport}">
+                              ItemsSource="{Binding DeviceDefaults.DeviceTransports}"
+                              SelectedItem="{Binding DeviceDefaults.SelectedDeviceTransport}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="services:DeviceTransportOption">
                                 <TextBlock Text="{Binding Description}" />
@@ -26,44 +26,44 @@
                     </ComboBox>
                 </Grid>
 
-                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceSerial}">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding DeviceDefaults.IsDeviceSerial}">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesSerialPort}" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <ComboBox Width="220"
-                                  ItemsSource="{Binding DeviceSerialPorts}"
-                                  SelectedItem="{Binding DeviceSerialPort}" />
+                                  ItemsSource="{Binding DeviceDefaults.DeviceSerialPorts}"
+                                  SelectedItem="{Binding DeviceDefaults.DeviceSerialPort}" />
                         <Button Content="{x:Static res:Strings.SettingsDevicesRefreshPorts}"
-                                Command="{Binding RefreshDeviceSerialPortsCommand}"
+                                Command="{Binding DeviceDefaults.RefreshDeviceSerialPortsCommand}"
                                 Padding="12,4" />
                     </StackPanel>
                 </Grid>
 
-                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceSerial}">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding DeviceDefaults.IsDeviceSerial}">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesBaud}" />
                     <ComboBox Grid.Column="1"
                               Width="280"
-                              ItemsSource="{Binding DeviceBaudRates}"
-                              SelectedItem="{Binding DeviceBaudRate}" />
+                              ItemsSource="{Binding DeviceDefaults.DeviceBaudRates}"
+                              SelectedItem="{Binding DeviceDefaults.DeviceBaudRate}" />
                 </Grid>
 
-                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceUdp}">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding DeviceDefaults.IsDeviceUdp}">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesUdpHost}" />
                     <TextBox Grid.Column="1"
                              Width="280"
-                             Text="{Binding DeviceUdpHost}"
+                             Text="{Binding DeviceDefaults.DeviceUdpHost}"
                              PlaceholderText="{x:Static res:Strings.DeviceUdpHostWatermark}" />
                 </Grid>
 
-                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding IsDeviceUdp}">
+                <Grid Classes="settingsRow" ColumnDefinitions="*,Auto" IsVisible="{Binding DeviceDefaults.IsDeviceUdp}">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesUdpRepeats}" />
                     <ComboBox Grid.Column="1"
                               Width="280"
-                              ItemsSource="{Binding DeviceUdpStreamRepeatOptions}"
-                              SelectedItem="{Binding DeviceUdpStreamRepeats}" />
+                              ItemsSource="{Binding DeviceDefaults.DeviceUdpStreamRepeatOptions}"
+                              SelectedItem="{Binding DeviceDefaults.DeviceUdpStreamRepeats}" />
                 </Grid>
 
                 <TextBlock Classes="note"
-                           IsVisible="{Binding IsDeviceBle}"
+                           IsVisible="{Binding DeviceDefaults.IsDeviceBle}"
                            Text="{x:Static res:Strings.DeviceTransportBleNote}" />
             </StackPanel>
         </Border>
@@ -79,27 +79,27 @@
                         <Slider Width="200"
                                 Minimum="0"
                                 Maximum="100"
-                                IsEnabled="{Binding DeviceBrightnessEnabled}"
-                                Value="{Binding DeviceBrightnessPercent}" />
+                                IsEnabled="{Binding DeviceDefaults.DeviceBrightnessEnabled}"
+                                Value="{Binding DeviceDefaults.DeviceBrightnessPercent}" />
                         <TextBlock Classes="rowValue"
                                    Width="44"
-                                   Text="{Binding DeviceBrightnessText}" />
+                                   Text="{Binding DeviceDefaults.DeviceBrightnessText}" />
                     </StackPanel>
                 </Grid>
 
                 <CheckBox Content="{x:Static res:Strings.SettingsDevicesBrightnessEnabled}"
-                          IsChecked="{Binding DeviceBrightnessEnabled}" />
+                          IsChecked="{Binding DeviceDefaults.DeviceBrightnessEnabled}" />
 
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsDevicesFrameAdvance}" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <Slider Width="200"
                                 Minimum="0"
-                                Maximum="{Binding DeviceFrameAdvanceMaximum}"
-                                Value="{Binding DeviceFrameAdvanceMilliseconds}" />
+                                Maximum="{Binding DeviceDefaults.DeviceFrameAdvanceMaximum}"
+                                Value="{Binding DeviceDefaults.DeviceFrameAdvanceMilliseconds}" />
                         <TextBlock Classes="rowValue"
                                    Width="64"
-                                   Text="{Binding DeviceFrameAdvanceText}" />
+                                   Text="{Binding DeviceDefaults.DeviceFrameAdvanceText}" />
                     </StackPanel>
                 </Grid>
 
@@ -115,11 +115,11 @@
                 <TextBox AcceptsReturn="True"
                          Height="64"
                          TextWrapping="Wrap"
-                         Text="{Binding DeviceLicenseText}"
+                         Text="{Binding DeviceDefaults.DeviceLicenseText}"
                          PlaceholderText="{x:Static res:Strings.SettingsDevicesLicenseWatermark}" />
 
                 <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesLicenseNote}" />
-                <TextBlock Classes="note" Text="{Binding DeviceLicenseHint}" />
+                <TextBlock Classes="note" Text="{Binding DeviceDefaults.DeviceLicenseHint}" />
             </StackPanel>
         </Border>
 

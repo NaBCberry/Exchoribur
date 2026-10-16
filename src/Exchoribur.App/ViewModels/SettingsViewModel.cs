@@ -1,36 +1,38 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.App.ViewModels.Settings;
+using Exchoribur.App.ViewModels.Updates;
 using Exchoribur.Application.Abstractions;
-using Exchoribur.Application.Playback;
 using Exchoribur.Application.Settings;
 using Exchoribur.Application.Updates;
 using Exchoribur.Core.Devices;
 
 namespace Exchoribur.App.ViewModels;
 
-/// <summary>
-/// 设置页的数据。
-/// 下面一排二级页,内容按分组摆。改一项就写回文件,所以没有确定/取消。
-/// </summary>
+/// <summary>设置窗口导航与统一的持久化入口;页面模型持有各自偏好。</summary>
 public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly string _path;
-    private readonly ISettingsStore _store;
-    private readonly IExternalLauncher? _externalLauncher;
-    private readonly IDeviceService? _deviceService;
-    private readonly AudioDeviceSection _audioSection;
-    public UpdateViewModel UpdateStatus { get; private set; }
-    private bool _ownsUpdateStatus = true;
 
-    /// <summary>构造函数里给属性赋初值不算"用户改过",这段时间不要写文件。</summary>
+    private readonly ISettingsStore _store;
+
     private bool _initializing = true;
 
-    /// <summary>"恢复默认设置"要点两下,这是第一下之后的状态。</summary>
-    private bool _resetConfirmPending;
+    private bool _disposed;
+
+    public EditingSettingsViewModel Editing { get; }
+
+    public AudioSettingsViewModel Audio { get; }
+
+    public DeviceDefaultsViewModel DeviceDefaults { get; }
+
+    public UpdateSettingsViewModel Updates { get; }
+
+    public StorageSettingsViewModel Storage { get; }
+
+    public AboutSettingsViewModel About { get; }
 
     /// <summary>正式运行走这个:读写当前用户的默认设置文件。</summary>
     public SettingsViewModel()
@@ -60,55 +62,62 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         _path = path;
         _store = store ?? AppServices.CreateSettingsStore();
-        _externalLauncher = externalLauncher;
-        _deviceService = device;
-        _audioSection = new AudioDeviceSection(audio);
-
-        UpdateStatus = new UpdateViewModel(updates);
-
+        Editing = new EditingSettingsViewModel();
+        Audio = new AudioSettingsViewModel(audio);
+        DeviceDefaults = new DeviceDefaultsViewModel(device);
+        Updates = new UpdateSettingsViewModel(new UpdateViewModel(updates));
+        Storage = new StorageSettingsViewModel(path, externalLauncher, ResetToDefaults);
+        About = new AboutSettingsViewModel(externalLauncher, () => Updates.Status.CurrentVersionText);
         Groups = BuildGroups();
         SelectGroup(Groups[0]);
-
-        var settings = _store.Load(path);
-        InvertMouseWheel = settings.InvertMouseWheel;
-        InvertTouchpadScroll = settings.InvertTouchpadScroll;
-        DefaultBlockLengthMilliseconds = settings.DefaultBlockLength.TotalMilliseconds;
-        UndoDepth = settings.UndoDepthOrDefault;
-        AudioVolume = settings.AudioVolumeOrDefault;
-        CheckForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
-        AutoDownloadUpdates = settings.AutoDownloadUpdates;
-        IncludePrereleaseVersions = settings.IncludePrereleaseVersions;
-
-        RefreshAudioDevices(settings.AudioOutputDeviceId);
-
-        SelectedDeviceTransport = DeviceTransports
-            .FirstOrDefault(option => option.Kind == settings.DeviceTransport) ?? DeviceTransports[0];
-        DeviceSerialPort = settings.DeviceSerialPort;
-        DeviceBaudRate = settings.DeviceBaudRateOrDefault;
-        DeviceUdpHost = settings.DeviceUdpHost ?? string.Empty;
-        DeviceUdpStreamRepeats = settings.DeviceUdpStreamRepeatsOrDefault;
-        DeviceBrightnessEnabled = settings.DeviceBrightnessEnabled;
-        DeviceBrightnessPercent = settings.DeviceBrightnessOrDefault;
-        DeviceFrameAdvanceMilliseconds = settings.DeviceFrameAdvance.TotalMilliseconds;
-        DeviceLicenseText = settings.DeviceLicenseText ?? string.Empty;
-        FillDeviceSerialPorts(settings.DeviceSerialPort);
-
+        Load(_store.Load(path));
+        Editing.PreferencesChanged += Save;
+        Audio.PreferencesChanged += Save;
+        DeviceDefaults.PreferencesChanged += Save;
+        Updates.PreferencesChanged += Save;
         _initializing = false;
     }
 
-    internal void UseUpdates(UpdateViewModel updates)
+    internal void UseUpdates(UpdateViewModel updates) => Updates.UseUpdates(updates);
+
+    private void Load(AppSettings settings)
     {
-        if (_ownsUpdateStatus) UpdateStatus.Dispose();
-        UpdateStatus = updates;
-        _ownsUpdateStatus = false;
-        OnPropertyChanged(nameof(UpdateStatus));
+        Editing.Load(settings);
+        Audio.Load(settings);
+        DeviceDefaults.Load(settings);
+        Updates.Load(settings);
+    }
+
+    private void ResetToDefaults()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _initializing = true;
+        try { Load(AppSettings.Default); }
+        finally { _initializing = false; }
+        Save();
     }
 
     public void Dispose()
     {
-        if (_ownsUpdateStatus) UpdateStatus.Dispose();
-    }
+        if (_disposed)
+        {
+            return;
+        }
 
+        _disposed = true;
+        Editing.PreferencesChanged -= Save;
+        Audio.PreferencesChanged -= Save;
+        DeviceDefaults.PreferencesChanged -= Save;
+        Updates.PreferencesChanged -= Save;
+        Editing.Dispose();
+        Audio.Dispose();
+        DeviceDefaults.Dispose();
+        Updates.Dispose();
+    }
     // ---- 导航 ----
 
     /// <summary>一级分类。</summary>
@@ -121,12 +130,19 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     public partial SettingsPageItem? SelectedPage { get; set; }
 
     public bool IsInputPage => SelectedPage?.Kind == SettingsPageKind.Input;
+
     public bool IsStoragePage => SelectedPage?.Kind == SettingsPageKind.Storage;
+
     public bool IsTimelineEditPage => SelectedPage?.Kind == SettingsPageKind.TimelineEdit;
+
     public bool IsBlocksPage => SelectedPage?.Kind == SettingsPageKind.Blocks;
+
     public bool IsAudioPage => SelectedPage?.Kind == SettingsPageKind.Audio;
+
     public bool IsExternalDevicesPage => SelectedPage?.Kind == SettingsPageKind.ExternalDevices;
+
     public bool IsUpdatesPage => SelectedPage?.Kind == SettingsPageKind.Updates;
+
     public bool IsAboutPage => SelectedPage?.Kind == SettingsPageKind.About;
 
     partial void OnSelectedGroupChanged(SettingsGroupItem? value)
@@ -162,11 +178,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     partial void OnSelectedPageChanged(SettingsPageItem? value)
     {
         // 离开存储页就把"恢复默认"的待确认状态收掉,免得回来时还是确认态。
-        if (value?.Kind != SettingsPageKind.Storage && _resetConfirmPending)
-        {
-            _resetConfirmPending = false;
-            OnPropertyChanged(nameof(ResetButtonText));
-        }
+        if (value?.Kind != SettingsPageKind.Storage) Storage.CancelReset();
 
         OnPropertyChanged(nameof(IsInputPage));
         OnPropertyChanged(nameof(IsStoragePage));
@@ -205,184 +217,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         ], SelectGroup),
     ];
 
-    // ---- 输入 ----
-
-    /// <summary>反转鼠标滚轮方向:平移和缩放一起翻。</summary>
-    [ObservableProperty]
-    public partial bool InvertMouseWheel { get; set; }
-
-    /// <summary>反转触摸板横向滑动方向。</summary>
-    [ObservableProperty]
-    public partial bool InvertTouchpadScroll { get; set; }
-
-    // ---- 时间轴 ----
-
-    /// <summary>撤销栈最多记多少步。</summary>
-    [ObservableProperty]
-    public partial double UndoDepth { get; set; }
-
-    public double UndoDepthMinimum => AppSettings.MinUndoDepth;
-    public double UndoDepthMaximum => AppSettings.MaxUndoDepth;
-
-    /// <summary>可填范围,写在输入框下面。</summary>
-    public string UndoDepthHint
-        => string.Format(Strings.SettingsUndoDepthHintFormat, AppSettings.MinUndoDepth, AppSettings.MaxUndoDepth);
-
-    /// <summary>新建编排块的默认长度(毫秒)。</summary>
-    [ObservableProperty]
-    public partial double DefaultBlockLengthMilliseconds { get; set; }
-
-    /// <summary>新建块的默认长度,给建块的地方用。</summary>
-    public TimeSpan DefaultBlockLength
-        => DefaultBlockLengthMilliseconds is > 0 && double.IsFinite(DefaultBlockLengthMilliseconds)
-            ? TimeSpan.FromMilliseconds(DefaultBlockLengthMilliseconds)
-            : TimeSpan.FromMilliseconds(AppSettings.DefaultBlockLengthFallbackMilliseconds);
-
-    /// <summary>撤销栈上限,给编辑栈用。</summary>
-    public int UndoDepthValue => (int)Math.Round(UndoDepth);
-
-    // ---- 音频 ----
-
-    /// <summary>可选设备(第一项是"跟随系统默认")。</summary>
-    public ObservableCollection<AudioDeviceOption> AudioDevices => _audioSection.Devices;
-
-    [ObservableProperty]
-    public partial AudioDeviceOption? SelectedAudioDevice { get; set; }
-
-    /// <summary>选中的设备 id;空表示跟随系统默认。</summary>
-    public string? AudioOutputDeviceId => SelectedAudioDevice?.Id;
-
-    /// <summary>预览音量(0-100)。</summary>
-    [ObservableProperty]
-    public partial double AudioVolume { get; set; }
-
-    public string AudioVolumeText => $"{Math.Round(AudioVolume)}%";
-
-    /// <summary>设备列表拿不到时给一句解释,能拿到就留空。</summary>
-    public string AudioDeviceHint => _audioSection.Hint;
-
-    public bool HasAudioDeviceHint => AudioDeviceHint.Length > 0;
-
-    /// <summary>重新枚举一次设备。插拔耳机之后用它。</summary>
-    [RelayCommand]
-    private void RefreshAudioDeviceList() => RefreshAudioDevices(SelectedAudioDevice?.Id);
-
-    private void RefreshAudioDevices(string? deviceId)
-    {
-        // 存着的设备可能已经拔掉了,那就回落到系统默认。
-        SelectedAudioDevice = _audioSection.Refresh(deviceId);
-
-        OnPropertyChanged(nameof(AudioDeviceHint));
-        OnPropertyChanged(nameof(HasAudioDeviceHint));
-    }
-
-    // ---- 外部设备(默认参数) ----
-    //
-    // 这里存的是"面板每次打开时的起点";现场真正在用的连接参数在设备面板上改,不写回这里。
-
-    /// <summary>可选传输方式。</summary>
-    public IReadOnlyList<DeviceTransportOption> DeviceTransports { get; } =
-    [
-        new(DeviceTransport.Serial, Strings.DeviceTransportSerial),
-        new(DeviceTransport.Udp, Strings.DeviceTransportUdp),
-        new(DeviceTransport.Ble, Strings.DeviceTransportBle),
-    ];
-
-    /// <summary>可选的串口名。</summary>
-    public ObservableCollection<string> DeviceSerialPorts { get; } = [];
-
-    [ObservableProperty]
-    public partial DeviceTransportOption? SelectedDeviceTransport { get; set; }
-
-    [ObservableProperty]
-    public partial string? DeviceSerialPort { get; set; }
-
-    [ObservableProperty]
-    public partial int DeviceBaudRate { get; set; } = DeviceProtocol.DefaultBaudRate;
-
-    public IReadOnlyList<int> DeviceBaudRates => DeviceProtocol.BaudRates;
-
-    [ObservableProperty]
-    public partial string DeviceUdpHost { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial int DeviceUdpStreamRepeats { get; set; } = DeviceProtocol.StreamRepeatsDefault;
-
-    public IReadOnlyList<int> DeviceUdpStreamRepeatOptions { get; } =
-        [.. Enumerable.Range(DeviceProtocol.StreamRepeatsMin, DeviceProtocol.StreamRepeatsMax)];
-
-    [ObservableProperty]
-    public partial bool DeviceBrightnessEnabled { get; set; } = true;
-
-    [ObservableProperty]
-    public partial double DeviceBrightnessPercent { get; set; } = 100;
-
-    public string DeviceBrightnessText => $"{Math.Round(DeviceBrightnessPercent)}%";
-
-    [ObservableProperty]
-    public partial double DeviceFrameAdvanceMilliseconds { get; set; } =
-        AppSettings.DefaultDeviceFrameAdvanceMilliseconds;
-
-    public double DeviceFrameAdvanceMaximum => AppSettings.MaxDeviceFrameAdvanceMilliseconds;
-
-    public string DeviceFrameAdvanceText => $"{Math.Round(DeviceFrameAdvanceMilliseconds)} ms";
-
-    [ObservableProperty]
-    public partial string DeviceLicenseText { get; set; } = string.Empty;
-
-    /// <summary>许可串的解析结果;和面板上那句是同一份说法。</summary>
-    public string DeviceLicenseHint => DeviceLicenseSummary.Describe(DeviceLicenseText, DateTimeOffset.Now);
-
-    /// <summary>取帧提前量,给吐帧的地方用。</summary>
-    public TimeSpan DeviceFrameAdvance => TimeSpan.FromMilliseconds(
-        DeviceFrameAdvanceMilliseconds is >= 0 and <= AppSettings.MaxDeviceFrameAdvanceMilliseconds
-            ? DeviceFrameAdvanceMilliseconds
-            : AppSettings.DefaultDeviceFrameAdvanceMilliseconds);
-
-    public bool IsDeviceSerial => SelectedDeviceTransport?.Kind == DeviceTransport.Serial;
-
-    public bool IsDeviceUdp => SelectedDeviceTransport?.Kind == DeviceTransport.Udp;
-
-    public bool IsDeviceBle => SelectedDeviceTransport?.Kind == DeviceTransport.Ble;
-
-    [RelayCommand]
-    private void RefreshDeviceSerialPorts() => FillDeviceSerialPorts(DeviceSerialPort);
-
-    /// <summary>
-    /// 填串口下拉。存着的那个口现在可能没插上,也一并放进列表:
-    /// 这一页存的是默认值,不该因为设备没插就被悄悄改掉。
-    /// </summary>
-    private void FillDeviceSerialPorts(string? preferred)
-    {
-        DeviceSerialPorts.Clear();
-
-        if (!string.IsNullOrWhiteSpace(preferred))
-        {
-            DeviceSerialPorts.Add(preferred);
-        }
-
-        foreach (var port in _deviceService?.SerialPorts() ?? [])
-        {
-            if (!DeviceSerialPorts.Contains(port))
-            {
-                DeviceSerialPorts.Add(port);
-            }
-        }
-
-        DeviceSerialPort = preferred ?? DeviceSerialPorts.FirstOrDefault();
-    }
-
-    // ---- 更新 ----
-
-    [ObservableProperty]
-    public partial bool CheckForUpdatesOnStartup { get; set; }
-
-    [ObservableProperty]
-    public partial bool AutoDownloadUpdates { get; set; }
-
-    [ObservableProperty]
-    public partial bool IncludePrereleaseVersions { get; set; }
-
     /// <summary>直接切到某一页,给"有新版本"提示里的"去设置页"用。</summary>
     public void ShowPage(SettingsPageKind kind)
     {
@@ -399,171 +233,9 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    // ---- 存储 ----
-
-    /// <summary>设置文件的位置,界面上照实显示。</summary>
-    public string SettingsFilePath => _path;
-
-    /// <summary>打开设置文件所在的文件夹,方便备份或者手改。</summary>
-    [RelayCommand]
-    private async Task OpenSettingsFolderAsync()
-    {
-        if (_externalLauncher is { } launcher
-            && Path.GetDirectoryName(_path) is { Length: > 0 } directory)
-        {
-            await launcher.OpenFolderAsync(directory);
-        }
-    }
-
-    /// <summary>"恢复默认设置"按钮上的字:第一次点完换成确认。</summary>
-    public string ResetButtonText
-        => _resetConfirmPending ? Strings.SettingsResetButtonConfirm : Strings.SettingsResetButton;
-
-    [RelayCommand]
-    private void ResetToDefaults()
-    {
-        if (!_resetConfirmPending)
-        {
-            _resetConfirmPending = true;
-            OnPropertyChanged(nameof(ResetButtonText));
-            return;
-        }
-
-        _resetConfirmPending = false;
-        OnPropertyChanged(nameof(ResetButtonText));
-
-        // 一次写回:中间不要把每一项都存一遍。
-        _initializing = true;
-
-        var defaults = AppSettings.Default;
-        InvertMouseWheel = defaults.InvertMouseWheel;
-        InvertTouchpadScroll = defaults.InvertTouchpadScroll;
-        DefaultBlockLengthMilliseconds = defaults.DefaultBlockLength.TotalMilliseconds;
-        UndoDepth = defaults.UndoDepthOrDefault;
-        AudioVolume = defaults.AudioVolumeOrDefault;
-        CheckForUpdatesOnStartup = defaults.CheckForUpdatesOnStartup;
-        AutoDownloadUpdates = defaults.AutoDownloadUpdates;
-        IncludePrereleaseVersions = defaults.IncludePrereleaseVersions;
-        RefreshAudioDevices(defaults.AudioOutputDeviceId);
-
-        SelectedDeviceTransport = DeviceTransports
-            .FirstOrDefault(option => option.Kind == defaults.DeviceTransport) ?? DeviceTransports[0];
-        DeviceSerialPort = defaults.DeviceSerialPort;
-        DeviceBaudRate = defaults.DeviceBaudRateOrDefault;
-        DeviceUdpHost = defaults.DeviceUdpHost ?? string.Empty;
-        DeviceUdpStreamRepeats = defaults.DeviceUdpStreamRepeatsOrDefault;
-        DeviceBrightnessEnabled = defaults.DeviceBrightnessEnabled;
-        DeviceBrightnessPercent = defaults.DeviceBrightnessOrDefault;
-        DeviceFrameAdvanceMilliseconds = defaults.DeviceFrameAdvance.TotalMilliseconds;
-        DeviceLicenseText = defaults.DeviceLicenseText ?? string.Empty;
-
-        _initializing = false;
-        Save();
-    }
-
-    // ---- 关于 ----
-
-    public string AppName => Strings.AppName;
-    public string BuildConfigurationText => AppVersion.Configuration;
-    public string ProjectUrl => ReleaseSource.RepositoryUrl;
-    public string LicenseText => Strings.SettingsLicenseName;
-    // 固定版权声明,不得通过翻译资源修改。
-    public string CopyrightText => "© 2026 NaBCberry";
-
-    /// <summary>打开项目主页。</summary>
-    [RelayCommand]
-    private async Task OpenProjectUrlAsync()
-    {
-        if (_externalLauncher is { } launcher)
-        {
-            await launcher.OpenUrlAsync(ProjectUrl);
-        }
-    }
-
-    /// <summary>用系统默认程序打开随程序发布的第三方组件声明。</summary>
-    [RelayCommand]
-    private async Task OpenNoticesAsync()
-    {
-        if (_externalLauncher is { } launcher)
-        {
-            await launcher.OpenFileAsync(Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md"));
-        }
-    }
-
-    /// <summary>用系统默认程序打开随程序发布的 MIT 许可全文。</summary>
-    [RelayCommand]
-    private async Task OpenLicenseAsync()
-    {
-        if (_externalLauncher is { } launcher)
-        {
-            await launcher.OpenFileAsync(Path.Combine(AppContext.BaseDirectory, "LICENSE"));
-        }
-    }
-
-    // ---- 保存 ----
-
-    partial void OnInvertMouseWheelChanged(bool value) => Save();
-    partial void OnInvertTouchpadScrollChanged(bool value) => Save();
-    partial void OnDefaultBlockLengthMillisecondsChanged(double value) => Save();
-    partial void OnUndoDepthChanged(double value) => Save();
-    partial void OnAudioVolumeChanged(double value)
-    {
-        OnPropertyChanged(nameof(AudioVolumeText));
-        ApplyAudioSettings();
-        Save();
-    }
-
-    partial void OnSelectedAudioDeviceChanged(AudioDeviceOption? value)
-    {
-        ApplyAudioSettings();
-        Save();
-    }
-
-    partial void OnCheckForUpdatesOnStartupChanged(bool value) => Save();
-    partial void OnAutoDownloadUpdatesChanged(bool value) => Save();
-    partial void OnIncludePrereleaseVersionsChanged(bool value) => Save();
-
-    partial void OnSelectedDeviceTransportChanged(DeviceTransportOption? value)
-    {
-        OnPropertyChanged(nameof(IsDeviceSerial));
-        OnPropertyChanged(nameof(IsDeviceUdp));
-        OnPropertyChanged(nameof(IsDeviceBle));
-        Save();
-    }
-
-    partial void OnDeviceSerialPortChanged(string? value) => Save();
-
-    partial void OnDeviceBaudRateChanged(int value) => Save();
-
-    partial void OnDeviceUdpHostChanged(string value) => Save();
-
-    partial void OnDeviceUdpStreamRepeatsChanged(int value) => Save();
-
-    partial void OnDeviceBrightnessEnabledChanged(bool value) => Save();
-
-    partial void OnDeviceBrightnessPercentChanged(double value)
-    {
-        OnPropertyChanged(nameof(DeviceBrightnessText));
-        Save();
-    }
-
-    partial void OnDeviceFrameAdvanceMillisecondsChanged(double value)
-    {
-        OnPropertyChanged(nameof(DeviceFrameAdvanceText));
-        Save();
-    }
-
-    partial void OnDeviceLicenseTextChanged(string value)
-    {
-        OnPropertyChanged(nameof(DeviceLicenseHint));
-        Save();
-    }
-
-    private void ApplyAudioSettings() => _audioSection.Apply(SelectedAudioDevice?.Id, AudioVolume);
-
     private void Save()
     {
-        if (_initializing)
+        if (_initializing || _disposed)
         {
             return;
         }
@@ -572,29 +244,29 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         {
             _store.Save(_path, new AppSettings
             {
-                InvertMouseWheel = InvertMouseWheel,
-                InvertTouchpadScroll = InvertTouchpadScroll,
-                DefaultBlockLengthMilliseconds = DefaultBlockLengthMilliseconds,
-                UndoDepth = UndoDepthValue,
-                AudioOutputDeviceId = SelectedAudioDevice?.Id,
-                AudioVolume = AudioVolume,
-                CheckForUpdatesOnStartup = CheckForUpdatesOnStartup,
-                AutoDownloadUpdates = AutoDownloadUpdates,
-                IncludePrereleaseVersions = IncludePrereleaseVersions,
-                DeviceTransport = SelectedDeviceTransport?.Kind ?? DeviceTransport.Serial,
-                DeviceSerialPort = DeviceSerialPort,
-                DeviceBaudRate = DeviceBaudRate,
-                DeviceUdpHost = DeviceUdpHost,
-                DeviceUdpStreamRepeats = DeviceUdpStreamRepeats,
-                DeviceBrightnessEnabled = DeviceBrightnessEnabled,
-                DeviceBrightnessPercent = DeviceBrightnessPercent,
-                DeviceFrameAdvanceMilliseconds = DeviceFrameAdvanceMilliseconds,
-                DeviceLicenseText = DeviceLicenseText,
+                InvertMouseWheel = Editing.InvertMouseWheel,
+                InvertTouchpadScroll = Editing.InvertTouchpadScroll,
+                DefaultBlockLengthMilliseconds = Editing.DefaultBlockLengthMilliseconds,
+                UndoDepth = Editing.UndoDepthValue,
+                AudioOutputDeviceId = Audio.AudioOutputDeviceId,
+                AudioVolume = Audio.AudioVolume,
+                CheckForUpdatesOnStartup = Updates.CheckForUpdatesOnStartup,
+                AutoDownloadUpdates = Updates.AutoDownloadUpdates,
+                IncludePrereleaseVersions = Updates.IncludePrereleaseVersions,
+                DeviceTransport = DeviceDefaults.SelectedDeviceTransport?.Kind ?? DeviceTransport.Serial,
+                DeviceSerialPort = DeviceDefaults.DeviceSerialPort,
+                DeviceBaudRate = DeviceDefaults.DeviceBaudRate,
+                DeviceUdpHost = DeviceDefaults.DeviceUdpHost,
+                DeviceUdpStreamRepeats = DeviceDefaults.DeviceUdpStreamRepeats,
+                DeviceBrightnessEnabled = DeviceDefaults.DeviceBrightnessEnabled,
+                DeviceBrightnessPercent = DeviceDefaults.DeviceBrightnessPercent,
+                DeviceFrameAdvanceMilliseconds = DeviceDefaults.DeviceFrameAdvanceMilliseconds,
+                DeviceLicenseText = DeviceDefaults.DeviceLicenseText,
             });
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            // 设置文件写不进去也不该让程序崩:本次运行里开关照样生效,只是记不住。
+            // 保持本次运行中的偏好;保存失败不打断编排。
         }
     }
 }

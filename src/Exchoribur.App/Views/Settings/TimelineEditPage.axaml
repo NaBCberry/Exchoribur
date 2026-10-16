@@ -14,10 +14,10 @@
                              Width="90"
                              Padding="6,2"
                              FontSize="12"
-                             Text="{Binding UndoDepth}" />
+                             Text="{Binding Editing.UndoDepth}" />
                 </Grid>
                 <TextBlock Classes="note"
-                           Text="{Binding UndoDepthHint}" />
+                           Text="{Binding Editing.UndoDepthHint}" />
                 <TextBlock Classes="note"
                            Text="{x:Static res:Strings.SettingsTimelineUndoDepthNote}" />
             </StackPanel>

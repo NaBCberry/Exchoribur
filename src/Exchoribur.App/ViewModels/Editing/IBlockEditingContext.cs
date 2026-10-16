@@ -1,6 +1,6 @@
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Editing;
 
 /// <summary>块编辑器所需的只读上下文和统一内容提交入口。</summary>
 internal interface IBlockEditingContext

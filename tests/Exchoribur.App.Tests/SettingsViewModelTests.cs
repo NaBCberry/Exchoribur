@@ -24,8 +24,8 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var viewModel = new SettingsViewModel(path);
 
-        Assert.False(viewModel.InvertMouseWheel);
-        Assert.False(viewModel.InvertTouchpadScroll);
+        Assert.False(viewModel.Editing.InvertMouseWheel);
+        Assert.False(viewModel.Editing.InvertTouchpadScroll);
 
         // 只是打开设置页看了一眼,不该凭空造出一个设置文件。
         Assert.False(File.Exists(path));
@@ -43,8 +43,8 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var viewModel = new SettingsViewModel(path);
 
-        Assert.True(viewModel.InvertMouseWheel);
-        Assert.True(viewModel.InvertTouchpadScroll);
+        Assert.True(viewModel.Editing.InvertMouseWheel);
+        Assert.True(viewModel.Editing.InvertTouchpadScroll);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class SettingsViewModelTests : IDisposable
         var path = Path.Combine(_directory, "settings.json");
         var viewModel = new SettingsViewModel(path);
 
-        viewModel.InvertTouchpadScroll = true;
+        viewModel.Editing.InvertTouchpadScroll = true;
 
         var saved = SettingsStore.Load(path);
         Assert.True(saved.InvertTouchpadScroll);

@@ -13,8 +13,8 @@
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsPageAudioOutput}" />
                     <ComboBox Grid.Column="1"
                               Width="280"
-                              ItemsSource="{Binding AudioDevices}"
-                              SelectedItem="{Binding SelectedAudioDevice}">
+                              ItemsSource="{Binding Audio.AudioDevices}"
+                              SelectedItem="{Binding Audio.SelectedAudioDevice}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="services:AudioDeviceOption">
                                 <TextBlock Text="{Binding Description}"
@@ -24,12 +24,12 @@
                     </ComboBox>
                 </Grid>
                 <Button Content="{x:Static res:Strings.SettingsAudioRefreshButton}"
-                        Command="{Binding RefreshAudioDeviceListCommand}"
+                        Command="{Binding Audio.RefreshAudioDeviceListCommand}"
                         HorizontalAlignment="Left"
                         Padding="12,4" />
                 <TextBlock Classes="note"
-                           IsVisible="{Binding HasAudioDeviceHint}"
-                           Text="{Binding AudioDeviceHint}" />
+                           IsVisible="{Binding Audio.HasAudioDeviceHint}"
+                           Text="{Binding Audio.AudioDeviceHint}" />
             </StackPanel>
         </Border>
 
@@ -41,10 +41,10 @@
                         <Slider Width="240"
                                 Minimum="0"
                                 Maximum="100"
-                                Value="{Binding AudioVolume}" />
+                                Value="{Binding Audio.AudioVolume}" />
                         <TextBlock Classes="rowValue"
                                    Width="44"
-                                   Text="{Binding AudioVolumeText}" />
+                                   Text="{Binding Audio.AudioVolumeText}" />
                     </StackPanel>
                 </Grid>
             </StackPanel>

@@ -3,20 +3,27 @@ using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Resources;
 using Exchoribur.Application.Updates;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Updates;
 
 /// <summary>主窗口与设置页共用的更新状态、提示和安装入口。</summary>
 public sealed partial class UpdateViewModel : ObservableObject, IDisposable
 {
     private readonly UpdateCoordinator? _updates;
+
     private readonly Func<Task<bool>>? _confirmInstall;
+
     private bool _disposed;
+
     private bool _notified;
 
     public event Action<string>? UpdateAvailableFound;
+
     public event Action? ExitRequested;
+
     public string UpdateBannerText { get; private set; } = string.Empty;
+
     public bool IsUpdateBannerVisible => UpdateBannerText.Length > 0;
+
     public bool IsUpdateApplyVisible => CanInstallUpdate;
 
     public UpdateViewModel(UpdateCoordinator? updates, Func<Task<bool>>? confirmInstall = null)
@@ -130,6 +137,13 @@ public sealed partial class UpdateViewModel : ObservableObject, IDisposable
             UpdateStage.Ready => string.Format(Strings.MainUpdateReadyFormat, state.Version),
             _ => string.Empty,
         };
+        IsUpdateBusy = state.IsBusy;
+        CanDownloadUpdate = state.Stage == UpdateStage.Available;
+        CanApplyUpdate = state.Stage == UpdateStage.Ready;
+        CanInstallUpdate = state.Stage is UpdateStage.Available or UpdateStage.Ready;
+        UpdateProgress = state.ProgressPercent;
+        IsUpdateProgressVisible = state.Stage == UpdateStage.Downloading;
+
         OnPropertyChanged(nameof(UpdateBannerText));
         OnPropertyChanged(nameof(IsUpdateBannerVisible));
         OnPropertyChanged(nameof(IsUpdateApplyVisible));
@@ -138,13 +152,6 @@ public sealed partial class UpdateViewModel : ObservableObject, IDisposable
             _notified = true;
             UpdateAvailableFound?.Invoke(version);
         }
-
-        IsUpdateBusy = state.IsBusy;
-        CanDownloadUpdate = state.Stage == UpdateStage.Available;
-        CanApplyUpdate = state.Stage == UpdateStage.Ready;
-        CanInstallUpdate = state.Stage is UpdateStage.Available or UpdateStage.Ready;
-        UpdateProgress = state.ProgressPercent;
-        IsUpdateProgressVisible = state.Stage == UpdateStage.Downloading;
 
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(IsUpdateBusy));

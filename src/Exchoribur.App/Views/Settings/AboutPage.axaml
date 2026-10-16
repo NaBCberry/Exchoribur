@@ -10,30 +10,30 @@
             <StackPanel Spacing="6">
                 <TextBlock Classes="rowLabel"
                            FontSize="16"
-                           Text="{Binding AppName}" />
+                           Text="{Binding About.AppName}" />
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutVersion}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding UpdateStatus.CurrentVersionText}" />
+                               Text="{Binding Updates.Status.CurrentVersionText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutBuildConfiguration}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding BuildConfigurationText}" />
+                               Text="{Binding About.BuildConfigurationText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutLicense}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding LicenseText}" />
+                               Text="{Binding About.LicenseText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutCopyright}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding CopyrightText}" />
+                               Text="{Binding About.CopyrightText}" />
                 </Grid>
             </StackPanel>
         </Border>
@@ -43,13 +43,13 @@
                 <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.SettingsAboutLinksTitle}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{x:Static res:Strings.SettingsAboutProjectUrl}"
-                            Command="{Binding OpenProjectUrlCommand}"
+                            Command="{Binding About.OpenProjectUrlCommand}"
                             Padding="12,4" />
                     <Button Content="{x:Static res:Strings.SettingsAboutLicenseFile}"
-                            Command="{Binding OpenLicenseCommand}"
+                            Command="{Binding About.OpenLicenseCommand}"
                             Padding="12,4" />
                     <Button Content="{x:Static res:Strings.SettingsAboutNotices}"
-                            Command="{Binding OpenNoticesCommand}"
+                            Command="{Binding About.OpenNoticesCommand}"
                             Padding="12,4" />
                 </StackPanel>
             </StackPanel>

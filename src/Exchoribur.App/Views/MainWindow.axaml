@@ -415,8 +415,8 @@
                                 CurrentBlockId="{Binding Editing.BlockEditor.CurrentBlockId}"
                                 BottomOverlayHeight="{Binding Editing.BlockEditor.EditorOverlayHeight}"
                                 EnsureVisibleChannel="{Binding Editing.BlockEditor.CurrentBlockChannel}"
-                                InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
-                                InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
+                                InvertMouseWheel="{Binding Settings.Editing.InvertMouseWheel}"
+                                InvertTouchpadScroll="{Binding Settings.Editing.InvertTouchpadScroll}"
                                 BlockCreateRequested="OnBlockCreateRequested"
                                 BlockMoveRequested="OnBlockMoveRequested"
                                 BlockOpenRequested="OnBlockOpenRequested"
@@ -477,8 +477,8 @@
                                         SelectedFrames="{Binding Editing.BlockEditor.SelectedFrames, Mode=TwoWay}"
                                         FocusTime="{Binding Editing.BlockEditor.CurrentBlockFocus}"
                                         FocusSpacing="{Binding Editing.BlockEditor.CurrentBlockSpacing}"
-                                        InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
-                                        InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}" />
+                                        InvertMouseWheel="{Binding Settings.Editing.InvertMouseWheel}"
+                                        InvertTouchpadScroll="{Binding Settings.Editing.InvertTouchpadScroll}" />
                                 </DockPanel>
                             </Border>
                         </Grid>

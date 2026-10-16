@@ -35,7 +35,7 @@ public sealed class DeviceShutdownTests
     public async Task Device_panel_submits_frames_and_disconnects_without_waiting_on_the_ui_thread()
     {
         var device = new DelayedDevice();
-        using var section = new DeviceSection(device, CreateSettings(), new StubHost());
+        using var section = new DeviceSection(device, CreateSettings().DeviceDefaults, new StubHost());
         var previousRequests = device.Requests;
 
         section.FollowPosition(TimeSpan.FromSeconds(1));

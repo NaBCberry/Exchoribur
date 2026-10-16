@@ -5,18 +5,21 @@ using Exchoribur.App.TimelineUi;
 using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Editing;
 
 /// <summary>块内帧选区与命令;内容修改统一交给时间轴撤销历史。</summary>
 public sealed partial class BlockEditorViewModel : ViewModelBase
 {
     private readonly IBlockEditingContext _context;
+
     private readonly ColorEditorViewModel _color;
+
     internal BlockEditorViewModel(IBlockEditingContext context, ColorEditorViewModel color)
     {
         _context = context;
         _color = color;
     }
+
     /// <summary>块编辑器正在编辑的块;没打开编辑器时是 null。</summary>
     [ObservableProperty]
     public partial Block? CurrentBlock { get; set; }

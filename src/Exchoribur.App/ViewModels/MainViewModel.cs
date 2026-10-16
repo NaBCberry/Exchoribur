@@ -4,6 +4,10 @@ using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.DesignTime;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.App.ViewModels.Editing;
+using Exchoribur.App.ViewModels.Playback;
+using Exchoribur.App.ViewModels.Settings;
+using Exchoribur.App.ViewModels.Updates;
 using Exchoribur.Application.Abstractions;
 using Exchoribur.Application.Updates;
 using Exchoribur.Core.Models;
@@ -11,22 +15,28 @@ using Exchoribur.Core.Models;
 namespace Exchoribur.App.ViewModels;
 
 /// <summary>
-/// 主窗口的数据:当前时间轴、播放头位置,以及"打开文件"这条流程。
-/// 界面只管把这些属性画出来,不直接读文件。
+/// 主窗口的装配和跨功能协调:工程文件流程、状态栏、子模型及异步停机。
+/// 编辑、播放、视频和更新状态由各自的子模型持有。
 /// </summary>
 public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposable, IProjectHost, IDeviceHost
 {
     private static string EmptyStatusText => Strings.MainStatusEmpty;
 
     private readonly IAudioDeviceController _audio;
+
     public UpdateViewModel Updates { get; }
+
     public PlaybackViewModel Playback { get; }
+
     public VideoPreviewViewModel Preview { get; }
+
     private readonly ProjectSession _projects;
+
     private readonly IDeviceService? _deviceService;
 
     /// <summary>关窗之后不再干活,重复 Dispose 也不重复释放。</summary>
     private bool _disposed;
+
     private Task _deviceShutdown = Task.CompletedTask;
 
     public TimelineEditorViewModel Editing { get; }
@@ -76,7 +86,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         IDeviceService? device = null,
         IProjectStore? projectStore = null)
     {
-
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
         Preview = new VideoPreviewViewModel(videoFactory ?? AppServices.CreateVideo);
         Preview.ServiceCreated += ApplyAudioSettings;
@@ -88,24 +97,24 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         SettingsViewModel? currentSettings = null;
         var updates = new UpdateCoordinator(
             updateFeed ?? AppServices.CreateUpdateFeed(),
-            () => currentSettings?.AutoDownloadUpdates ?? false,
-            () => currentSettings?.IncludePrereleaseVersions ?? false);
+            () => currentSettings?.Updates.AutoDownloadUpdates ?? false,
+            () => currentSettings?.Updates.IncludePrereleaseVersions ?? false);
         Updates = new UpdateViewModel(updates, ConfirmDiscardChangesAsync);
         Updates.ExitRequested += OnUpdateExitRequested;
 
         Settings = settings
             ?? new SettingsViewModel(AppServices.CreateSettingsStore().DefaultPath, _audio, updates, externalLauncher, device);
         currentSettings = Settings;
-        Settings.PropertyChanged += OnSettingsChanged;
+        Settings.Editing.PropertyChanged += OnSettingsChanged;
         Settings.UseUpdates(Updates);
 
         // 场控设备这条线:面板上的连接状态与发包统计都归它,默认参数从设置页现取。
         _deviceService = device;
-        Device = new DeviceSection(device, Settings, this, externalLauncher);
+        Device = new DeviceSection(device, Settings.DeviceDefaults, this, externalLauncher);
 
-        // 播放只管时间怎么走;播放头画在哪、按钮亮不亮还是由这里发布。
+        // 子模型只接收需要的取值入口,不持有整个主窗口。
         Editing = new TimelineEditorViewModel(namePrompt, () => Document is not null,
-            () => TimelineName, () => Settings.DefaultBlockLength, () => Settings.UndoDepthValue,
+            () => TimelineName, () => Settings.Editing.DefaultBlockLength, () => Settings.Editing.UndoDepthValue,
             () => Playback?.PlayheadTime ?? TimeSpan.Zero, Color);
         Playback = new PlaybackViewModel(clock, () => Editing.Timeline, Preview);
         Editing.EditStarting += Playback.PausePlayback;
@@ -154,7 +163,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         Updates.ExitRequested -= OnUpdateExitRequested;
         Updates.Dispose();
         Settings.Dispose();
-        Settings.PropertyChanged -= OnSettingsChanged;
+        Settings.Editing.PropertyChanged -= OnSettingsChanged;
 
         // 发起后台停机;真实关窗路径通过 DisposeAsync 等待,不阻塞界面线程。
         _deviceShutdown = _deviceService?.DisposeAsync().AsTask() ?? Task.CompletedTask;
@@ -263,15 +272,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     public void StartBackgroundUpdateCheck()
     {
-        if (Settings.CheckForUpdatesOnStartup && Updates.IsUpdateSupported) _ = Updates.CheckAsync();
+        if (Settings.Updates.CheckForUpdatesOnStartup && Updates.IsUpdateSupported)
+        {
+            _ = Updates.CheckAsync();
+        }
     }
 
     /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsViewModel.UndoDepth))
+        if (e.PropertyName == nameof(EditingSettingsViewModel.UndoDepth))
         {
-            Editing.SetUndoDepth(Settings.UndoDepthValue);
+            Editing.SetUndoDepth(Settings.Editing.UndoDepthValue);
         }
     }
 
@@ -283,7 +295,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Editing.Timeline, time);
     bool IProjectHost.OpenVideo(string path) => Preview.OpenVideo(path);
-    private void ApplyAudioSettings() => _audio.Apply(Settings.AudioOutputDeviceId, Settings.AudioVolume);
+    private void ApplyAudioSettings() => _audio.Apply(Settings.Audio.AudioOutputDeviceId, Settings.Audio.AudioVolume);
 
     private void OnEditingTimelineChanged(bool reset) => Playback.RefreshTimeline(reset);
 
@@ -295,15 +307,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     private void OnPlaybackPositionChanged(TimeSpan value)
     {
-        if (Playback.IsPlaying) Editing.BlockEditor.BlockEditorViewport.PageTo(value);
-        else Editing.BlockEditor.BlockEditorViewport.EnsureVisible(value);
+        if (Playback.IsPlaying)
+        {
+            Editing.BlockEditor.BlockEditorViewport.PageTo(value);
+        }
+        else
+        {
+            Editing.BlockEditor.BlockEditorViewport.EnsureVisible(value);
+        }
+
         Device.FollowPosition(value);
     }
 
     private void OnPlaybackViewportRequested(TimeSpan value, bool page)
     {
-        if (page) Editing.Viewport.PageTo(value);
-        else Editing.Viewport.EnsureVisible(value);
+        if (page)
+        {
+            Editing.Viewport.PageTo(value);
+        }
+        else
+        {
+            Editing.Viewport.EnsureVisible(value);
+        }
     }
 
     /// <summary>菜单「文件 → 打开」和快捷键 Ctrl+O 都走这里。</summary>
@@ -344,6 +369,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// <summary>往状态栏写一句结果。error 为 true 时用报错的颜色。</summary>
     private void Report(string text, bool error = false)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         HasError = error;
         StatusText = text;
     }
@@ -366,6 +396,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// <summary>文件流程写状态栏:error 为 null 表示保持当前的报错标记不变。</summary>
     void IProjectHost.Report(string text, bool? error)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (error is { } flag)
         {
             Report(text, flag);

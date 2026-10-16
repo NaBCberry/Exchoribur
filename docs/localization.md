@@ -9,7 +9,7 @@
 `dotnet build` 使用同一配置,不依赖 Visual Studio 的“运行自定义工具”。
 生成文件不提交 Git,不手动编辑,也不需要 Python。
 
-版权声明 `© 2026 NaBCberry` 按项目约定固定在 `SettingsViewModel.cs` 中,
+版权声明 `© 2026 NaBCberry` 按项目约定固定在 `AboutSettingsViewModel.cs` 中,
 不放入翻译资源,不得随语言修改;“版权”等说明标签仍使用资源。
 
 ## 添加文字

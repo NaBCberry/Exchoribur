@@ -75,4 +75,5 @@ CI 在 Windows、macOS、Linux 上构建并测试,同时生成资源访问器并
 
 提交使用中文单行摘要:`type(scope): 摘要`,不写 body 和 footer。
 每个提交聚焦一个改动,提交前构建、测试及 `git diff --check` 应通过。
-大型界面模型按功能拆分、macOS/Linux 打包和硬件验收另行实施。
+界面模型按功能分工,具体职责见 [architecture.md](architecture.md)。
+macOS/Linux 打包和硬件验收另行实施。

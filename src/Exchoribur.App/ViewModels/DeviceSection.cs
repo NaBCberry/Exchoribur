@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
+using Exchoribur.App.ViewModels.Settings;
 using Exchoribur.Application.Abstractions;
 using Exchoribur.Core.Devices;
 using Exchoribur.Core.Models;
@@ -23,7 +24,7 @@ internal interface IDeviceHost
 public sealed partial class DeviceSection : ObservableObject, IDisposable
 {
     private readonly IDeviceService? _service;
-    private readonly SettingsViewModel _settings;
+    private readonly DeviceDefaultsViewModel _settings;
     private readonly IDeviceHost? _host;
     private readonly IExternalLauncher? _launcher;
     private readonly IFileAccess _files;
@@ -35,7 +36,7 @@ public sealed partial class DeviceSection : ObservableObject, IDisposable
     /// <summary>本地就发现的问题(参数没填对、许可串读不出来),显示在状态行上。</summary>
     private string? _problem;
 
-    internal DeviceSection(IDeviceService? service, SettingsViewModel settings, IDeviceHost? host,
+    internal DeviceSection(IDeviceService? service, DeviceDefaultsViewModel settings, IDeviceHost? host,
                            IExternalLauncher? launcher = null, IFileAccess? files = null)
     {
         _service = service;

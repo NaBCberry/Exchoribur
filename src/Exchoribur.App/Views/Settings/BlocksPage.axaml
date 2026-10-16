@@ -14,7 +14,7 @@
                              Width="110"
                              Padding="6,2"
                              FontSize="12"
-                             Text="{Binding DefaultBlockLengthMilliseconds}" />
+                             Text="{Binding Editing.DefaultBlockLengthMilliseconds}" />
                 </Grid>
             </StackPanel>
         </Border>

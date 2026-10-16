@@ -1,16 +1,17 @@
 using Exchoribur.App.ViewModels;
+using Exchoribur.App.ViewModels.Updates;
 using Exchoribur.Application.Abstractions;
 using Exchoribur.Application.Updates;
 
 namespace Exchoribur.App.Tests;
 
 /// <summary>共享更新状态、安装确认和订阅释放的回归测试。</summary>
-public sealed class SettingsUpdateSectionTests : IDisposable
+public sealed class UpdateViewModelTests : IDisposable
 {
     private readonly string _directory =
         Path.Combine(Path.GetTempPath(), $"exchoribur-updatesection-{Guid.NewGuid():N}");
 
-    public SettingsUpdateSectionTests() => Directory.CreateDirectory(_directory);
+    public UpdateViewModelTests() => Directory.CreateDirectory(_directory);
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
@@ -62,11 +63,11 @@ public sealed class SettingsUpdateSectionTests : IDisposable
             updates: coordinator);
 
         var relayed = new List<string?>();
-        viewModel.UpdateStatus.PropertyChanged += (_, e) => relayed.Add(e.PropertyName);
+        viewModel.Updates.Status.PropertyChanged += (_, e) => relayed.Add(e.PropertyName);
 
-        await viewModel.UpdateStatus.CheckCommand.ExecuteAsync(null);
+        await viewModel.Updates.Status.CheckCommand.ExecuteAsync(null);
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.UpdateStatus.UpdateStatusText);
+        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.Updates.Status.UpdateStatusText);
         Assert.Contains(nameof(UpdateViewModel.UpdateStatusText), relayed);
         Assert.Contains(nameof(UpdateViewModel.CanDownloadUpdate), relayed);
     }
@@ -75,7 +76,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
     public void Main_window_and_settings_share_one_update_model()
     {
         using var model = new MainViewModel(filePicker: null);
-        Assert.Same(model.Updates, model.Settings.UpdateStatus);
+        Assert.Same(model.Updates, model.Settings.Updates.Status);
     }
 
     [Fact]
@@ -124,6 +125,37 @@ public sealed class SettingsUpdateSectionTests : IDisposable
         Assert.Equal(0, feed.Applied);
     }
 
+    [Fact]
+    public async Task Banner_notification_exposes_the_new_button_state()
+    {
+        using var model = new UpdateViewModel(new UpdateCoordinator(new FakeUpdateFeed { Version = "9.9.9" }, () => false, () => false));
+        var visibleStates = new List<bool>();
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(UpdateViewModel.UpdateBannerText) && model.IsUpdateBannerVisible)
+            {
+                visibleStates.Add(model.IsUpdateApplyVisible);
+            }
+        };
+        await model.CheckAsync();
+        Assert.True(Assert.Single(visibleStates));
+    }
+
+    [Fact]
+    public async Task Disposing_while_confirmation_is_pending_prevents_installation()
+    {
+        var feed = new FakeUpdateFeed { Version = "9.9.9" };
+        var confirmation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var model = new UpdateViewModel(new UpdateCoordinator(feed, () => false, () => false), () => confirmation.Task);
+        await model.CheckAsync();
+        var install = model.InstallUpdateCommand.ExecuteAsync(null);
+        model.Dispose();
+        confirmation.SetResult(true);
+        await install;
+        Assert.Equal(0, feed.Downloads);
+        Assert.Equal(0, feed.Applied);
+    }
+
     private sealed class FakeUpdateFeed : IUpdateFeed
     {
         public bool IsSupported { get; init; } = true;
@@ -142,7 +174,11 @@ public sealed class SettingsUpdateSectionTests : IDisposable
         public Task DownloadAsync(IProgress<int>? progress, CancellationToken cancellationToken = default)
         {
             Downloads++;
-            if (FailDownload) throw new IOException("download failed");
+            if (FailDownload)
+            {
+                throw new IOException("download failed");
+            }
+
             progress?.Report(100);
             return Task.CompletedTask;
         }

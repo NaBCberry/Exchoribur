@@ -8,25 +8,39 @@ using Exchoribur.Core.Editing;
 using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
 
-namespace Exchoribur.App.ViewModels;
+namespace Exchoribur.App.ViewModels.Editing;
 
 /// <summary>时间轴、块选择及唯一撤销历史;不持有主窗口。</summary>
 public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditingContext, IDisposable
 {
     private readonly BlockEditingSession _editing = new();
+
     private readonly INamePrompt? _namePrompt;
+
     private readonly Func<bool> _hasDocument;
+
     private readonly Func<string> _timelineName;
+
     private readonly Func<TimeSpan> _defaultLength;
+
     private readonly Func<int> _undoDepth;
+
     private readonly Func<TimeSpan> _position;
+
     private bool _syncingSelection;
+
     private bool _disposed;
+
     public BlockEditorViewModel BlockEditor { get; }
+
     public event Action? EditStarting;
+
     public event Action<bool>? TimelineChanged;
+
     public event Action<Timeline>? TimelineEdited;
+
     public event Action<string, bool>? StatusReported;
+
     internal TimelineEditorViewModel(INamePrompt? namePrompt, Func<bool> hasDocument,
         Func<string> timelineName, Func<TimeSpan> defaultLength, Func<int> undoDepth,
         Func<TimeSpan> position, ColorEditorViewModel color)
@@ -42,13 +56,20 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
     bool IBlockEditingContext.CanEdit => !_disposed && _editing.IsActive && _hasDocument();
     TimeSpan IBlockEditingContext.PlayheadTime => _position();
     private bool CanEdit => !_disposed && _editing.IsActive && _hasDocument();
+
     [ObservableProperty]
     public partial Timeline Timeline { get; private set; } = new([], []);
+
     public IReadOnlyList<Block> Blocks => Timeline.Blocks;
+
     public IReadOnlyList<TimelineMarker> Markers => Timeline.Markers;
+
     public TimeSpan Duration => Timeline.Duration;
+
     public TimeSpan TimelineStart => Timeline.Start;
+
     public TimelineViewport Viewport { get; } = new();
+
     partial void OnTimelineChanged(Timeline value)
     {
         OnPropertyChanged(nameof(Blocks));
@@ -56,6 +77,7 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
         OnPropertyChanged(nameof(Duration));
         OnPropertyChanged(nameof(TimelineStart));
     }
+
     public void LoadTimeline(Timeline timeline)
     {
         if (_disposed) return;
@@ -68,7 +90,9 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
         TimelineChanged?.Invoke(true);
         Viewport.SetContent(TimelineStart, Duration - TimelineStart);
     }
+
     public void SetUndoDepth(int depth) => _editing.SetMaxUndoSteps(depth);
+
     /// <summary>主时间轴上选中的块。</summary>
     [ObservableProperty]
     public partial IReadOnlyList<Block> SelectedBlocks { get; set; } = [];
@@ -414,7 +438,7 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
     private void SyncLinkState() => LinkState = BlockEditingSession.LinkStateOf(SelectedBlocks);
 
     /// <summary>换掉当前块的内容;新帧超出原长度时自动把块延长到刚好装下。</summary>
-    public void ApplyBlockContent(Block block, IReadOnlyList<BlockFrame> frames, string actionName)
+    void IBlockEditingContext.ApplyBlockContent(Block block, IReadOnlyList<BlockFrame> frames, string actionName)
     {
         var (fitted, length) = BlockEditingSession.FitContent(block, frames);
         var updated = block.WithContent(fitted, length);
@@ -465,6 +489,7 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
     }
 
     public void Report(string text, bool error = false) => StatusReported?.Invoke(text, error);
+
     public void Dispose()
     {
         if (_disposed) return;

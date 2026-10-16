@@ -22,9 +22,9 @@ public sealed class SettingsLauncherTests : IDisposable
         var launcher = new StubLauncher();
         var viewModel = CreateViewModel(launcher);
 
-        await viewModel.OpenProjectUrlCommand.ExecuteAsync(null);
+        await viewModel.About.OpenProjectUrlCommand.ExecuteAsync(null);
 
-        Assert.Equal([viewModel.ProjectUrl], launcher.OpenedUrls);
+        Assert.Equal([viewModel.About.ProjectUrl], launcher.OpenedUrls);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class SettingsLauncherTests : IDisposable
         var launcher = new StubLauncher();
         var viewModel = CreateViewModel(launcher);
 
-        await viewModel.OpenSettingsFolderCommand.ExecuteAsync(null);
+        await viewModel.Storage.OpenSettingsFolderCommand.ExecuteAsync(null);
 
         Assert.Equal([_directory], launcher.OpenedPaths);
     }
@@ -44,7 +44,7 @@ public sealed class SettingsLauncherTests : IDisposable
         var launcher = new StubLauncher();
         var viewModel = CreateViewModel(launcher);
 
-        await viewModel.OpenNoticesCommand.ExecuteAsync(null);
+        await viewModel.About.OpenNoticesCommand.ExecuteAsync(null);
 
         var path = Assert.Single(launcher.OpenedPaths);
         Assert.Equal("THIRD-PARTY-NOTICES.md", Path.GetFileName(path));
@@ -56,7 +56,7 @@ public sealed class SettingsLauncherTests : IDisposable
         var launcher = new StubLauncher();
         var viewModel = CreateViewModel(launcher);
 
-        await viewModel.OpenLicenseCommand.ExecuteAsync(null);
+        await viewModel.About.OpenLicenseCommand.ExecuteAsync(null);
 
         var path = Assert.Single(launcher.OpenedPaths);
         Assert.Equal("LICENSE", Path.GetFileName(path));
@@ -67,10 +67,10 @@ public sealed class SettingsLauncherTests : IDisposable
     {
         var viewModel = new SettingsViewModel(Path.Combine(_directory, "settings.json"));
 
-        await viewModel.OpenProjectUrlCommand.ExecuteAsync(null);
-        await viewModel.OpenSettingsFolderCommand.ExecuteAsync(null);
-        await viewModel.OpenNoticesCommand.ExecuteAsync(null);
-        await viewModel.OpenLicenseCommand.ExecuteAsync(null);
+        await viewModel.About.OpenProjectUrlCommand.ExecuteAsync(null);
+        await viewModel.Storage.OpenSettingsFolderCommand.ExecuteAsync(null);
+        await viewModel.About.OpenNoticesCommand.ExecuteAsync(null);
+        await viewModel.About.OpenLicenseCommand.ExecuteAsync(null);
     }
 
     private SettingsViewModel CreateViewModel(IExternalLauncher launcher)
