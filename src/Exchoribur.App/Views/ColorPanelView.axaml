@@ -134,7 +134,7 @@
                     Margin="0,4,0,0"
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
-                    Command="{Binding ApplyEditorColorCommand}" />
+                    Command="{Binding Editing.BlockEditor.ApplyEditorColorCommand}" />
         </StackPanel>
     </ScrollViewer>
 

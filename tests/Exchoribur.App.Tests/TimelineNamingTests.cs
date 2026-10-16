@@ -30,7 +30,7 @@ public sealed class TimelineNamingTests : IDisposable
         Assert.Equal("乐鸣东方 2026 巡演 — Exchoribur", viewModel.WindowTitle);
         Assert.NotNull(viewModel.Document);
         Assert.False(viewModel.IsModified);
-        Assert.Single(viewModel.Blocks);
+        Assert.Single(viewModel.Editing.Blocks);
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public sealed class TimelineNamingTests : IDisposable
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         Assert.Null(viewModel.Document);
-        Assert.Empty(viewModel.Blocks);
+        Assert.Empty(viewModel.Editing.Blocks);
         Assert.Equal("Exchoribur", viewModel.WindowTitle);
     }
 
@@ -66,7 +66,7 @@ public sealed class TimelineNamingTests : IDisposable
 
         Assert.Equal("巡演工程", viewModel.TimelineName);
         // 第二版里 CH0 有两个不一样的状态,所以是一个块、两帧。
-        Assert.Equal(2, Assert.Single(viewModel.Blocks).Frames.Count);
+        Assert.Equal(2, Assert.Single(viewModel.Editing.Blocks).Frames.Count);
         Assert.True(viewModel.IsModified);
         Assert.Equal("*巡演工程 — Exchoribur", viewModel.WindowTitle);
     }

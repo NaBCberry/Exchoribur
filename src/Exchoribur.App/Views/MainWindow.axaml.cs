@@ -157,7 +157,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
         {
-            viewModel.CreateBlockAt(request.Channel, request.Time);
+            viewModel.Editing.CreateBlockAt(request.Channel, request.Time);
         }
     }
 
@@ -166,7 +166,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
         {
-            viewModel.MoveSelectedBlocks(request.TimeDelta, request.ChannelDelta);
+            viewModel.Editing.MoveSelectedBlocks(request.TimeDelta, request.ChannelDelta);
         }
     }
 
@@ -175,7 +175,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
         {
-            viewModel.OpenBlockEditor(block);
+            viewModel.Editing.BlockEditor.OpenBlockEditor(block);
         }
     }
 

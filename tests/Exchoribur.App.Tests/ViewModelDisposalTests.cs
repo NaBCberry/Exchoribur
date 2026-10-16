@@ -42,7 +42,7 @@ public sealed class ViewModelDisposalTests : IDisposable
         viewModel.Dispose();
 
         // 释放之后工程还在:Dispose 只放播放器,不动数据。
-        Assert.NotEmpty(viewModel.Blocks);
+        Assert.NotEmpty(viewModel.Editing.Blocks);
     }
 
     private string WriteCsv()

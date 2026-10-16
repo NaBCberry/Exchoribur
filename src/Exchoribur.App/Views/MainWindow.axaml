@@ -27,14 +27,14 @@
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveProjectCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveProjectAsCommand}" />
-        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoEditsCommand}" />
-        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoEditsCommand}" />
-        <KeyBinding Gesture="Ctrl+A" Command="{Binding SelectAllCommand}" />
-        <KeyBinding Gesture="Ctrl+D" Command="{Binding CopyBlockToOtherChannelsCommand}" />
-        <KeyBinding Gesture="Escape" Command="{Binding ClearSelectionCommand}" />
-        <KeyBinding Gesture="Delete" Command="{Binding DeleteSelectedBlocksCommand}" />
-        <KeyBinding Gesture="Shift+Delete" Command="{Binding DeleteSelectedFramesCommand}" />
-        <KeyBinding Gesture="Insert" Command="{Binding InsertFrameAtPlayheadCommand}" />
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding Editing.UndoEditsCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding Editing.RedoEditsCommand}" />
+        <KeyBinding Gesture="Ctrl+A" Command="{Binding Editing.SelectAllCommand}" />
+        <KeyBinding Gesture="Ctrl+D" Command="{Binding Editing.CopyBlockToOtherChannelsCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding Editing.ClearSelectionCommand}" />
+        <KeyBinding Gesture="Delete" Command="{Binding Editing.DeleteSelectedBlocksCommand}" />
+        <KeyBinding Gesture="Shift+Delete" Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}" />
+        <KeyBinding Gesture="Insert" Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -78,64 +78,64 @@
                 <MenuItem Header="{x:Static res:Strings.MainMenuExit}" Click="OnExitClick" />
             </MenuItem>
             <MenuItem Header="{x:Static res:Strings.MainMenuEdit}">
-                <MenuItem Header="{Binding UndoLabel}"
-                          Command="{Binding UndoEditsCommand}"
+                <MenuItem Header="{Binding Editing.UndoLabel}"
+                          Command="{Binding Editing.UndoEditsCommand}"
                           InputGesture="Ctrl+Z">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Undo}" />
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="{Binding RedoLabel}"
-                          Command="{Binding RedoEditsCommand}"
+                <MenuItem Header="{Binding Editing.RedoLabel}"
+                          Command="{Binding Editing.RedoEditsCommand}"
                           InputGesture="Ctrl+Y">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Redo}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
-                <MenuItem Header="{x:Static res:Strings.MainMenuSelectAll}" Command="{Binding SelectAllCommand}" InputGesture="Ctrl+A">
+                <MenuItem Header="{x:Static res:Strings.MainMenuSelectAll}" Command="{Binding Editing.SelectAllCommand}" InputGesture="Ctrl+A">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Channels}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuClearSelection}"
-                          Command="{Binding ClearSelectionCommand}"
+                          Command="{Binding Editing.ClearSelectionCommand}"
                           InputGesture="Escape" />
                 <Separator />
                 <MenuItem Header="{x:Static res:Strings.MainMenuCopyToOtherChannels}"
-                          Command="{Binding CopyBlockToOtherChannelsCommand}"
+                          Command="{Binding Editing.CopyBlockToOtherChannelsCommand}"
                           InputGesture="Ctrl+D">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Copy}" />
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="{x:Static res:Strings.MainMenuRenameBlock}" Command="{Binding RenameSelectedBlockCommand}">
+                <MenuItem Header="{x:Static res:Strings.MainMenuRenameBlock}" Command="{Binding Editing.RenameSelectedBlockCommand}">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.SetFunction}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
-                <MenuItem Header="{x:Static res:Strings.MainMenuUsePlayheadColor}" Command="{Binding SetSelectionColorCommand}">
+                <MenuItem Header="{x:Static res:Strings.MainMenuUsePlayheadColor}" Command="{Binding Editing.BlockEditor.SetSelectionColorCommand}">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuInsertFrame}"
-                          Command="{Binding InsertFrameAtPlayheadCommand}"
+                          Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}"
                           InputGesture="Insert">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.InsertFrame}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuDeleteFrames}"
-                          Command="{Binding DeleteSelectedFramesCommand}"
+                          Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}"
                           InputGesture="Shift+Delete">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuDeleteBlocks}"
-                          Command="{Binding DeleteSelectedBlocksCommand}"
+                          Command="{Binding Editing.DeleteSelectedBlocksCommand}"
                           InputGesture="Delete">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
@@ -287,10 +287,10 @@
                         Background="{DynamicResource PanelBorderBrush}" />
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipLink}"
-                        Command="{Binding ToggleLinkCommand}">
+                        Command="{Binding Editing.ToggleLinkCommand}">
                     <Path Classes="icon big"
                           Data="{x:Static controls:Icons.Link}"
-                          Stroke="{Binding LinkIconBrush}" />
+                          Stroke="{Binding Editing.LinkIconBrush}" />
                 </Button>
 
                 <!-- 场控设备:白色=面板收着,强调色=面板弹出来了 -->
@@ -377,17 +377,17 @@
                                             Margin="0,0,6,0">
                                     <Button Classes="transport"
                                             ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomIn}"
-                                            Command="{Binding ZoomInCommand}">
+                                            Command="{Binding Editing.ZoomInCommand}">
                                         <Path Classes="icon" Data="{x:Static controls:Icons.ZoomIn}" />
                                     </Button>
                                     <Button Classes="transport"
                                             ToolTip.Tip="{x:Static res:Strings.MainTooltipZoomOut}"
-                                            Command="{Binding ZoomOutCommand}">
+                                            Command="{Binding Editing.ZoomOutCommand}">
                                         <Path Classes="icon" Data="{x:Static controls:Icons.ZoomOut}" />
                                     </Button>
                                     <Button Classes="transport"
                                             ToolTip.Tip="{x:Static res:Strings.MainTooltipFitAll}"
-                                            Command="{Binding FitAllCommand}">
+                                            Command="{Binding Editing.FitAllCommand}">
                                         <Path Classes="icon" Data="{x:Static controls:Icons.FitAll}" />
                                     </Button>
                                 </StackPanel>
@@ -407,14 +407,14 @@
                             <timeline:TimelineControl
                                 Grid.RowSpan="2"
                                 Grid.Column="0"
-                                Blocks="{Binding Blocks}"
-                                Markers="{Binding Markers}"
-                                Viewport="{Binding Viewport}"
+                                Blocks="{Binding Editing.Blocks}"
+                                Markers="{Binding Editing.Markers}"
+                                Viewport="{Binding Editing.Viewport}"
                                 PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}"
-                                SelectedBlocks="{Binding SelectedBlocks, Mode=TwoWay}"
-                                CurrentBlockId="{Binding CurrentBlockId}"
-                                BottomOverlayHeight="{Binding EditorOverlayHeight}"
-                                EnsureVisibleChannel="{Binding CurrentBlockChannel}"
+                                SelectedBlocks="{Binding Editing.SelectedBlocks, Mode=TwoWay}"
+                                CurrentBlockId="{Binding Editing.BlockEditor.CurrentBlockId}"
+                                BottomOverlayHeight="{Binding Editing.BlockEditor.EditorOverlayHeight}"
+                                EnsureVisibleChannel="{Binding Editing.BlockEditor.CurrentBlockChannel}"
                                 InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
                                 InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}"
                                 BlockCreateRequested="OnBlockCreateRequested"
@@ -429,7 +429,7 @@
                             <Border Grid.Column="1"
                                     Grid.RowSpan="2"
                                     Width="220"
-                                    IsVisible="{Binding HasCurrentBlock}"
+                                    IsVisible="{Binding Editing.BlockEditor.HasCurrentBlock}"
                                     Background="{DynamicResource PanelBackgroundBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="1,0,0,0">
@@ -453,8 +453,8 @@
                             <!-- 块编辑器:盖在轨道上面(不挤压轨道),打开时主时间轴会把选中的块滚到它上面 -->
                             <Border Grid.Row="1"
                                     Grid.Column="0"
-                                    Height="{Binding EditorOverlayHeight}"
-                                    IsVisible="{Binding HasCurrentBlock}"
+                                    Height="{Binding Editing.BlockEditor.EditorOverlayHeight}"
+                                    IsVisible="{Binding Editing.BlockEditor.HasCurrentBlock}"
                                     Background="{DynamicResource PanelBackgroundBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="0,1,0,0"
@@ -466,17 +466,17 @@
                                                 Margin="10,6,0,2">
                                         <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />
                                         <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.MainPanelBlockEditor}" />
-                                        <TextBlock Classes="panelTitle" Text="{Binding CurrentBlockTitle}" />
+                                        <TextBlock Classes="panelTitle" Text="{Binding Editing.BlockEditor.CurrentBlockTitle}" />
                                     </StackPanel>
 
                                     <timeline:BlockEditorControl
-                                        Blocks="{Binding Blocks}"
-                                        CurrentBlock="{Binding CurrentBlock}"
-                                        Viewport="{Binding BlockEditorViewport}"
+                                        Blocks="{Binding Editing.Blocks}"
+                                        CurrentBlock="{Binding Editing.BlockEditor.CurrentBlock}"
+                                        Viewport="{Binding Editing.BlockEditor.BlockEditorViewport}"
                                         PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}"
-                                        SelectedFrames="{Binding SelectedFrames, Mode=TwoWay}"
-                                        FocusTime="{Binding CurrentBlockFocus}"
-                                        FocusSpacing="{Binding CurrentBlockSpacing}"
+                                        SelectedFrames="{Binding Editing.BlockEditor.SelectedFrames, Mode=TwoWay}"
+                                        FocusTime="{Binding Editing.BlockEditor.CurrentBlockFocus}"
+                                        FocusSpacing="{Binding Editing.BlockEditor.CurrentBlockSpacing}"
                                         InvertMouseWheel="{Binding Settings.InvertMouseWheel}"
                                         InvertTouchpadScroll="{Binding Settings.InvertTouchpadScroll}" />
                                 </DockPanel>

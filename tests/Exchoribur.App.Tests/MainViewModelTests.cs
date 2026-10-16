@@ -31,14 +31,14 @@ public sealed class MainViewModelTests : IDisposable
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         // 只有 CH0 有内容,所以只生成了一个块,块名就是工程名。
-        var block = Assert.Single(viewModel.Blocks);
+        var block = Assert.Single(viewModel.Editing.Blocks);
         Assert.Equal("show", block.Name);
         Assert.Equal(0, block.Channel);
         Assert.Equal(3, block.Frames.Count);
 
-        Assert.Equal("开场", Assert.Single(viewModel.Markers).Name);
+        Assert.Equal("开场", Assert.Single(viewModel.Editing.Markers).Name);
         // 块铺到最后一帧再往后一格。
-        Assert.Equal(3, viewModel.Duration.TotalSeconds, 3);
+        Assert.Equal(3, viewModel.Editing.Duration.TotalSeconds, 3);
         Assert.False(viewModel.HasError);
         Assert.Contains("show.csv", viewModel.StatusText);
 
@@ -62,7 +62,7 @@ public sealed class MainViewModelTests : IDisposable
 
         await viewModel.OpenCommand.ExecuteAsync(null);
 
-        Assert.Empty(viewModel.Blocks);
+        Assert.Empty(viewModel.Editing.Blocks);
         Assert.Equal(statusBefore, viewModel.StatusText);
         Assert.Equal(titleBefore, viewModel.WindowTitle);
         Assert.False(viewModel.HasError);
@@ -78,7 +78,7 @@ public sealed class MainViewModelTests : IDisposable
 
         Assert.True(viewModel.HasError);
         Assert.Contains("broken.csv", viewModel.StatusText);
-        Assert.Empty(viewModel.Blocks);
+        Assert.Empty(viewModel.Editing.Blocks);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class MainViewModelTests : IDisposable
         await viewModel.OpenCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Empty(viewModel.Blocks);
+        Assert.Empty(viewModel.Editing.Blocks);
     }
 
     [Fact]
@@ -101,17 +101,17 @@ public sealed class MainViewModelTests : IDisposable
         var viewModel = new MainViewModel(new StubFilePicker(first));
 
         // 视口要有轨道宽度才能算倍率;真跑起来这一句由时间轴控件填。
-        viewModel.Viewport.SetTrackWidth(600);
+        viewModel.Editing.Viewport.SetTrackWidth(600);
 
         await viewModel.OpenCommand.ExecuteAsync(null);
-        viewModel.Viewport.ZoomBy(4);
-        Assert.True(viewModel.Viewport.Start > TimeSpan.Zero);
+        viewModel.Editing.Viewport.ZoomBy(4);
+        Assert.True(viewModel.Editing.Viewport.Start > TimeSpan.Zero);
 
         await viewModel.LoadAsync(second);
 
         // 新文件的时长(二帧 + 一格 = 4 秒)决定新的铺满倍率,缩放位置不能留着。
-        Assert.Equal(TimeSpan.Zero, viewModel.Viewport.Start);
-        Assert.Equal(150, viewModel.Viewport.Scale, 2);
+        Assert.Equal(TimeSpan.Zero, viewModel.Editing.Viewport.Start);
+        Assert.Equal(150, viewModel.Editing.Viewport.Scale, 2);
     }
 
     [Fact]

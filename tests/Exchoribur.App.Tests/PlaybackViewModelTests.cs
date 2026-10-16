@@ -143,7 +143,7 @@ public sealed class PlaybackViewModelTests : IDisposable
         var viewModel = new MainViewModel(new StubFilePicker(path), clock);
 
         await viewModel.LoadAsync(path);
-        viewModel.Viewport.SetTrackWidth(600);
+        viewModel.Editing.Viewport.SetTrackWidth(600);
 
         return (viewModel, clock);
     }
