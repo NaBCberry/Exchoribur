@@ -40,6 +40,9 @@ public static class Icons
     /// <summary>播放 · 静音(lucide: volume-x)</summary>
     public static Geometry Mute { get; } = Geometry.Parse("M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z M16.5 14.5l5-5 M16.5 9.5l5 5");
 
+    /// <summary>播放 · 弹出视频窗口(lucide: screen-share)</summary>
+    public static Geometry PopOut { get; } = Geometry.Parse("M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3M8 21h8m-4-4v4m5-13l5-5m-5 0h5v5");
+
     /// <summary>时间轴 · 放大(lucide: zoom-in)</summary>
     public static Geometry ZoomIn { get; } = Geometry.Parse("M3 11a8 8 0 1 0 16 0a8 8 0 1 0 -16 0 M21 21L16.65 16.65 M11 8L11 14 M8 11L14 11");
 

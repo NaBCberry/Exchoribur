@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Exchoribur.App.ViewModels"
+        xmlns:controls="using:Exchoribur.App.Controls"
+        xmlns:res="using:Exchoribur.App.Resources"
+        x:Class="Exchoribur.App.Views.VideoPreviewWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{x:Static res:Strings.MainPanelVideoPreview}"
+        Width="800"
+        Height="450"
+        Background="Black">
+
+  <controls:VideoSurface
+      Frame="{Binding Preview.VideoFrame}"
+      FrameVersion="{Binding Preview.VideoFrameVersion}" />
+
+</Window>

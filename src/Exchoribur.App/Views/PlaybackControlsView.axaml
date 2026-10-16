@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Exchoribur.App.ViewModels.Playback"
+             xmlns:controls="using:Exchoribur.App.Controls"
+             xmlns:res="using:Exchoribur.App.Resources"
+             x:Class="Exchoribur.App.Views.PlaybackControlsView"
+             x:DataType="vm:PlaybackViewModel">
+
+  <StackPanel Orientation="Horizontal"
+              VerticalAlignment="Center"
+              Spacing="8">
+    <Button Classes="transport"
+                        ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToStart}"
+                        Command="{Binding GoToStartCommand}">
+      <Path Classes="icon title" Data="{x:Static controls:Icons.GoToStart}" />
+    </Button>
+    <Button Classes="transport"
+            ToolTip.Tip="{x:Static res:Strings.MainTooltipPreviousFrame}"
+            Command="{Binding PreviousFrameCommand}">
+      <Path Classes="icon title" Data="{x:Static controls:Icons.PreviousFrame}" />
+    </Button>
+    <Button Classes="transport"
+            ToolTip.Tip="{x:Static res:Strings.MainTooltipNextFrame}"
+            Command="{Binding NextFrameCommand}">
+      <Path Classes="icon title" Data="{x:Static controls:Icons.NextFrame}" />
+    </Button>
+    <Button Classes="transport"
+            ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToEnd}"
+            Command="{Binding GoToEndCommand}">
+      <Path Classes="icon title" Data="{x:Static controls:Icons.GoToEnd}" />
+    </Button>
+
+    <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
+    <Button Classes="transport primary play"
+            ToolTip.Tip="{x:Static res:Strings.MainTooltipPlayPause}"
+            Command="{Binding TogglePlayCommand}">
+      <Panel>
+        <Path Classes="icon big play"
+              Data="{x:Static controls:Icons.Play}"
+              IsVisible="{Binding IsPaused}" />
+        <Path Classes="icon big play"
+              Data="{x:Static controls:Icons.Pause}"
+              IsVisible="{Binding IsPlaying}" />
+      </Panel>
+    </Button>
+    <Button Classes="transport primary stop"
+            ToolTip.Tip="{x:Static res:Strings.MainTooltipStop}"
+            Command="{Binding StopPlaybackCommand}">
+      <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
+    </Button>
+    <ToggleButton Classes="transport primary loop"
+                  ToolTip.Tip="{x:Static res:Strings.MainTooltipLoop}"
+                  IsChecked="{Binding IsLooping}">
+      <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
+    </ToggleButton>
+  </StackPanel>
+</UserControl>

@@ -894,4 +894,7 @@
   <data name="DeviceTargetErrorIpv4" xml:space="preserve">
     <value>UDP 目标地址要写 IPv4,不收 IPv6。</value>
   </data>
+  <data name="MainTooltipPopOutVideo" xml:space="preserve">
+    <value>弹出独立视频窗口</value>
+  </data>
 </root>

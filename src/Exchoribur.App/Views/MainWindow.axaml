@@ -222,69 +222,45 @@
                             VerticalAlignment="Center"
                             Margin="0,0,12,0"
                             Spacing="8">
+                  
                     <!-- 走带光标所在处的时间,紧贴中间按钮组的左边 -->
                     <Border Classes="readout">
                         <TextBlock Classes="clock"
                                    Text="{Binding Playback.PlayheadText}"
                                    VerticalAlignment="Center" />
                     </Border>
+                  <Border Width="1"
+                          Height="20"
+                          Margin="8,0"
+                          Background="{DynamicResource PanelBorderBrush}" />
                 </StackPanel>
+              
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Spacing="8">
-                <Button Classes="transport"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToStart}"
-                        Command="{Binding Playback.GoToStartCommand}">
-                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToStart}" />
-                </Button>
-                <Button Classes="transport"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipPreviousFrame}"
-                        Command="{Binding Playback.PreviousFrameCommand}">
-                    <Path Classes="icon title" Data="{x:Static controls:Icons.PreviousFrame}" />
-                </Button>
-                <Button Classes="transport"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipNextFrame}"
-                        Command="{Binding Playback.NextFrameCommand}">
-                    <Path Classes="icon title" Data="{x:Static controls:Icons.NextFrame}" />
-                </Button>
-                <Button Classes="transport"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipGoToEnd}"
-                        Command="{Binding Playback.GoToEndCommand}">
-                    <Path Classes="icon title" Data="{x:Static controls:Icons.GoToEnd}" />
-                </Button>
+                  
 
-                <!-- 播放和暂停合成一个按钮:暂停时显示播放三角,播放时显示暂停条 -->
-                <Button Classes="transport primary play"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipPlayPause}"
-                        Command="{Binding Playback.TogglePlayCommand}">
-                    <Panel>
-                        <Path Classes="icon big play"
-                              Data="{x:Static controls:Icons.Play}"
-                              IsVisible="{Binding Playback.IsPaused}" />
-                        <Path Classes="icon big play"
-                              Data="{x:Static controls:Icons.Pause}"
-                              IsVisible="{Binding Playback.IsPlaying}" />
-                    </Panel>
-                </Button>
-                <Button Classes="transport primary stop"
-                        ToolTip.Tip="{x:Static res:Strings.MainTooltipStop}"
-                        Command="{Binding Playback.StopPlaybackCommand}">
-                    <Path Classes="icon big stop" Data="{x:Static controls:Icons.Stop}" />
-                </Button>
-                <ToggleButton Classes="transport primary loop"
-                              ToolTip.Tip="{x:Static res:Strings.MainTooltipLoop}"
-                              IsChecked="{Binding Playback.IsLooping}">
-                    <Path Classes="icon big loop" Data="{x:Static controls:Icons.Loop}" />
-                </ToggleButton>
+                  <!-- 中央播放控件 -->
+                  <views:PlaybackControlsView DataContext="{Binding Playback}" />
+                </StackPanel>
 
-                <!-- 链接开关:白色=没选块;亮黄=选中的块都已链接(再点解除);紫色=混合(点一下重新链成一伙) -->
+              <StackPanel x:Name="RightSlot"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="12,0,0,0"
+                            Spacing="8" >
+                
                 <Border Width="1"
                         Height="20"
                         Margin="8,0"
                         Background="{DynamicResource PanelBorderBrush}" />
+
+                <!-- 链接开关:白色=没选块;亮黄=选中的块都已链接(再点解除);紫色=混合(点一下重新链成一伙) -->
                 <Button Classes="transport"
                         ToolTip.Tip="{x:Static res:Strings.MainTooltipLink}"
                         Command="{Binding Editing.ToggleLinkCommand}">
@@ -299,16 +275,17 @@
                               IsChecked="{Binding IsDevicePanelOpen}">
                     <Path Classes="icon big device" Data="{x:Static controls:Icons.SerialPort}" />
                 </ToggleButton>
-                </StackPanel>
 
-                <!-- 右槽位:以后摆在按钮组右边的显示面板加在这里 -->
-                <StackPanel x:Name="RightSlot"
-                            Grid.Column="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Margin="12,0,0,0"
-                            Spacing="8" />
+                <!--视频窗口弹出按钮-->
+                <Button Classes="transport primary popout"
+                        IsEnabled="{Binding Preview.HasVideo}"
+                        ToolTip.Tip="{x:Static res:Strings.MainTooltipPopOutVideo}"
+                        Click="OnPopOutVideoClick">
+                  <Path Classes="icon big popout"
+                        Data="{x:Static controls:Icons.PopOut}"/>
+                </Button>
+              </StackPanel>
+                
             </Grid>
         </Border>
 
@@ -325,9 +302,6 @@
                             <TextBlock Classes="panelTitle" Text="{x:Static res:Strings.MainPanelVideoPreview}" />
                         </StackPanel>
 
-                        <!-- 视频画面是 libvlc 的原生子窗口,必须从一开始就在可视树里:
-                             等到导入视频才显示的话,宿主窗口还没建出来 VLC 就会自己弹窗,
-                             而且它盖在 Avalonia 内容之上,面板标题不能压在它身上。 -->
                         <controls:VideoSurface Frame="{Binding Preview.VideoFrame}"
                                                FrameVersion="{Binding Preview.VideoFrameVersion}" />
                     </DockPanel>

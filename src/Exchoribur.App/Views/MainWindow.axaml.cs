@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private SettingsWindow? _settingsWindow;
     private MainViewModel? _subscribedViewModel;
+    private VideoPreviewWindow? _videoPreviewWindow;
 
     /// <summary>已经问过未保存的改动并得到"可以关"的回答,再关就不再拦。</summary>
     private bool _closingConfirmed;
@@ -76,6 +77,52 @@ public partial class MainWindow : Window
         catch (Exception)
         {
             // 弹提示失败不该影响正在编排的人
+        }
+    }
+    /// <summary>弹出窗口</summary>
+    private void OnPopOutVideoClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel
+            || !viewModel.Preview.HasVideo)
+        {
+            return;
+        }
+
+        if (_videoPreviewWindow is { } existingWindow)
+        {
+            if (existingWindow.WindowState == WindowState.Minimized)
+            {
+                existingWindow.WindowState = WindowState.Normal;
+            }
+
+            existingWindow.Activate();
+            return;
+        }
+
+        var window = new VideoPreviewWindow
+        {
+            DataContext = viewModel,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+
+        _videoPreviewWindow = window;
+        window.Closed += OnVideoPreviewWindowClosed;
+        window.Show(this);
+    }
+
+    private void OnVideoPreviewWindowClosed(object? sender, EventArgs e)
+    {
+        if (sender is not VideoPreviewWindow window)
+        {
+            return;
+        }
+
+        window.Closed -= OnVideoPreviewWindowClosed;
+        window.DataContext = null;
+
+        if (ReferenceEquals(_videoPreviewWindow, window))
+        {
+            _videoPreviewWindow = null;
         }
     }
 
@@ -225,6 +272,7 @@ public partial class MainWindow : Window
         {
             if (_skipUnsavedPrompt || await viewModel.ConfirmDiscardChangesAsync())
             {
+                _videoPreviewWindow?.Close();
                 await viewModel.DisposeAsync();
                 _closingConfirmed = true;
                 _settingsWindow?.Close();

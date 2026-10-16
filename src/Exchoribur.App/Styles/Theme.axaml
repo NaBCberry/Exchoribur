@@ -248,4 +248,9 @@
         <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
     </Style>
 
+  <Style Selector="Button.transport.primary.popout:pointerover Path.icon.popout">
+    <Setter Property="Stroke"
+            Value="{DynamicResource AccentBrush}" />
+  </Style>
+
 </Styles>
