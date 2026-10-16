@@ -184,14 +184,14 @@
                     <!-- 自动更新的提示:平时不出现,不占地方 -->
                     <Path Classes="icon"
                           Data="{x:Static controls:Icons.Download}"
-                          IsVisible="{Binding IsUpdateBannerVisible}" />
+                          IsVisible="{Binding Updates.IsUpdateBannerVisible}" />
                     <TextBlock Classes="update"
-                               Text="{Binding UpdateBannerText}"
-                               IsVisible="{Binding IsUpdateBannerVisible}" />
+                               Text="{Binding Updates.UpdateBannerText}"
+                               IsVisible="{Binding Updates.IsUpdateBannerVisible}" />
                     <Button Classes="transport"
                             ToolTip.Tip="{x:Static res:Strings.MainTooltipApplyUpdate}"
-                            Command="{Binding InstallUpdateCommand}"
-                            IsVisible="{Binding IsUpdateApplyVisible}">
+                            Command="{Binding Updates.InstallUpdateCommand}"
+                            IsVisible="{Binding Updates.IsUpdateApplyVisible}">
                         <Path Classes="icon" Data="{x:Static controls:Icons.Refresh}" />
                     </Button>
                 </StackPanel>

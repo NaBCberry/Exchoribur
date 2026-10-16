@@ -15,7 +15,7 @@
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutVersion}" />
                     <TextBlock Grid.Column="1"
                                Classes="rowValue"
-                               Text="{Binding CurrentVersionText}" />
+                               Text="{Binding UpdateStatus.CurrentVersionText}" />
                 </Grid>
                 <Grid Classes="settingsRow" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsAboutBuildConfiguration}" />

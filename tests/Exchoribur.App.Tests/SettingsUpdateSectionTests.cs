@@ -4,10 +4,7 @@ using Exchoribur.Application.Updates;
 
 namespace Exchoribur.App.Tests;
 
-/// <summary>
-/// 更新那一块从设置页里拆出去之后:状态照样算对,而且改过的属性名要照原样转发给界面
-/// (界面靠这个刷新)。转发一旦漏掉,设置页上的更新提示就会"不刷新"。
-/// </summary>
+/// <summary>共享更新状态、安装确认和订阅释放的回归测试。</summary>
 public sealed class SettingsUpdateSectionTests : IDisposable
 {
     private readonly string _directory =
@@ -20,7 +17,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
     [Fact]
     public void A_fresh_section_says_it_has_not_checked_yet()
     {
-        var section = new UpdateSection(new UpdateCoordinator(new FakeUpdateFeed(), () => false, () => false));
+        var section = new UpdateViewModel(new UpdateCoordinator(new FakeUpdateFeed(), () => false, () => false));
 
         Assert.Equal("还没有检查过。", section.UpdateStatusText);
         Assert.True(section.IsUpdateSupported);
@@ -32,7 +29,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
     [Fact]
     public async Task Found_version_text_appears_after_a_check()
     {
-        var section = new UpdateSection(new UpdateCoordinator(
+        var section = new UpdateViewModel(new UpdateCoordinator(
             new FakeUpdateFeed { Version = "9.9.9" },
             () => false,
             () => false));
@@ -46,7 +43,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
     [Fact]
     public void An_unsupported_environment_says_so()
     {
-        var section = new UpdateSection(new UpdateCoordinator(
+        var section = new UpdateViewModel(new UpdateCoordinator(
             new FakeUpdateFeed { IsSupported = false },
             () => false,
             () => false));
@@ -56,7 +53,7 @@ public sealed class SettingsUpdateSectionTests : IDisposable
     }
 
     [Fact]
-    public async Task The_settings_page_relays_the_update_notifications()
+    public async Task The_settings_page_observes_the_update_model_directly()
     {
         var coordinator = new UpdateCoordinator(new FakeUpdateFeed { Version = "9.9.9" }, () => false, () => false);
         var viewModel = new SettingsViewModel(
@@ -65,18 +62,74 @@ public sealed class SettingsUpdateSectionTests : IDisposable
             updates: coordinator);
 
         var relayed = new List<string?>();
-        viewModel.PropertyChanged += (_, e) => relayed.Add(e.PropertyName);
+        viewModel.UpdateStatus.PropertyChanged += (_, e) => relayed.Add(e.PropertyName);
 
-        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+        await viewModel.UpdateStatus.CheckCommand.ExecuteAsync(null);
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.UpdateStatusText);
-        Assert.Contains(nameof(SettingsViewModel.UpdateStatusText), relayed);
-        Assert.Contains(nameof(SettingsViewModel.CanDownloadUpdate), relayed);
+        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.UpdateStatus.UpdateStatusText);
+        Assert.Contains(nameof(UpdateViewModel.UpdateStatusText), relayed);
+        Assert.Contains(nameof(UpdateViewModel.CanDownloadUpdate), relayed);
+    }
+
+    [Fact]
+    public void Main_window_and_settings_share_one_update_model()
+    {
+        using var model = new MainViewModel(filePicker: null);
+        Assert.Same(model.Updates, model.Settings.UpdateStatus);
+    }
+
+    [Fact]
+    public async Task Declining_installation_does_not_download_or_exit()
+    {
+        var feed = new FakeUpdateFeed { Version = "9.9.9" };
+        using var model = new UpdateViewModel(new UpdateCoordinator(feed, () => false, () => false), () => Task.FromResult(false));
+        var exited = false;
+        model.ExitRequested += () => exited = true;
+        await model.CheckAsync();
+        await model.InstallUpdateCommand.ExecuteAsync(null);
+        Assert.Equal(0, feed.Downloads);
+        Assert.Equal(0, feed.Applied);
+        Assert.False(exited);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Only_a_successful_download_applies_and_requests_exit(bool failDownload)
+    {
+        var feed = new FakeUpdateFeed { Version = "9.9.9", FailDownload = failDownload };
+        using var model = new UpdateViewModel(new UpdateCoordinator(feed, () => false, () => false), () => Task.FromResult(true));
+        var exited = false;
+        model.ExitRequested += () => exited = true;
+        await model.CheckAsync();
+        await model.InstallUpdateCommand.ExecuteAsync(null);
+        Assert.Equal(1, feed.Downloads);
+        Assert.Equal(failDownload ? 0 : 1, feed.Applied);
+        Assert.Equal(!failDownload, exited);
+    }
+
+    [Fact]
+    public async Task Disposal_detaches_notifications_and_disables_commands()
+    {
+        var feed = new FakeUpdateFeed { Version = "9.9.9" };
+        var coordinator = new UpdateCoordinator(feed, () => false, () => false);
+        var model = new UpdateViewModel(coordinator);
+        var notifications = 0;
+        model.PropertyChanged += (_, _) => notifications++;
+        model.Dispose();
+        model.Dispose();
+        await coordinator.CheckAsync();
+        await model.InstallUpdateCommand.ExecuteAsync(null);
+        Assert.Equal(0, notifications);
+        Assert.Equal(0, feed.Applied);
     }
 
     private sealed class FakeUpdateFeed : IUpdateFeed
     {
         public bool IsSupported { get; init; } = true;
+        public bool FailDownload { get; init; }
+        public int Downloads { get; private set; }
+        public int Applied { get; private set; }
 
         public string CurrentVersion => "0.1.0";
 
@@ -88,12 +141,12 @@ public sealed class SettingsUpdateSectionTests : IDisposable
 
         public Task DownloadAsync(IProgress<int>? progress, CancellationToken cancellationToken = default)
         {
+            Downloads++;
+            if (FailDownload) throw new IOException("download failed");
             progress?.Report(100);
             return Task.CompletedTask;
         }
 
-        public void ApplyAndRestart()
-        {
-        }
+        public void ApplyAndRestart() => Applied++;
     }
 }

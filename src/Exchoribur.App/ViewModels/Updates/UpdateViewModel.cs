@@ -1,28 +1,32 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Resources;
 using Exchoribur.Application.Updates;
 
 namespace Exchoribur.App.ViewModels;
 
-/// <summary>
-/// 设置页里"更新"那一块:把更新协调器的状态翻译成界面上的文字与按钮可用性。
-/// 协调器抬一次状态通知,这里就整体重算一次并把通知转发出去。
-/// </summary>
-/// <remarks>
-/// 这些值只有"整体重算"一个来源,没有单独改某一项的入口,所以用普通属性自己抬通知,
-/// 不用 <c>[ObservableProperty]</c>。
-/// </remarks>
-internal sealed class UpdateSection : ObservableObject
+/// <summary>主窗口与设置页共用的更新状态、提示和安装入口。</summary>
+public sealed partial class UpdateViewModel : ObservableObject, IDisposable
 {
     private readonly UpdateCoordinator? _updates;
+    private readonly Func<Task<bool>>? _confirmInstall;
+    private bool _disposed;
+    private bool _notified;
 
-    public UpdateSection(UpdateCoordinator? updates)
+    public event Action<string>? UpdateAvailableFound;
+    public event Action? ExitRequested;
+    public string UpdateBannerText { get; private set; } = string.Empty;
+    public bool IsUpdateBannerVisible => UpdateBannerText.Length > 0;
+    public bool IsUpdateApplyVisible => CanInstallUpdate;
+
+    public UpdateViewModel(UpdateCoordinator? updates, Func<Task<bool>>? confirmInstall = null)
     {
         _updates = updates;
+        _confirmInstall = confirmInstall;
 
         if (_updates is not null)
         {
-            _updates.Changed += (_, _) => Refresh();
+            _updates.Changed += OnUpdatesChanged;
         }
 
         Refresh();
@@ -52,48 +56,51 @@ internal sealed class UpdateSection : ObservableObject
     public bool IsUpdateProgressVisible { get; private set; }
 
     /// <summary>查一次;查到新版本并且开着自动下载,协调器会接着下。</summary>
+    [RelayCommand]
     public async Task CheckAsync()
     {
-        if (_updates is not null)
+        if (!_disposed && _updates is not null)
         {
             await _updates.CheckAsync();
         }
     }
 
     /// <summary>下载已经查到的新版本。</summary>
+    [RelayCommand]
     public async Task DownloadAsync()
     {
-        if (_updates is not null)
+        if (!_disposed && _updates is not null)
         {
             await _updates.DownloadAsync();
         }
     }
 
-    /// <summary>重启并装上已经下载好的版本。</summary>
-    public void ApplyAndRestart() => _updates?.ApplyAndRestart();
-
-    /// <summary>
-    /// 装更新:没下过就先下,下好了启动安装器。返回 false 表示没装成——调用方别退出程序。
-    /// </summary>
-    public async Task<bool> InstallAsync()
+    [RelayCommand]
+    private async Task InstallUpdateAsync()
     {
-        if (_updates is null)
+        if (_disposed || _updates is null || (_confirmInstall is not null && !await _confirmInstall()))
         {
-            return false;
+            return;
         }
+        if (_disposed) return;
+        if (_updates.State.Stage == UpdateStage.Available) await DownloadAsync();
+        if (_disposed || _updates.State.Stage != UpdateStage.Ready) return;
+        _updates.ApplyAndRestart();
+        ExitRequested?.Invoke();
+    }
 
-        if (_updates.State.Stage == UpdateStage.Available)
-        {
-            await DownloadAsync();
-        }
+    private void OnUpdatesChanged(object? sender, EventArgs e)
+    {
+        if (!_disposed) Refresh();
+    }
 
-        if (_updates.State.Stage != UpdateStage.Ready)
-        {
-            return false;
-        }
-
-        ApplyAndRestart();
-        return true;
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        if (_updates is not null) _updates.Changed -= OnUpdatesChanged;
+        UpdateAvailableFound = null;
+        ExitRequested = null;
     }
 
     private void Refresh()
@@ -115,6 +122,22 @@ internal sealed class UpdateSection : ObservableObject
             UpdateStage.Failed => string.Format(Strings.UpdateStatusFailedFormat, state.Error),
             _ => string.Empty,
         };
+
+        UpdateBannerText = state.Stage switch
+        {
+            UpdateStage.Available => string.Format(Strings.MainUpdateAvailableFormat, state.Version),
+            UpdateStage.Downloading => string.Format(Strings.MainUpdateDownloadingFormat, state.Version, state.ProgressPercent),
+            UpdateStage.Ready => string.Format(Strings.MainUpdateReadyFormat, state.Version),
+            _ => string.Empty,
+        };
+        OnPropertyChanged(nameof(UpdateBannerText));
+        OnPropertyChanged(nameof(IsUpdateBannerVisible));
+        OnPropertyChanged(nameof(IsUpdateApplyVisible));
+        if (state.Stage == UpdateStage.Available && state.Version is { } version && !_notified)
+        {
+            _notified = true;
+            UpdateAvailableFound?.Invoke(version);
+        }
 
         IsUpdateBusy = state.IsBusy;
         CanDownloadUpdate = state.Stage == UpdateStage.Available;

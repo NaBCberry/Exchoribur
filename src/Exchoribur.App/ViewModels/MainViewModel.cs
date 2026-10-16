@@ -26,7 +26,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     private readonly INamePrompt? _namePrompt;
     private readonly IAudioDeviceController _audio;
-    private readonly UpdateCoordinator _updates;
+    public UpdateViewModel Updates { get; }
     private readonly PlaybackController _playback;
     private readonly ProjectSession _projects;
     private readonly IDeviceService? _deviceService;
@@ -95,20 +95,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         // 更新协调器必须先于设置页建好(设置页要用它),而它的两个开关又要从设置页取,
         // 所以这里用"取设置页"的方法把取值延后:开关真正被读到时,设置页早就建好了。
         SettingsViewModel? currentSettings = null;
-        _updates = new UpdateCoordinator(
+        var updates = new UpdateCoordinator(
             updateFeed ?? AppServices.CreateUpdateFeed(),
             () => currentSettings?.AutoDownloadUpdates ?? false,
             () => currentSettings?.IncludePrereleaseVersions ?? false);
-        _updates.Changed += OnUpdatesChanged;
+        Updates = new UpdateViewModel(updates, ConfirmDiscardChangesAsync);
+        Updates.ExitRequested += OnUpdateExitRequested;
 
         Settings = settings
-            ?? new SettingsViewModel(AppServices.CreateSettingsStore().DefaultPath, _audio, _updates, externalLauncher, device);
+            ?? new SettingsViewModel(AppServices.CreateSettingsStore().DefaultPath, _audio, updates, externalLauncher, device);
         currentSettings = Settings;
         Settings.PropertyChanged += OnSettingsChanged;
-        RefreshUpdateBanner();
-
-        // 设置页的「下载并安装」交给这里:装之前得先把未保存的改动问清楚。
-        Settings.InstallUpdateRequested = () => _ = InstallUpdateAsync();
+        Settings.UseUpdates(Updates);
 
         // 场控设备这条线:面板上的连接状态与发包统计都归它,默认参数从设置页现取。
         _deviceService = device;
@@ -132,8 +130,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     }
 
-    /// <summary>更新状态变了,状态条上的提示跟着换。</summary>
-    private void OnUpdatesChanged(object? sender, EventArgs e) => RefreshUpdateBanner();
+    private void OnUpdateExitRequested() => ExitRequested?.Invoke();
 
     /// <summary>
     /// 关窗时把懒创建的播放器放掉:它挂着 libvlc 的解码线程和一块固定住的内存,
@@ -151,7 +148,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         _playback.Pause();
         Device.Dispose();
 
-        _updates.Changed -= OnUpdatesChanged;
+        Updates.ExitRequested -= OnUpdateExitRequested;
+        Updates.Dispose();
+        Settings.Dispose();
         Settings.PropertyChanged -= OnSettingsChanged;
 
         // 发起后台停机;真实关窗路径通过 DisposeAsync 等待,不阻塞界面线程。
@@ -471,90 +470,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     /// <summary>用户偏好设置(滚轮方向、新建块长度之类),设置窗口改的就是这一份。</summary>
     public SettingsViewModel Settings { get; }
 
-    /// <summary>底部状态条上的更新提示;没有要说的就是空。</summary>
-    [ObservableProperty]
-    public partial string UpdateBannerText { get; set; } = string.Empty;
-
-    /// <summary>有更新提示时,状态条右边多出一块。</summary>
-    public bool IsUpdateBannerVisible => UpdateBannerText.Length > 0;
-
-    /// <summary>有版本可以装(下没下好都算),状态条右边就多出一个按钮。</summary>
-    public bool IsUpdateApplyVisible => _updates.State.Stage is UpdateStage.Available or UpdateStage.Ready;
-
-    /// <summary>查到新版本时抬一次(每次运行只抬一次),窗口据此弹一次提示。</summary>
-    public event Action<string>? UpdateAvailableFound;
-
-    /// <summary>装更新要退出程序了:窗口订阅它,关掉自己让安装器接管。</summary>
+    /// <summary>安装更新前已确认工程可关闭,请求窗口退出。</summary>
     public event Action? ExitRequested;
 
-    /// <summary>这次运行已经弹过"有新版本"没有。</summary>
-    private bool _updateNotified;
-
-    partial void OnUpdateBannerTextChanged(string value)
-    {
-        OnPropertyChanged(nameof(IsUpdateBannerVisible));
-        OnPropertyChanged(nameof(IsUpdateApplyVisible));
-    }
-
-    /// <summary>
-    /// 启动后在后台查一次更新。等界面出来之后再调,别让网络把启动拖住;
-    /// 查失败只在设置页里体现,不弹东西打断用户。
-    /// </summary>
     public void StartBackgroundUpdateCheck()
     {
-        if (Settings.CheckForUpdatesOnStartup && _updates.IsSupported)
-        {
-            _ = _updates.CheckAsync();
-        }
-    }
-
-    /// <summary>
-    /// 下载并装上更新,然后退出程序——安装器装完会把新版拉起来。
-    /// 装之前先把未保存的改动问清楚,免得更新吃掉用户还没存的东西。
-    /// </summary>
-    [RelayCommand]
-    private async Task InstallUpdateAsync()
-    {
-        if (!await ConfirmDiscardChangesAsync())
-        {
-            return;
-        }
-
-        if (_updates.State.Stage == UpdateStage.Available)
-        {
-            await _updates.DownloadAsync();
-        }
-
-        // 下载失败或者中途被打断:停在原地,别把程序关掉
-        if (_updates.State.Stage != UpdateStage.Ready)
-        {
-            return;
-        }
-
-        _updates.ApplyAndRestart();
-        ExitRequested?.Invoke();
-    }
-
-    private void RefreshUpdateBanner()
-    {
-        var state = _updates.State;
-
-        UpdateBannerText = state.Stage switch
-        {
-            UpdateStage.Available => string.Format(Strings.MainUpdateAvailableFormat, state.Version),
-            UpdateStage.Downloading => string.Format(
-                Strings.MainUpdateDownloadingFormat,
-                state.Version,
-                state.ProgressPercent),
-            UpdateStage.Ready => string.Format(Strings.MainUpdateReadyFormat, state.Version),
-            _ => string.Empty,
-        };
-
-        if (state.Stage == UpdateStage.Available && state.Version is { } version && !_updateNotified)
-        {
-            _updateNotified = true;
-            UpdateAvailableFound?.Invoke(version);
-        }
+        if (Settings.CheckForUpdatesOnStartup && Updates.IsUpdateSupported) _ = Updates.CheckAsync();
     }
 
     /// <summary>设置里改了撤销步数,立刻作用到已经开着的编辑栈上。</summary>

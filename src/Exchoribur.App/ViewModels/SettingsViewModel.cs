@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Exchoribur.App.Controls;
@@ -17,14 +16,15 @@ namespace Exchoribur.App.ViewModels;
 /// 设置页的数据。
 /// 下面一排二级页,内容按分组摆。改一项就写回文件,所以没有确定/取消。
 /// </summary>
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly string _path;
     private readonly ISettingsStore _store;
     private readonly IExternalLauncher? _externalLauncher;
     private readonly IDeviceService? _deviceService;
     private readonly AudioDeviceSection _audioSection;
-    private readonly UpdateSection _updateSection;
+    public UpdateViewModel UpdateStatus { get; private set; }
+    private bool _ownsUpdateStatus = true;
 
     /// <summary>构造函数里给属性赋初值不算"用户改过",这段时间不要写文件。</summary>
     private bool _initializing = true;
@@ -64,9 +64,7 @@ public partial class SettingsViewModel : ViewModelBase
         _deviceService = device;
         _audioSection = new AudioDeviceSection(audio);
 
-        // 更新那一块自己管状态:它一变就把通知转发给界面,不用在这里逐个搬字段。
-        _updateSection = new UpdateSection(updates);
-        _updateSection.PropertyChanged += OnUpdateSectionChanged;
+        UpdateStatus = new UpdateViewModel(updates);
 
         Groups = BuildGroups();
         SelectGroup(Groups[0]);
@@ -98,9 +96,18 @@ public partial class SettingsViewModel : ViewModelBase
         _initializing = false;
     }
 
-    /// <summary>更新那一块算完了,把它改过的属性名照搬给界面。</summary>
-    private void OnUpdateSectionChanged(object? sender, PropertyChangedEventArgs e)
-        => OnPropertyChanged(e.PropertyName);
+    internal void UseUpdates(UpdateViewModel updates)
+    {
+        if (_ownsUpdateStatus) UpdateStatus.Dispose();
+        UpdateStatus = updates;
+        _ownsUpdateStatus = false;
+        OnPropertyChanged(nameof(UpdateStatus));
+    }
+
+    public void Dispose()
+    {
+        if (_ownsUpdateStatus) UpdateStatus.Dispose();
+    }
 
     // ---- 导航 ----
 
@@ -367,27 +374,6 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ---- 更新 ----
 
-    /// <summary>当前版本,读不到更新源信息时用编译进程序集的那个。</summary>
-    public string CurrentVersionText => _updateSection.CurrentVersionText;
-
-    /// <summary>这个运行环境支不支持自动更新(开发运行不支持)。</summary>
-    public bool IsUpdateSupported => _updateSection.IsUpdateSupported;
-
-    /// <summary>更新状态那句话,由更新区算好。</summary>
-    public string UpdateStatusText => _updateSection.UpdateStatusText;
-
-    public bool IsUpdateBusy => _updateSection.IsUpdateBusy;
-
-    public bool CanDownloadUpdate => _updateSection.CanDownloadUpdate;
-
-    public bool CanApplyUpdate => _updateSection.CanApplyUpdate;
-
-    public bool CanInstallUpdate => _updateSection.CanInstallUpdate;
-
-    public int UpdateProgress => _updateSection.UpdateProgress;
-
-    public bool IsUpdateProgressVisible => _updateSection.IsUpdateProgressVisible;
-
     [ObservableProperty]
     public partial bool CheckForUpdatesOnStartup { get; set; }
 
@@ -396,30 +382,6 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial bool IncludePrereleaseVersions { get; set; }
-
-    [RelayCommand]
-    private Task CheckForUpdatesAsync() => _updateSection.CheckAsync();
-
-    [RelayCommand]
-    private Task DownloadUpdateAsync() => _updateSection.DownloadAsync();
-
-    /// <summary>
-    /// 主视图模型接手"装更新"这件事:它得先问清楚未保存的改动,装完还要把程序关掉。
-    /// 没人接手(比如测试里单独建的设置页)就自己走完下载加启动安装器。
-    /// </summary>
-    internal Action? InstallUpdateRequested { get; set; }
-
-    [RelayCommand]
-    private async Task InstallUpdateAsync()
-    {
-        if (InstallUpdateRequested is { } request)
-        {
-            request();
-            return;
-        }
-
-        await _updateSection.InstallAsync();
-    }
 
     /// <summary>直接切到某一页,给"有新版本"提示里的"去设置页"用。</summary>
     public void ShowPage(SettingsPageKind kind)

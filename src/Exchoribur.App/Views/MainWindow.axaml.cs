@@ -12,6 +12,7 @@ namespace Exchoribur.App.Views;
 public partial class MainWindow : Window
 {
     private SettingsWindow? _settingsWindow;
+    private MainViewModel? _subscribedViewModel;
 
     /// <summary>已经问过未保存的改动并得到"可以关"的回答,再关就不再拦。</summary>
     private bool _closingConfirmed;
@@ -34,13 +35,15 @@ public partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        DetachViewModel();
         if (DataContext is not MainViewModel viewModel)
         {
             return;
         }
 
+        _subscribedViewModel = viewModel;
         viewModel.ExitRequested += OnExitRequested;
-        viewModel.UpdateAvailableFound += OnUpdateAvailableFound;
+        viewModel.Updates.UpdateAvailableFound += OnUpdateAvailableFound;
     }
 
     /// <summary>装更新:未保存的改动视图模型已经问过了,这里直接关掉自己让安装器接管。</summary>
@@ -63,7 +66,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var dialog = new UpdateAvailableWindow(version, viewModel.Settings.CurrentVersionText);
+            var dialog = new UpdateAvailableWindow(version, viewModel.Updates.CurrentVersionText);
 
             if (await dialog.ShowDialog<bool>(this))
             {
@@ -78,7 +81,18 @@ public partial class MainWindow : Window
 
     /// <summary>窗口关了就放掉懒创建的播放器,别把解码线程和固定住的内存留着。</summary>
     private void OnClosed(object? sender, EventArgs e)
-        => (DataContext as MainViewModel)?.Dispose();
+    {
+        DetachViewModel();
+        (DataContext as MainViewModel)?.Dispose();
+    }
+
+    private void DetachViewModel()
+    {
+        if (_subscribedViewModel is not { } model) return;
+        model.ExitRequested -= OnExitRequested;
+        model.Updates.UpdateAvailableFound -= OnUpdateAvailableFound;
+        _subscribedViewModel = null;
+    }
 
     /// <summary>
     /// 空格是播放 / 暂停。这条没写进窗口的 KeyBindings:那里的绑定在事件走到输入框之前
