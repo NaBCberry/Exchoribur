@@ -505,7 +505,8 @@ public partial class SettingsViewModel : ViewModelBase
     public string BuildConfigurationText => AppVersion.Configuration;
     public string ProjectUrl => ReleaseSource.RepositoryUrl;
     public string LicenseText => Strings.SettingsLicenseName;
-    public string CopyrightText => Strings.AppCopyright;
+    // 固定版权声明,不得通过翻译资源修改。
+    public string CopyrightText => "© 2026 NaBCberry";
 
     /// <summary>打开项目主页。</summary>
     [RelayCommand]

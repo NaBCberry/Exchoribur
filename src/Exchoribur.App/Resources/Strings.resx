@@ -855,9 +855,6 @@
   <data name="ColorPresetGray" xml:space="preserve">
     <value>灰色</value>
   </data>
-  <data name="AppCopyright" xml:space="preserve">
-    <value>© 2026 NaBCberry</value>
-  </data>
   <data name="DeviceLicenseErrorEmpty" xml:space="preserve">
     <value>许可串是空的。</value>
   </data>
