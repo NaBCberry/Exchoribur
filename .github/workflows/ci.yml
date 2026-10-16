@@ -18,6 +18,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   AVALONIA_TELEMETRY_OPTOUT: 1
+  PYTHONUTF8: '1'
 
 jobs:
   build:
@@ -35,10 +36,17 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check generated resources
+        run: python scripts/generate-strings.py --check
       - name: Restore
         run: dotnet restore Exchoribur.slnx
       - name: Build
         run: dotnet build Exchoribur.slnx --configuration Release --no-restore
+      - name: Check code style
+        run: dotnet format style Exchoribur.slnx --no-restore --verify-no-changes --diagnostics IDE0005 IDE0161 IDE1006
       - name: Test
         run: dotnet test Exchoribur.slnx --configuration Release --no-build

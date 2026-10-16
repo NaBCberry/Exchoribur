@@ -1,0 +1,26 @@
+<Project>
+  <!-- 在构建时检查声明的引用,避免“尚未使用”的违规引用逃过程序集检查。 -->
+  <Target Name="ValidateProjectBoundaries" BeforeTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <_ForbiddenProjectReference Include="@(ProjectReference)"
+        Condition="'$(MSBuildProjectName)' == 'Exchoribur.Core'" />
+      <_ForbiddenProjectReference Include="@(ProjectReference)"
+        Condition="'$(MSBuildProjectName)' == 'Exchoribur.Application' and '%(ProjectReference.Filename)' != 'Exchoribur.Core'" />
+      <_ForbiddenProjectReference Include="@(ProjectReference)"
+        Condition="'$(MSBuildProjectName)' == 'Exchoribur.Infrastructure' and '%(ProjectReference.Filename)' != 'Exchoribur.Core' and '%(ProjectReference.Filename)' != 'Exchoribur.Application'" />
+      <_ForbiddenProjectReference Include="@(ProjectReference)"
+        Condition="'$(MSBuildProjectName)' == 'Exchoribur.App' and '%(ProjectReference.Filename)' != 'Exchoribur.Core' and '%(ProjectReference.Filename)' != 'Exchoribur.Application' and '%(ProjectReference.Filename)' != 'Exchoribur.Infrastructure'" />
+      <_ForbiddenPackageReference Include="@(PackageReference)"
+        Condition="('$(MSBuildProjectName)' == 'Exchoribur.Core' or '$(MSBuildProjectName)' == 'Exchoribur.Application') and $([System.Text.RegularExpressions.Regex]::IsMatch('%(PackageReference.Identity)', '^(Avalonia|CommunityToolkit\.Mvvm|LibVLCSharp|VideoLAN\.|System\.IO\.Ports)'))" />
+      <_ForbiddenPackageReference Include="@(PackageReference)"
+        Condition="'$(MSBuildProjectName)' == 'Exchoribur.Infrastructure' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(PackageReference.Identity)', '^(Avalonia|CommunityToolkit\.Mvvm)'))" />
+    </ItemGroup>
+    <Error Code="EXC001" Condition="'@(_ForbiddenProjectReference)' != ''"
+      Text="$(MSBuildProjectName) 存在违反分层方向的项目引用: @(_ForbiddenProjectReference)" />
+    <Error Code="EXC002" Condition="'@(_ForbiddenPackageReference)' != ''"
+      Text="$(MSBuildProjectName) 存在不属于本层的依赖包: @(_ForbiddenPackageReference)" />
+    <Error Code="EXC003"
+      Condition="('$(MSBuildProjectName)' == 'Exchoribur.Core' or '$(MSBuildProjectName)' == 'Exchoribur.Application' or '$(MSBuildProjectName)' == 'Exchoribur.Infrastructure') and ('$(UseWPF)' == 'true' or '$(UseWindowsForms)' == 'true' or '$(UseMaui)' == 'true')"
+      Text="$(MSBuildProjectName) 不允许启用界面框架工作负载" />
+  </Target>
+</Project>

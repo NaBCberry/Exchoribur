@@ -6,7 +6,7 @@ namespace Exchoribur.App.Controls;
 
 /// <summary>
 /// 画一帧视频画面:等比缩放、居中,不拉伸变形。
-/// 画面由 <see cref="VideoService"/> 填进位图,这里只负责显示;
+/// 画面由 <see cref="Services.VideoService"/> 填进位图,这里只负责显示;
 /// 用 FrameVersion 当刷新信号,位图内容变了就重画一次。
 /// </summary>
 public sealed class VideoSurface : Control

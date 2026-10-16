@@ -664,19 +664,19 @@ public sealed class TimelineControl : Control
             new Point(x, TimelineLayout.TimecodeBandHeight),
             new Point(x, Bounds.Height));
 
-        const double halfWidth = 7;
-        const double bodyHeight = 10;
-        const double tipHeight = 6;
-        var top = TimelineLayout.RulerHeight - bodyHeight - tipHeight - 2;
+        const double HalfWidth = 7;
+        const double BodyHeight = 10;
+        const double TipHeight = 6;
+        var top = TimelineLayout.RulerHeight - BodyHeight - TipHeight - 2;
 
         var geometry = new StreamGeometry();
         using (var figure = geometry.Open())
         {
-            figure.BeginFigure(new Point(x - halfWidth, top), true);
-            figure.LineTo(new Point(x + halfWidth, top));
-            figure.LineTo(new Point(x + halfWidth, top + bodyHeight));
-            figure.LineTo(new Point(x, top + bodyHeight + tipHeight));
-            figure.LineTo(new Point(x - halfWidth, top + bodyHeight));
+            figure.BeginFigure(new Point(x - HalfWidth, top), true);
+            figure.LineTo(new Point(x + HalfWidth, top));
+            figure.LineTo(new Point(x + HalfWidth, top + BodyHeight));
+            figure.LineTo(new Point(x, top + BodyHeight + TipHeight));
+            figure.LineTo(new Point(x - HalfWidth, top + BodyHeight));
             figure.EndFigure(true);
         }
 

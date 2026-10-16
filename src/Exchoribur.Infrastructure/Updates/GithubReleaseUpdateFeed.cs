@@ -1,8 +1,7 @@
+using System.Xml.Linq;
 using Exchoribur.Application.Abstractions;
 using Exchoribur.Application.Updates;
 using Exchoribur.Infrastructure.Platform.Windows;
-using System.Net.Http;
-using System.Xml.Linq;
 
 namespace Exchoribur.Infrastructure.Updates;
 

@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Xml.Linq;
 using Exchoribur.App.Resources;
 
 namespace Exchoribur.App.Tests;
@@ -8,6 +10,20 @@ namespace Exchoribur.App.Tests;
 /// </summary>
 public sealed class StringsResourceTests
 {
+    [Fact]
+    public void Generated_accessors_cover_all_resource_entries_without_missing_translations()
+    {
+        var path = Path.Combine(SourceBoundaryTests.RepositoryRoot(), "src", "Exchoribur.App", "Resources", "Strings.resx");
+        var entries = XDocument.Load(path).Root!.Elements("data")
+            .ToDictionary(node => node.Attribute("name")!.Value, node => node.Element("value")!.Value);
+        var properties = typeof(Strings).GetProperties(BindingFlags.Public | BindingFlags.Static);
+        Assert.Equal(entries.Keys.Order(), properties.Select(property => property.Name).Order());
+        foreach (var property in properties)
+        {
+            Assert.Equal(entries[property.Name], property.GetValue(null));
+        }
+    }
+
     [Fact]
     public void The_embedded_strings_are_found_by_the_resource_manager()
     {

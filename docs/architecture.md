@@ -38,7 +38,7 @@ App 中对 Infrastructure 的源代码引用集中在 `AppServices.cs`。
 ## 后台设备发送
 
 `DeviceService` 的单个后台任务独占 `DeviceLink`,连接、实际发送和断开不会并行
-操作同一条通道。界面调用 `RequestSend` 只复制十个通道的状态和亮度并提交请求,
+操作同一条通道。界面调用 `RequestSend` 只提交只读帧快照和亮度,
 不执行串口/UDP 写入。提交完成不等于实际发送完成,计数与错误由 `Changed` 通知。
 
 待发送队列容量为一,新状态替换尚未取出的旧状态。正在写入的帧继续完成,
@@ -50,6 +50,16 @@ App 中对 Infrastructure 的源代码引用集中在 `AppServices.cs`。
 同步的驱动写入/打开无法强行取消,`DisconnectAsync` 和 `DisposeAsync` 异步等待
 当前操作结束后清理,关闭窗口前会等待 `MainViewModel.DisposeAsync` 完成。
 这些操作不新增黑场命令,继续保留原有灯光保持行为。
+
+## 数据、文案和自动约束
+
+领域模型与 CSV 解析结果封装内部集合,设备许可的字节输入输出相互隔离。
+设备校验返回代码,由 App 的 `DeviceValidationText` 使用资源翻译。
+系统打开方式通过 Avalonia 存储接口执行;创建目录通过 `IFileAccess` 交给
+Infrastructure,避免界面服务直接操作磁盘。
+
+SDK、命名、项目依赖方向及资源生成规则见
+[engineering-standards.md](engineering-standards.md),构建和 CI 自动检查这些约定。
 
 ## 媒体帧与释放
 
