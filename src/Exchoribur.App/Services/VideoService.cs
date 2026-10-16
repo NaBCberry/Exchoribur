@@ -12,7 +12,7 @@ namespace Exchoribur.App.Services;
 public sealed class VideoService : IVideoService
 {
     private readonly IVideoDecoder _decoder;
-    private readonly byte[] _pixels;
+    private byte[] _pixels = [];
     private int _updateQueued;
     private volatile bool _disposed;
 
@@ -22,12 +22,6 @@ public sealed class VideoService : IVideoService
         _decoder = decoder;
         try
         {
-            _pixels = new byte[checked(decoder.Width * decoder.Height * 4)];
-            if (decoder.IsAvailable)
-            {
-                Frame = new WriteableBitmap(new PixelSize(decoder.Width, decoder.Height),
-                    new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
-            }
             _decoder.FrameUpdated += OnFrameUpdated;
         }
         catch
@@ -38,7 +32,7 @@ public sealed class VideoService : IVideoService
         }
     }
 
-    public WriteableBitmap? Frame { get; }
+    public WriteableBitmap? Frame { get; private set; }
     public string? ErrorMessage => _decoder.ErrorMessage;
     public bool IsAvailable => !_disposed && _decoder.IsAvailable;
     public double Volume { get => _decoder.Volume; set => _decoder.Volume = value; }
@@ -60,26 +54,44 @@ public sealed class VideoService : IVideoService
             return;
         }
 
-        Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(RefreshFrame, DispatcherPriority.Render);
+    }
+
+    /// <summary>在界面线程发布完整一帧,并在格式变化时替换位图。</summary>
+    internal void RefreshFrame()
+    {
+        Interlocked.Exchange(ref _updateQueued, 0);
+        if (_disposed)
         {
-            Interlocked.Exchange(ref _updateQueued, 0);
-            if (_disposed || Frame is not { } bitmap)
-            {
-                return;
-            }
+            return;
+        }
 
-            _decoder.CopyLatestFrame(_pixels);
-            using (var buffer = bitmap.Lock())
+        if (!_decoder.TryCopyLatestFrame(_pixels, out var format))
+        {
+            if (format.Width <= 0 || format.Height <= 0 || format.BufferSize <= _pixels.Length) return;
+            _pixels = new byte[format.BufferSize];
+            // 格式可能再次变化,本次不等待,由下一次帧通知重试。
+            if (!_decoder.TryCopyLatestFrame(_pixels, out format)) return;
+        }
+        var size = new PixelSize(format.Width, format.Height);
+        var oldBitmap = Frame;
+        var bitmap = oldBitmap?.PixelSize == size ? oldBitmap
+            : new WriteableBitmap(size, new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+        using (var buffer = bitmap.Lock())
+        {
+            var rowBytes = checked(format.Width * 4);
+            for (var row = 0; row < format.Height; row++)
             {
-                var rowBytes = _decoder.Width * 4;
-                for (var row = 0; row < _decoder.Height; row++)
-                {
-                    Marshal.Copy(_pixels, row * rowBytes, buffer.Address + row * buffer.RowBytes, rowBytes);
-                }
+                Marshal.Copy(_pixels, row * format.Stride, buffer.Address + row * buffer.RowBytes, rowBytes);
             }
-
-            FrameUpdated?.Invoke(this, EventArgs.Empty);
-        }, DispatcherPriority.Render);
+        }
+        Frame = bitmap;
+        FrameUpdated?.Invoke(this, EventArgs.Empty);
+        // 绑定已切换到新位图,在后续界面调度中释放旧画面。
+        if (!ReferenceEquals(oldBitmap, bitmap))
+        {
+            Dispatcher.UIThread.Post(() => oldBitmap?.Dispose(), DispatcherPriority.Background);
+        }
     }
 
     public void Dispose()

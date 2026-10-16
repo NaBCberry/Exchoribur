@@ -11,6 +11,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     private IVideoService? _video;
 
     private bool _disposed;
+    private WriteableBitmap? _lastFrame;
 
     public event Action? ServiceCreated;
 
@@ -43,7 +44,13 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
 
     private void OnFrameUpdated(object? sender, EventArgs e)
     {
-        if (!_disposed) VideoFrameVersion++;
+        if (_disposed) return;
+        if (!ReferenceEquals(_lastFrame, _video?.Frame))
+        {
+            _lastFrame = _video?.Frame;
+            OnPropertyChanged(nameof(VideoFrame));
+        }
+        VideoFrameVersion++;
     }
 
     public bool OpenVideo(string path)

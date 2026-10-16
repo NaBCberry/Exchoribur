@@ -14,22 +14,10 @@ namespace Exchoribur.Infrastructure.Media;
 /// </summary>
 public sealed class LibVlcVideoDecoder : IVideoDecoder
 {
-    private const int FrameWidth = 1280;
-    private const int FrameHeight = 720;
-    private const int BytesPerPixel = 4;
-    private const int RowBytes = FrameWidth * BytesPerPixel;
-    private const int FrameBytes = RowBytes * FrameHeight;
-
     private readonly object _sync = new();
+    private FrameBuffer? _activeBuffer;
+    private FrameBuffer? _latest;
 
-    /// <summary>libvlc 写当前帧用的缓冲。</summary>
-    private readonly byte[] _vlcBuffer = new byte[FrameBytes];
-
-    /// <summary>界面线程取帧用的缓冲,避免读到写了一半的像素。</summary>
-    private readonly byte[] _latestFrame = new byte[FrameBytes];
-
-    private GCHandle _vlcBufferPin;
-    private readonly IntPtr _vlcBufferPointer;
     private readonly LibVLC? _libVlc;
     private readonly MediaPlayer? _player;
 
@@ -37,9 +25,6 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
     private VlcMedia? _media;
 
     private bool _disposed;
-
-    public int Width => FrameWidth;
-    public int Height => FrameHeight;
 
     public LibVlcVideoDecoder()
     {
@@ -49,11 +34,8 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             _libVlc = new LibVLC();
             _player = new MediaPlayer(_libVlc);
 
-            _vlcBufferPin = GCHandle.Alloc(_vlcBuffer, GCHandleType.Pinned);
-            _vlcBufferPointer = _vlcBufferPin.AddrOfPinnedObject();
-
-            // BGRA 与 Avalonia 位图的 Bgra8888 一致,可以整块拷贝,不用逐像素转换。
-            _player.SetVideoFormat("BGRA", FrameWidth, FrameHeight, RowBytes);
+            // 保留解码器提供的原始宽高,仅协商像素格式与内存布局。
+            _player.SetVideoFormatCallbacks(SetupVideoFormat, CleanupVideoFormat);
             _player.SetVideoCallbacks(LockFrame, UnlockFrame, DisplayFrame);
         }
         catch (Exception exception)
@@ -62,10 +44,6 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             _player?.Dispose();
             _media?.Dispose();
             _libVlc?.Dispose();
-            if (_vlcBufferPin.IsAllocated)
-            {
-                _vlcBufferPin.Free();
-            }
             _player = null;
             _libVlc = null;
         }
@@ -182,6 +160,8 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             return false;
         }
 
+        _player.Stop();
+        lock (_sync) _latest = null;
         _media?.Dispose();
         _media = new VlcMedia(_libVlc, path, FromType.FromPath);
         _media.AddOption(":start-paused");
@@ -217,56 +197,157 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
         }
     }
 
-    /// <summary>libvlc 要一块可写内存放当前帧,把固定住的那块地址给它。</summary>
+    private uint SetupVideoFormat(ref IntPtr opaque, IntPtr chroma,
+        ref uint width, ref uint height, ref uint pitches, ref uint lines)
+    {
+        FrameBuffer? buffer = null;
+        try
+        {
+            // VLC 的格式回调可能携带显示变换后的建议尺寸。优先使用选中视频轨的
+            // 原始像素尺寸,避免输出尺寸受窗口或输出模块的协商影响。
+            var tracks = _media?.Tracks;
+            var selectedTrackId = _player?.VideoTrack;
+            var track = tracks?.Where(track => track.TrackType == TrackType.Video)
+                .OrderByDescending(track => track.Id == selectedTrackId).FirstOrDefault();
+            if (track is { TrackType: TrackType.Video } videoTrack)
+            {
+                var video = videoTrack.Data.Video;
+                if (video.Width > 0 && video.Height > 0)
+                {
+                    width = video.Width;
+                    height = video.Height;
+                    if ((int)video.Orientation >= 4) (width, height) = (height, width);
+                }
+            }
+            var stride = checked((checked((int)width * 4) + 31) & ~31);
+            var allocatedLines = checked((checked((int)height) + 31) & ~31);
+            buffer = new FrameBuffer(new VideoFrameFormat(checked((int)width), checked((int)height), stride),
+                allocatedLines);
+            lock (_sync)
+            {
+                if (_disposed)
+                {
+                    buffer.Dispose();
+                    return 0;
+                }
+                _activeBuffer?.Dispose();
+                _activeBuffer = buffer;
+            }
+            Marshal.WriteInt32(chroma, 0x41524742); // BGRA 四个 ASCII 字节。
+            pitches = checked((uint)stride);
+            lines = checked((uint)allocatedLines);
+            return 1;
+        }
+        catch (Exception)
+        {
+            // 异常不能穿过原生回调边界。返回 0 告知 VLC 格式协商失败。
+            lock (_sync)
+            {
+                if (ReferenceEquals(_activeBuffer, buffer)) _activeBuffer = null;
+            }
+            buffer?.Dispose();
+            return 0;
+        }
+    }
+
+    private void CleanupVideoFormat(ref IntPtr opaque)
+    {
+        // LibVLCSharp 3.9.7.1 将格式清理直接传给原生库,而非像 lock/display 一样
+        // 转交 _videoUserData。因此不能解引用此 opaque,由实例持有当前格式缓冲。
+        lock (_sync)
+        {
+            _activeBuffer?.Dispose();
+            _activeBuffer = null;
+            // _latest 的托管副本继续保留最后一帧。
+        }
+    }
+
     private IntPtr LockFrame(IntPtr opaque, IntPtr planes)
     {
-        Marshal.WriteIntPtr(planes, _vlcBufferPointer);
-        return _vlcBufferPointer;
+        lock (_sync)
+        {
+            Marshal.WriteIntPtr(planes, _activeBuffer!.Pixels);
+            return IntPtr.Zero;
+        }
     }
 
-    private void UnlockFrame(IntPtr opaque, IntPtr picture, IntPtr planes)
-    {
-    }
+    private static void UnlockFrame(IntPtr opaque, IntPtr picture, IntPtr planes) { }
 
-    /// <summary>LibVLC 说这一帧齐了:搬到自有缓冲后通知调用方。</summary>
     private void DisplayFrame(IntPtr opaque, IntPtr picture)
     {
         lock (_sync)
         {
-            Buffer.BlockCopy(_vlcBuffer, 0, _latestFrame, 0, FrameBytes);
+            if (_disposed) return;
+            var buffer = _activeBuffer!;
+            Marshal.Copy(buffer.Pixels, buffer.Latest, 0, buffer.Format.BufferSize);
+            _latest = buffer;
         }
-
         FrameUpdated?.Invoke(this, EventArgs.Empty);
     }
 
-    public void CopyLatestFrame(byte[] destination)
+    public bool TryCopyLatestFrame(Span<byte> destination, out VideoFrameFormat format)
     {
-        ArgumentNullException.ThrowIfNull(destination);
-        if (destination.Length < FrameBytes)
-        {
-            throw new ArgumentException("目标缓冲小于视频帧大小。", nameof(destination));
-        }
-
         lock (_sync)
         {
-            Buffer.BlockCopy(_latestFrame, 0, destination, 0, FrameBytes);
+            format = _latest?.Format ?? default;
+            if (_disposed || _latest is not { } buffer || destination.Length < format.BufferSize)
+            {
+                return false;
+            }
+            buffer.Latest.AsSpan().CopyTo(destination);
+            return true;
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_sync)
         {
-            return;
+            if (_disposed) return;
+            _disposed = true;
         }
-        _disposed = true;
+        // 不持锁等待 VLC:它停止时会等待正在运行的回调,并调用格式清理。
         _player?.Dispose();
         _media?.Dispose();
         _libVlc?.Dispose();
-
-        if (_vlcBufferPin.IsAllocated)
+        lock (_sync)
         {
-            _vlcBufferPin.Free();
+            _activeBuffer?.Dispose();
+            _activeBuffer = null;
+            _latest = null;
+        }
+    }
+
+    private sealed class FrameBuffer : IDisposable
+    {
+        private IntPtr _allocation;
+        public VideoFrameFormat Format { get; }
+        public byte[] Latest { get; }
+        public IntPtr Pixels { get; }
+
+        public FrameBuffer(VideoFrameFormat format, int allocatedLines)
+        {
+            Format = format;
+            Latest = new byte[format.BufferSize];
+            try
+            {
+                _allocation = Marshal.AllocHGlobal(checked(format.Stride * allocatedLines + 31));
+                Pixels = new IntPtr((_allocation.ToInt64() + 31) & ~31L);
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_allocation != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_allocation);
+                _allocation = IntPtr.Zero;
+            }
         }
     }
 }

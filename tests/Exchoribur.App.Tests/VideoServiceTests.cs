@@ -33,8 +33,6 @@ public sealed class VideoServiceTests
 
     private sealed class StubDecoder : IVideoDecoder
     {
-        public int Width => 2;
-        public int Height => 2;
         public int Subscribers { get; private set; }
         public int DisposeCalls { get; private set; }
         public bool IsAvailable => false;
@@ -47,7 +45,11 @@ public sealed class VideoServiceTests
             add => Subscribers++;
             remove => Subscribers--;
         }
-        public void CopyLatestFrame(byte[] destination) => throw new InvalidOperationException();
+        public bool TryCopyLatestFrame(Span<byte> destination, out VideoFrameFormat format)
+        {
+            format = default;
+            return false;
+        }
         public IReadOnlyList<AudioDeviceOption> GetAudioDevices() => [];
         public void ApplyAudioDevice(string? deviceId) { }
         public bool Load(string path) => false;
