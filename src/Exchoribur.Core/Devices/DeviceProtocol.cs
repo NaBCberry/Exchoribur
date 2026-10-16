@@ -13,7 +13,7 @@ public static class DeviceProtocol
     public const int DefaultBaudRate = 512000;
 
     /// <summary>现场可选的波特率。</summary>
-    public static readonly IReadOnlyList<int> BaudRates = [115200, 230400, 512000, 460800, 921600];
+    public static IReadOnlyList<int> BaudRates { get; } = Array.AsReadOnly<int>([115200, 230400, 512000, 460800, 921600]);
 
     /// <summary>STREAM 帧在 UDP 上默认连发几次:丢一两个包不至于黑灯。</summary>
     public const int StreamRepeatsDefault = 2;

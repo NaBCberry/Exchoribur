@@ -18,13 +18,13 @@ public enum FlashMode : byte
 /// <summary> FlashMode 的取值集合与转换工具。 </summary>
 public static class FlashModes
 {
-    public static readonly IReadOnlyList<FlashMode> All =
+    public static IReadOnlyList<FlashMode> All { get; } = Array.AsReadOnly<FlashMode>(
     [
         FlashMode.Solid,
         FlashMode.Blink1Hz,
         FlashMode.Blink2Hz,
         FlashMode.Blink4Hz
-    ];
+    ]);
 
     public static bool TryFromRawValue(byte raw, out FlashMode mode)
     {

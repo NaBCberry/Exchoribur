@@ -178,7 +178,8 @@ public sealed class BackgroundDeviceServiceTests
             var frame = FrameOf(2);
             var expected = StreamPayload.Encode(frame);
             service.RequestSend(frame, 100);
-            ((ChannelState[])frame.Channels)[0] = new ChannelState(new LightColor(15, 0, 0), FlashMode.Solid);
+            Assert.Throws<NotSupportedException>(() => ((IList<ChannelState>)frame.Channels)[0] =
+                new ChannelState(new LightColor(15, 0, 0), FlashMode.Solid));
             channel.ReleaseSend.Set();
             await channel.SecondSend.Task.WaitAsync(Timeout);
             await service.DisconnectAsync().WaitAsync(Timeout);

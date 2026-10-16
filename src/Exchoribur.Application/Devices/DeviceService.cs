@@ -121,9 +121,9 @@ public sealed class DeviceService : IDeviceService
             {
                 return;
             }
-            // 提交时复制十个通道,避免调用方修改帧的底层数组影响后台发送。
+            // Frame 已封装内部集合,可以直接将只读快照交给后台任务。
             _pendingFrames.Writer.TryWrite(new DeviceFrameRequest(
-                new Frame(frame.Time, frame.Channels), brightnessPercent, _generation));
+                frame, brightnessPercent, _generation));
             _wake.Writer.TryWrite(0);
         }
     }

@@ -57,7 +57,7 @@ public sealed partial class SettingsGroupItem : ObservableObject
     {
         Title = title;
         Icon = icon;
-        Pages = pages;
+        Pages = Array.AsReadOnly(pages.ToArray());
         _select = select;
         SelectCommand = new RelayCommand(() => _select(this));
     }

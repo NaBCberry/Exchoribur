@@ -25,11 +25,12 @@ public static class AuthFrame
             throw new InvalidOperationException("这个许可已经过期了,发 AUTH 没意义。");
         }
 
-        var payload = new byte[9 + license.Signature.Length];
+        var signature = license.Signature;
+        var payload = new byte[9 + signature.Length];
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0), (uint)hostUnixTime);
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(4), (uint)license.ExpireUnixTime);
-        payload[8] = (byte)license.Signature.Length;
-        license.Signature.CopyTo(payload.AsSpan(9));
+        payload[8] = (byte)signature.Length;
+        signature.CopyTo(payload.AsSpan(9));
 
         return TlvFrame.Wrap(TlvFrame.CommandAuth, payload);
     }

@@ -7,8 +7,11 @@ public sealed class CsvTable
 {
     private CsvTable(IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<string>> rows)
     {
-        Headers = headers ?? throw new ArgumentNullException(nameof(headers));
-        Rows = rows ?? throw new ArgumentNullException(nameof(rows));
+        ArgumentNullException.ThrowIfNull(headers);
+        ArgumentNullException.ThrowIfNull(rows);
+        Headers = Array.AsReadOnly(headers.ToArray());
+        Rows = Array.AsReadOnly(rows.Select(row =>
+            (IReadOnlyList<string>)Array.AsReadOnly(row.ToArray())).ToArray());
     }
 
     /// <summary>

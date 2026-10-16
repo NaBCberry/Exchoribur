@@ -8,15 +8,17 @@ public sealed class Timeline
 {
     private readonly Block[] _blocks;
     private readonly TimelineMarker[] _markers;
+    private readonly IReadOnlyList<Block> _blocksView;
+    private readonly IReadOnlyList<TimelineMarker> _markersView;
 
     /// <summary>
     /// 按通道分好的块。桶里的顺序跟着 _blocks 走(按起点排),所以按通道查的时候
     /// 不用每次把整条轴扫一遍——自绘控件每帧都要问一次"这条通道上有哪些块"。
     /// </summary>
-    private readonly Dictionary<int, Block[]> _blocksByChannel;
+    private readonly Dictionary<int, IReadOnlyList<Block>> _blocksByChannel;
 
     /// <summary>所有状态变化点的绝对时间(含每个块的结束时刻),按时间排好,懒算一次。</summary>
-    private TimeSpan[]? _frameTimes;
+    private IReadOnlyList<TimeSpan>? _frameTimes;
 
     public Timeline(IReadOnlyList<Block> blocks, IReadOnlyList<TimelineMarker> markers)
     {
@@ -25,6 +27,8 @@ public sealed class Timeline
 
         _blocks = [.. blocks.OrderBy(block => block.Start)];
         _markers = [.. markers.OrderBy(marker => marker.Time)];
+        _blocksView = Array.AsReadOnly(_blocks);
+        _markersView = Array.AsReadOnly(_markers);
 
         if (_blocks.Select(block => block.Id).Distinct().Count() != _blocks.Length)
         {
@@ -33,14 +37,15 @@ public sealed class Timeline
 
         _blocksByChannel = _blocks
             .GroupBy(block => block.Channel)
-            .ToDictionary(group => group.Key, group => group.ToArray());
+            .ToDictionary(group => group.Key,
+                group => (IReadOnlyList<Block>)Array.AsReadOnly(group.ToArray()));
     }
 
     public static Timeline Empty { get; } = new([], []);
 
-    public IReadOnlyList<Block> Blocks => _blocks;
+    public IReadOnlyList<Block> Blocks => _blocksView;
 
-    public IReadOnlyList<TimelineMarker> Markers => _markers;
+    public IReadOnlyList<TimelineMarker> Markers => _markersView;
 
     /// <summary>最早的块起点;没有块时是 0。</summary>
     public TimeSpan Start => _blocks.Length == 0 ? TimeSpan.Zero : _blocks[0].Start;
@@ -86,7 +91,7 @@ public sealed class Timeline
 
     /// <summary>某一刻盖住这条通道的块;没有就是空,重叠时会有多个。</summary>
     public IReadOnlyList<Block> BlocksAt(int channel, TimeSpan time)
-        => [.. BlocksOnChannel(channel).Where(block => block.Contains(time))];
+        => Array.AsReadOnly(BlocksOnChannel(channel).Where(block => block.Contains(time)).ToArray());
 
     /// <summary>这条通道这一刻是不是被多个块盖住(重叠 = 无法播放)。</summary>
     public bool IsOverlapping(int channel, TimeSpan time)
@@ -111,7 +116,7 @@ public sealed class Timeline
         {
             foreach (var blocks in _blocksByChannel.Values)
             {
-                for (var index = 1; index < blocks.Length; index++)
+                for (var index = 1; index < blocks.Count; index++)
                 {
                     if (blocks[index].Start < blocks[index - 1].End)
                     {
@@ -167,7 +172,7 @@ public sealed class Timeline
         return low;
     }
 
-    private TimeSpan[] BuildFrameTimes()
+    private IReadOnlyList<TimeSpan> BuildFrameTimes()
     {
         var times = new List<TimeSpan>(_blocks.Length * 2);
 
@@ -182,6 +187,6 @@ public sealed class Timeline
             times.Add(block.End);
         }
 
-        return [.. times.Distinct().OrderBy(time => time)];
+        return Array.AsReadOnly(times.Distinct().OrderBy(time => time).ToArray());
     }
 }

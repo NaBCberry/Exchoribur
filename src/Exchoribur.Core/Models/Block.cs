@@ -11,6 +11,7 @@ public sealed class Block
     public const string DefaultName = "编排块";
 
     private readonly BlockFrame[] _frames;
+    private readonly IReadOnlyList<BlockFrame> _framesView;
 
     public Block(
         Guid id,
@@ -48,6 +49,7 @@ public sealed class Block
         Length = length;
         LinkGroupId = linkGroupId;
         _frames = [.. frames.OrderBy(frame => frame.Offset)];
+        _framesView = Array.AsReadOnly(_frames);
 
         foreach (var frame in _frames)
         {
@@ -80,7 +82,7 @@ public sealed class Block
     public TimeSpan End => Start + Length;
 
     /// <summary>内容:按偏移排好序的状态变化点。</summary>
-    public IReadOnlyList<BlockFrame> Frames => _frames;
+    public IReadOnlyList<BlockFrame> Frames => _framesView;
 
     /// <summary>时刻落在块范围内(左闭右开)。</summary>
     public bool Contains(TimeSpan time) => time >= Start && time < End;

@@ -6,11 +6,27 @@ namespace Exchoribur.Core.Devices;
 /// </summary>
 public sealed record DeviceLicense(byte[] Mac, long ExpireUnixTime, byte[] Signature)
 {
+    private readonly byte[] _mac = (byte[])Mac.Clone();
+    private readonly byte[] _signature = (byte[])Signature.Clone();
+
+    // 保持构造、解构和 with 语法可用,但输入和输出都不共享许可内部的字节数组。
+    public byte[] Mac
+    {
+        get => (byte[])_mac.Clone();
+        init => _mac = (byte[])value.Clone();
+    }
+
+    public byte[] Signature
+    {
+        get => (byte[])_signature.Clone();
+        init => _signature = (byte[])value.Clone();
+    }
+
     public const char Separator = '|';
     public const int MaxSignatureBytes = 72;
 
     /// <summary>AA:BB:CC:DD:EE:FF 这种写法。</summary>
-    public string MacText => string.Join(':', Mac.Select(value => value.ToString("X2")));
+    public string MacText => string.Join(':', _mac.Select(value => value.ToString("X2")));
 
     public DateTimeOffset ExpireAt => DateTimeOffset.FromUnixTimeSeconds(ExpireUnixTime);
 

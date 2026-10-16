@@ -5,6 +5,18 @@ namespace Exchoribur.Infrastructure.Tests;
 public class CsvTableTests
 {
     [Fact]
+    public void Parsed_headers_rows_and_cells_are_read_only()
+    {
+        var table = CsvTable.Parse("a,b\n1,2");
+
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)table.Headers)[0] = "changed");
+        Assert.Throws<NotSupportedException>(() => ((IList<IReadOnlyList<string>>)table.Rows).Clear());
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)table.Rows[0])[0] = "changed");
+        Assert.Equal("a", table.Headers[0]);
+        Assert.Equal("1", table.Rows[0][0]);
+    }
+
+    [Fact]
     public void Parse_separates_header_from_rows()
     {
         var table = CsvTable.Parse("a,b,c\n1,2,3\n4,5,6");

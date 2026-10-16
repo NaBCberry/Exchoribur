@@ -5,17 +5,18 @@ public sealed class Frame
 {
     public const int ChannelCount = 10;
 
-    private readonly ChannelState[] _channels;
+    private readonly IReadOnlyList<ChannelState> _channels;
 
     public Frame(TimeSpan time, IReadOnlyList<ChannelState> channels)
     {
+        ArgumentNullException.ThrowIfNull(channels);
         if (channels.Count != ChannelCount)
         {
             throw new ArgumentException($"通道数量必须为 {ChannelCount}。", nameof(channels));
         }
 
         Time = time;
-        _channels = [.. channels];
+        _channels = Array.AsReadOnly(channels.ToArray());
     }
 
     /// <summary>全部通道使用同一个状态,用于整帧同色(如黑场)的场景。</summary>
