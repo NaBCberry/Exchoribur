@@ -1,0 +1,166 @@
+{
+  "Runtime": ".NET 10.0.14",
+  "OS": "Microsoft Windows 10.0.26200",
+  "ProcessorCount": 24,
+  "Configuration": "Release",
+  "TieredCompilation": "0",
+  "Rounds": 7,
+  "Project": {
+    "Blocks": 1,
+    "Frames": 5887,
+    "LargestBlockFrames": 5887,
+    "DurationSeconds": 8810.0436243
+  },
+  "Media": {
+    "Width": 1920,
+    "Height": 1080,
+    "Seconds": 8.0011917,
+    "Frames": 401,
+    "FramesPerSecond": 50.11753436678689,
+    "GapP95Milliseconds": 21.1805,
+    "GapMaxMilliseconds": 21.9559,
+    "CpuCorePercent": 40.618949299764935,
+    "AllocatedBytes": 0,
+    "FirstFrameMilliseconds": 887.6265,
+    "AudioDevices": 4,
+    "AudioMuted": true
+  },
+  "Results": [
+    {
+      "Name": "sample-10000-blocks",
+      "OperationsPerRound": 1000,
+      "MedianMicroseconds": 40.817,
+      "SlowestRoundMicroseconds": 41.818,
+      "BytesPerOperation": 216,
+      "Value": null
+    },
+    {
+      "Name": "duration-10000-blocks",
+      "OperationsPerRound": 1000,
+      "MedianMicroseconds": 9.2301,
+      "SlowestRoundMicroseconds": 10.305,
+      "BytesPerOperation": 24,
+      "Value": null
+    },
+    {
+      "Name": "edit-10000-blocks",
+      "OperationsPerRound": 20,
+      "MedianMicroseconds": 1365.06,
+      "SlowestRoundMicroseconds": 1446.4950000000001,
+      "BytesPerOperation": 1711896,
+      "Value": null
+    },
+    {
+      "Name": "sample-100000-blocks",
+      "OperationsPerRound": 1000,
+      "MedianMicroseconds": 437.0985,
+      "SlowestRoundMicroseconds": 451.039,
+      "BytesPerOperation": 216,
+      "Value": null
+    },
+    {
+      "Name": "duration-100000-blocks",
+      "OperationsPerRound": 1000,
+      "MedianMicroseconds": 233.97570000000002,
+      "SlowestRoundMicroseconds": 252.05939999999998,
+      "BytesPerOperation": 24,
+      "Value": null
+    },
+    {
+      "Name": "edit-100000-blocks",
+      "OperationsPerRound": 20,
+      "MedianMicroseconds": 14285.420000000002,
+      "SlowestRoundMicroseconds": 14425.164999999999,
+      "BytesPerOperation": 17087948.8,
+      "Value": null
+    },
+    {
+      "Name": "move-100000-frames",
+      "OperationsPerRound": 40,
+      "MedianMicroseconds": 3898.6974999999998,
+      "SlowestRoundMicroseconds": 3970.655,
+      "BytesPerOperation": 4403271.8,
+      "Value": null
+    },
+    {
+      "Name": "video-copy-1920x1080",
+      "OperationsPerRound": 60,
+      "MedianMicroseconds": 1073.015,
+      "SlowestRoundMicroseconds": 1362.7166666666667,
+      "BytesPerOperation": 56,
+      "Value": null
+    },
+    {
+      "Name": "video-copy-3840x2160",
+      "OperationsPerRound": 60,
+      "MedianMicroseconds": 6685.405,
+      "SlowestRoundMicroseconds": 8101.2733333333335,
+      "BytesPerOperation": 56,
+      "Value": null
+    },
+    {
+      "Name": "audio-output-reconfigurations-101-volume-changes",
+      "OperationsPerRound": 101,
+      "MedianMicroseconds": 0,
+      "SlowestRoundMicroseconds": 0,
+      "BytesPerOperation": 0,
+      "Value": 101
+    },
+    {
+      "Name": "fake-device-connect-ms",
+      "OperationsPerRound": 1,
+      "MedianMicroseconds": 0,
+      "SlowestRoundMicroseconds": 0,
+      "BytesPerOperation": 0,
+      "Value": 14.9265
+    },
+    {
+      "Name": "device-queued-ui-notifications-200-sends",
+      "OperationsPerRound": 200,
+      "MedianMicroseconds": 0,
+      "SlowestRoundMicroseconds": 0,
+      "BytesPerOperation": 0,
+      "Value": 202
+    },
+    {
+      "Name": "device-request-submit",
+      "OperationsPerRound": 1000,
+      "MedianMicroseconds": 0.073,
+      "SlowestRoundMicroseconds": 0.0884,
+      "BytesPerOperation": 40,
+      "Value": null
+    },
+    {
+      "Name": "device-duplicate-payload",
+      "OperationsPerRound": 10000,
+      "MedianMicroseconds": 0.042539999999999994,
+      "SlowestRoundMicroseconds": 0.0529,
+      "BytesPerOperation": 48,
+      "Value": null
+    },
+    {
+      "Name": "actual-project-sample",
+      "OperationsPerRound": 2000,
+      "MedianMicroseconds": 0.09834999999999999,
+      "SlowestRoundMicroseconds": 0.11095000000000001,
+      "BytesPerOperation": 216,
+      "Value": null
+    },
+    {
+      "Name": "actual-project-move-largest-block",
+      "OperationsPerRound": 100,
+      "MedianMicroseconds": 190.451,
+      "SlowestRoundMicroseconds": 231.69099999999997,
+      "BytesPerOperation": 259704.24,
+      "Value": null
+    },
+    {
+      "Name": "actual-project-rebuild",
+      "OperationsPerRound": 20,
+      "MedianMicroseconds": 2.275,
+      "SlowestRoundMicroseconds": 3.3299999999999996,
+      "BytesPerOperation": 2632,
+      "Value": null
+    }
+  ]
+}
