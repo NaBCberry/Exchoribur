@@ -80,9 +80,17 @@ public sealed class VideoService : IVideoService
         using (var buffer = bitmap.Lock())
         {
             var rowBytes = checked(format.Width * 4);
-            for (var row = 0; row < format.Height; row++)
+            if (format.Stride == rowBytes && buffer.RowBytes == rowBytes)
             {
-                Marshal.Copy(_pixels, row * format.Stride, buffer.Address + row * buffer.RowBytes, rowBytes);
+                // 常见的连续 BGRA 帧一次复制完,避免每行都跨一次托管/原生边界。
+                Marshal.Copy(_pixels, 0, buffer.Address, checked(rowBytes * format.Height));
+            }
+            else
+            {
+                for (var row = 0; row < format.Height; row++)
+                {
+                    Marshal.Copy(_pixels, row * format.Stride, buffer.Address + row * buffer.RowBytes, rowBytes);
+                }
             }
         }
         Frame = bitmap;

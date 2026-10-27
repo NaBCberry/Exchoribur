@@ -240,6 +240,25 @@ public sealed class VideoInjectionTests : IDisposable
             videoFactory: () => video);
     }
 
+    [Fact]
+    public void Volume_changes_keep_the_output_device_and_switching_or_recreating_reapplies_it()
+    {
+        var first = new StubVideoService();
+        IVideoService current = first;
+        var audio = new VideoAudioDeviceController(() => current);
+        for (var volume = 0; volume <= 100; volume++) audio.Apply("headphones", volume);
+        Assert.Equal(100, first.Volume);
+        Assert.Equal(["headphones"], first.AppliedAudioDevices);
+
+        audio.Apply(null, 50);
+        Assert.Equal(["headphones", null], first.AppliedAudioDevices);
+        var replacement = new StubVideoService();
+        current = replacement;
+        audio.Apply(null, 75);
+        Assert.Equal(new string?[] { null }, replacement.AppliedAudioDevices);
+        Assert.Equal(75, replacement.Volume);
+    }
+
     private sealed class StubVideoService : IVideoService
     {
         public WriteableBitmap? Frame => null;
@@ -268,8 +287,11 @@ public sealed class VideoInjectionTests : IDisposable
 
         public IReadOnlyList<AudioDeviceOption> GetAudioDevices() => [];
 
+        public List<string?> AppliedAudioDevices { get; } = [];
+
         public void ApplyAudioDevice(string? deviceId)
         {
+            AppliedAudioDevices.Add(deviceId);
         }
 
         public bool Load(string path)

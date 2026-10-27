@@ -44,16 +44,18 @@ public sealed class VideoFrameRenderingTests
         Assert.Equal(3, preview.VideoFrameVersion);
     }
 
-    [Fact]
-    public void Padded_source_rows_are_copied_without_including_alignment_bytes()
+    [Theory]
+    [InlineData(12)]
+    [InlineData(16)]
+    public void Source_rows_are_copied_without_including_alignment_bytes(int stride)
     {
         var decoder = new FrameDecoder();
         using var video = new VideoService(decoder);
-        decoder.SetFrame(3, 2, 16);
-        decoder.Pixels[16] = 45;
-        decoder.Pixels[17] = 67;
-        decoder.Pixels[18] = 89;
-        decoder.Pixels[19] = 255;
+        decoder.SetFrame(3, 2, stride);
+        decoder.Pixels[stride] = 45;
+        decoder.Pixels[stride + 1] = 67;
+        decoder.Pixels[stride + 2] = 89;
+        decoder.Pixels[stride + 3] = 255;
         video.RefreshFrame();
         using var pixels = video.Frame!.Lock();
         Assert.Equal(45, Marshal.ReadByte(pixels.Address + pixels.RowBytes));

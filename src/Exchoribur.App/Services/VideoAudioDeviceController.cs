@@ -9,6 +9,8 @@ namespace Exchoribur.App.Services;
 public sealed class VideoAudioDeviceController : IAudioDeviceController
 {
     private readonly Func<IVideoService?> _video;
+    private WeakReference<IVideoService>? _configuredVideo;
+    private string? _configuredDeviceId;
 
     public VideoAudioDeviceController(Func<IVideoService?> video)
     {
@@ -27,6 +29,15 @@ public sealed class VideoAudioDeviceController : IAudioDeviceController
         }
 
         video.Volume = volume;
-        video.ApplyAudioDevice(deviceId);
+        // 拖动音量只调整音量;切输出设备可能重建原生音频链路,不应每一步都执行。
+        if (_configuredVideo is null || !_configuredVideo.TryGetTarget(out var configured)
+            || !ReferenceEquals(video, configured) || _configuredDeviceId != deviceId)
+        {
+            video.ApplyAudioDevice(deviceId);
+            // 预览清空后不应由这个缓存继续保留播放器和大帧缓冲。
+            if (_configuredVideo is null) _configuredVideo = new WeakReference<IVideoService>(video);
+            else _configuredVideo.SetTarget(video);
+            _configuredDeviceId = deviceId;
+        }
     }
 }
