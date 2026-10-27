@@ -87,5 +87,32 @@ public sealed class BlockSamplerTests
     private static Block CreateBlock(int channel, TimeSpan start, TimeSpan length)
         => new(Block.NewId(), "块", channel, start, length, [new BlockFrame(TimeSpan.Zero, State(Red))]);
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(16)]
+    [InlineData(17)]
+    [InlineData(250)]
+    public void Sampling_matches_a_full_scan_for_nested_overlaps_negative_times_and_boundaries(int count)
+    {
+        var random = new Random(82371);
+        var blocks = Enumerable.Range(0, count).Select(index => new Block(Guid.NewGuid(), "块",
+            index % Frame.ChannelCount, TimeSpan.FromMilliseconds(random.Next(-500, 1500)),
+            TimeSpan.FromMilliseconds(random.Next(1, 600)),
+            [new BlockFrame(TimeSpan.Zero, State(index % 2 == 0 ? Red : Blue))])).ToArray();
+        var timeline = new Timeline(blocks, []);
+        var times = blocks.SelectMany(block => new[] { block.Start, block.End, block.End - TimeSpan.FromTicks(1) })
+            .Append(TimeSpan.FromSeconds(-10)).Append(TimeSpan.FromSeconds(10));
+        foreach (var time in times)
+        {
+            var sampled = BlockSampler.SampleChannels(timeline, time);
+            for (var channel = 0; channel < Frame.ChannelCount; channel++)
+            {
+                var covering = blocks.Where(block => block.Channel == channel && block.Contains(time)).ToArray();
+                var expected = covering.Length == 1 ? covering[0].GetFrameAt(time - covering[0].Start).State : BlockSampler.Dark;
+                Assert.Equal(expected, sampled[channel]);
+            }
+        }
+    }
+
     private static ChannelState State(LightColor color) => new(color, FlashMode.Solid);
 }

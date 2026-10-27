@@ -114,6 +114,24 @@ public sealed class BlockTests
     public void A_blank_name_falls_back_to_the_default()
         => Assert.Equal(Block.DefaultName, Create(name: "  ").Name);
 
+    [Fact]
+    public void Metadata_edits_keep_frame_ownership_and_validation()
+    {
+        var frames = new[] { new BlockFrame(TimeSpan.Zero, State(Red)) };
+        var original = new Block(Guid.NewGuid(), "块", 0, TimeSpan.Zero, OneSecond, frames);
+        var moved = original.MovedTo(TimeSpan.FromSeconds(-1), 3).Renamed("  副歌  ").WithLinkGroup(Guid.NewGuid());
+        frames[0] = new BlockFrame(TimeSpan.Zero, State(Blue));
+        var painted = moved.WithContent(frames);
+
+        Assert.Equal(Red, original.Frames[0].State.Color);
+        Assert.Equal(Red, moved.Frames[0].State.Color);
+        Assert.Equal(Blue, painted.Frames[0].State.Color);
+        Assert.Equal("副歌", moved.Name);
+        Assert.Throws<NotSupportedException>(() => ((IList<BlockFrame>)moved.Frames)[0] = frames[0]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => moved.MovedTo(TimeSpan.Zero, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => moved.MovedTo(TimeSpan.Zero, Frame.ChannelCount));
+    }
+
     private static Block Create(
         string name = "块",
         TimeSpan start = default,

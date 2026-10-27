@@ -28,29 +28,22 @@ public static class BlockSampler
         var channels = new ChannelState[Frame.ChannelCount];
         Array.Fill(channels, Dark);
 
-        // 一趟扫描:每条通道记住"最后一个盖住这一刻的块",并数一下有几个。
-        // 取样会被反复调用(画一屏、播一帧都要),所以这里不建中间集合。
-        var covering = new Block?[Frame.ChannelCount];
-        var counts = new int[Frame.ChannelCount];
+        Span<int> counts = stackalloc int[Frame.ChannelCount];
+        counts.Clear();
 
-        foreach (var block in timeline.Blocks)
+        // 先二分跳过已经结束的前缀,遇到还没开始的块就停,不再每帧扫描整条工程。
+        for (var index = timeline.FindFirstSamplingCandidate(time); index < timeline.Blocks.Count; index++)
         {
+            var block = timeline.Blocks[index];
+            if (block.Start > time) break;
             if (!block.Contains(time))
             {
                 continue;
             }
 
-            covering[block.Channel] = block;
-            counts[block.Channel]++;
-        }
-
-        for (var channel = 0; channel < Frame.ChannelCount; channel++)
-        {
-            // 同一通道被多个块盖住 = 无法播放,按黑场处理(画面上另外用灰色覆盖提示)。
-            if (counts[channel] == 1 && covering[channel] is { } block)
-            {
-                channels[channel] = block.GetFrameAt(time - block.Start).State;
-            }
+            var channel = block.Channel;
+            channels[channel] = ++counts[channel] == 1
+                ? block.GetFrameAt(time - block.Start).State : Dark;
         }
 
         return channels;

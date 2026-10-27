@@ -116,12 +116,30 @@ public sealed class Block
 
     /// <summary>挪到别的时间/通道。</summary>
     public Block MovedTo(TimeSpan start, int channel)
-        => new(Id, Name, channel, start, Length, _frames, LinkGroupId);
+        => new(this, Name, channel, start, LinkGroupId);
 
-    public Block Renamed(string name) => new(Id, name, Channel, Start, Length, _frames, LinkGroupId);
+    public Block Renamed(string name) => new(this, name, Channel, Start, LinkGroupId);
 
     public Block WithLinkGroup(Guid? linkGroupId)
-        => new(Id, Name, Channel, Start, Length, _frames, linkGroupId);
+        => new(this, Name, Channel, Start, linkGroupId);
+
+    /// <summary>只改块的位置、名字或链接时共享已封装的只读帧,避免复制和排序整段内容。</summary>
+    private Block(Block source, string name, int channel, TimeSpan start, Guid? linkGroupId)
+    {
+        if (channel < 0 || channel >= Frame.ChannelCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(channel), channel,
+                $"通道号必须在 0 到 {Frame.ChannelCount - 1} 之间。");
+        }
+        Id = source.Id;
+        Name = string.IsNullOrWhiteSpace(name) ? DefaultName : name.Trim();
+        Channel = channel;
+        Start = start;
+        Length = source.Length;
+        LinkGroupId = linkGroupId;
+        _frames = source._frames;
+        _framesView = source._framesView;
+    }
 
     /// <summary>换内容;不传长度就沿用原来的长度。</summary>
     public Block WithContent(IReadOnlyList<BlockFrame> frames, TimeSpan? length = null)

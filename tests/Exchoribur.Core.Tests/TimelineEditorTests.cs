@@ -9,6 +9,23 @@ public sealed class TimelineEditorTests
     private static readonly LightColor Red = new(15, 0, 0);
 
     [Fact]
+    public void Batch_replacement_preserves_stable_order_at_equal_start_times()
+    {
+        var first = CreateBlock(0, TimeSpan.Zero);
+        var sameTime = CreateBlock(1, TimeSpan.Zero);
+        var later = CreateBlock(2, TimeSpan.FromSeconds(10));
+        var addedFirst = CreateBlock(3, TimeSpan.Zero);
+        var addedSecond = CreateBlock(4, TimeSpan.Zero);
+        var early = CreateBlock(5, TimeSpan.FromSeconds(-1));
+        var timeline = new Timeline([later, first, sameTime], []);
+        var edit = new BlockSetEdit("批量替换", [later], [addedFirst, early, addedSecond]);
+
+        var edited = edit.Apply(timeline);
+        Assert.Equal(new[] { early, first, sameTime, addedFirst, addedSecond }, edited.Blocks);
+        Assert.Equal(new[] { first, sameTime, later }, edit.Revert(edited).Blocks);
+    }
+
+    [Fact]
     public void A_new_block_can_be_undone_and_redone()
     {
         var editor = new TimelineEditor(Timeline.Empty);

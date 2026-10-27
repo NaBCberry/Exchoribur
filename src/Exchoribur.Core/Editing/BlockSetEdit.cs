@@ -39,14 +39,29 @@ public sealed class BlockSetEdit : ITimelineEdit
         ArgumentNullException.ThrowIfNull(timeline);
 
         var takenIds = taken.Select(block => block.Id).ToHashSet();
-        var remaining = timeline.Blocks.Where(block => !takenIds.Contains(block.Id)).ToList();
+        var added = put.OrderBy(block => block.Start).ToArray();
+        var remaining = new List<Block>(Math.Max(0, timeline.Blocks.Count - takenIds.Count + put.Count));
+        var keptCount = 0;
+        var addedIndex = 0;
+        // 原块已经有序,只把本次修改的少量块合并进去。相同起点仍然先放原块,
+        // 与原先“先追加再稳定排序”的顺序一致,避免改变重叠块的显示层级。
+        foreach (var block in timeline.Blocks)
+        {
+            if (takenIds.Contains(block.Id)) continue;
+            while (addedIndex < added.Length && added[addedIndex].Start < block.Start)
+            {
+                remaining.Add(added[addedIndex++]);
+            }
+            remaining.Add(block);
+            keptCount++;
+        }
 
-        if (timeline.Blocks.Count - remaining.Count != takenIds.Count)
+        if (timeline.Blocks.Count - keptCount != takenIds.Count)
         {
             throw new InvalidOperationException("编辑命令和当前时间轴对不上:要替换的块没有全部找到。");
         }
 
-        remaining.AddRange(put);
+        while (addedIndex < added.Length) remaining.Add(added[addedIndex++]);
 
         return new Timeline(remaining, timeline.Markers);
     }
