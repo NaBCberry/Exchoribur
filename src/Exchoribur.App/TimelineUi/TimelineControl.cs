@@ -415,7 +415,8 @@ public sealed class TimelineControl : Control
         foreach (var block in blocks)
         {
             var dragging = _isDraggingBlocks && selected is not null && selected.Contains(block);
-            var start = block.Start + (dragging ? _dragTimeDelta : TimeSpan.Zero);
+            var timeDelta = dragging ? _dragTimeDelta : TimeSpan.Zero;
+            var start = block.Start + timeDelta;
             var channel = dragging
                 ? Math.Clamp(block.Channel + _dragChannelDelta, 0, Frame.ChannelCount - 1)
                 : block.Channel;
@@ -435,7 +436,7 @@ public sealed class TimelineControl : Control
                 Math.Max(3, x1 - x0),
                 Math.Max(6, rowHeight - (BlockInset * 2)));
 
-            DrawBlockBody(context, block, viewport, rect, trackWidth);
+            DrawBlockBody(context, block, viewport, rect, trackWidth, timeDelta);
             DrawBlockTitle(context, block, rect);
 
             var pen = Palette.SelectedBlockPen;
@@ -458,7 +459,8 @@ public sealed class TimelineControl : Control
         Block block,
         TimelineViewport viewport,
         Rect rect,
-        double trackWidth)
+        double trackWidth,
+        TimeSpan timeDelta)
     {
         var bodyTop = rect.Y + BlockTitleHeight;
         var bodyHeight = rect.Height - BlockTitleHeight;
@@ -478,7 +480,8 @@ public sealed class TimelineControl : Control
             block,
             viewport,
             TimelineLayout.TrackLeft,
-            TimelineLayout.TrackLeft + trackWidth);
+            TimelineLayout.TrackLeft + trackWidth,
+            timeDelta);
 
         foreach (var run in _colorRuns)
         {

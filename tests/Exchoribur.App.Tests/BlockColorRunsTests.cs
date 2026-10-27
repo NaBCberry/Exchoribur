@@ -153,6 +153,38 @@ public sealed class BlockColorRunsTests
 
     private static ChannelState State(LightColor color) => new(color, default);
 
+    [Theory]
+    [InlineData(5, 3)]
+    [InlineData(5, -3)]
+    [InlineData(5, 18)]
+    [InlineData(5, -12)]
+    [InlineData(5, -20)]
+    [InlineData(50, -45)]
+    [InlineData(5, 0)]
+    [InlineData(5, 2.35)]
+    public void Drag_preview_matches_the_colors_after_committing_the_move(double startSeconds, double deltaSeconds)
+    {
+        var start = TimeSpan.FromSeconds(startSeconds);
+        var delta = TimeSpan.FromSeconds(deltaSeconds);
+        var block = new Block(Guid.NewGuid(), "块", 3, start, TimeSpan.FromSeconds(10),
+            [new BlockFrame(TimeSpan.Zero, State(Red)),
+             new BlockFrame(TimeSpan.FromSeconds(2), State(Green)),
+             new BlockFrame(TimeSpan.FromSeconds(5), State(Blue))]);
+        var viewport = CreateViewport(TimeSpan.FromSeconds(100), trackWidth: 200, visibleSeconds: 20);
+        var preview = new List<BlockColorRun>();
+        var committed = new List<BlockColorRun>();
+
+        BlockColorRuns.Append(preview, block, viewport, TimelineLayout.TrackLeft,
+            TimelineLayout.TrackLeft + 200, timeDelta: delta);
+        BlockColorRuns.Append(committed, block.MovedTo(start + delta, block.Channel), viewport,
+            TimelineLayout.TrackLeft, TimelineLayout.TrackLeft + 200);
+
+        Assert.Equal(committed, preview);
+        Assert.Equal(start, block.Start);
+        Assert.Equal(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5) },
+            block.Frames.Select(frame => frame.Offset));
+    }
+
     private static Block MakeBlock(IReadOnlyList<BlockFrame> frames, TimeSpan length)
         => new(Guid.NewGuid(), "块", channel: 0, TimeSpan.Zero, length, frames);
 
