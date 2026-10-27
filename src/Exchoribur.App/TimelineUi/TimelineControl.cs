@@ -44,6 +44,7 @@ public sealed class TimelineControl : Control
     private readonly TimelineBrushCache _brushes = new();
     /// <summary>一帧里每个块用到的色段,复用同一个列表免得每块都分配一次。</summary>
     private readonly List<BlockColorRun> _colorRuns = [];
+    private BlockOverlapScanner? _overlaps;
     private readonly TimelineTextCache _text = new(TextCacheLimit);
 
     /// <summary>当前主题下的一套颜色。主题变体换了要重新取,所以记着取的是哪一版。</summary>
@@ -259,6 +260,7 @@ public sealed class TimelineControl : Control
         }
         else if (change.Property == BlocksProperty)
         {
+            _overlaps = Blocks is { } blocks ? new BlockOverlapScanner(blocks) : null;
             // 换了数据:纵向缩放回到"十条铺满",滚动回到顶部。
             _vertical.ResetForNewContent(TrackHeight);
             InvalidateVisual();
@@ -321,7 +323,7 @@ public sealed class TimelineControl : Control
             using (context.PushClip(trackRect))
             {
                 DrawBlocks(context, blocks, viewport, rowHeight, trackWidth);
-                DrawOverlaps(context, blocks, viewport, rowHeight);
+                DrawOverlaps(context, viewport, rowHeight);
             }
 
             DrawUnplayableRegion(context, viewport, trackHeight);
@@ -511,48 +513,21 @@ public sealed class TimelineControl : Control
     /// <summary>同一通道上两个块时间重叠的地方盖一层灰:这段没法播。</summary>
     private void DrawOverlaps(
         DrawingContext context,
-        IReadOnlyList<Block> blocks,
         TimelineViewport viewport,
         double rowHeight)
     {
-        // 一次按通道分组,而不是每条通道都把整表重扫一遍——块多的时候那是平方级的。
-        foreach (var onChannel in blocks.GroupBy(block => block.Channel))
+        _overlaps?.Visit((channel, start, end) =>
         {
-            var overlapping = onChannel.ToArray();
-            if (overlapping.Length < 2)
-            {
-                continue;
-            }
-
             var top = TimelineLayout.RulerHeight
-                + (onChannel.Key * rowHeight)
+                + (channel * rowHeight)
                 + BlockInset
                 - _vertical.Offset;
             var height = Math.Max(6, rowHeight - (BlockInset * 2));
 
-            for (var first = 0; first < overlapping.Length; first++)
-            {
-                for (var second = first + 1; second < overlapping.Length; second++)
-                {
-                    var start = overlapping[first].Start > overlapping[second].Start
-                        ? overlapping[first].Start
-                        : overlapping[second].Start;
-                    var end = overlapping[first].End < overlapping[second].End
-                        ? overlapping[first].End
-                        : overlapping[second].End;
-
-                    if (end <= start)
-                    {
-                        continue;
-                    }
-
-                    var x0 = TimelineLayout.TrackLeft + viewport.MapTime(start);
-                    var x1 = TimelineLayout.TrackLeft + viewport.MapTime(end);
-
-                    context.FillRectangle(Palette.UnplayableMask, new Rect(x0, top, Math.Max(1, x1 - x0), height));
-                }
-            }
-        }
+            var x0 = TimelineLayout.TrackLeft + viewport.MapTime(start);
+            var x1 = TimelineLayout.TrackLeft + viewport.MapTime(end);
+            context.FillRectangle(Palette.UnplayableMask, new Rect(x0, top, Math.Max(1, x1 - x0), height));
+        });
     }
 
     /// <summary>框选:白色半透明底加一圈白边。</summary>
