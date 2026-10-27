@@ -78,31 +78,18 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
         CurrentFrame = BlockSampler.Sample(Timeline, PlayheadTime);
     }
 
-    private TimeSpan PlaybackLength
-    {
-        get
-        {
-            var length = Duration;
-
-            // 长度在媒体还没读出来之前是 0,这时不算数。
-            if (_preview.HasVideo && _preview.Video.Length > TimeSpan.Zero)
-            {
-                var videoLength = _preview.Video.Length;
-                if (videoLength > length)
-                {
-                    length = videoLength;
-                }
-            }
-
-            return length;
-        }
-    }
+    /// <summary>播放和主视口共用的结束时间,同时覆盖灯光内容和参考视频。</summary>
+    public TimeSpan PlaybackLength => _preview.VideoLength > Duration ? _preview.VideoLength : Duration;
 
     [RelayCommand]
     private void GoToStart() => Seek(TimeSpan.Zero);
 
     [RelayCommand]
-    private void GoToEnd() => Seek(Duration);
+    private void GoToEnd()
+    {
+        _preview.RefreshVideoLength();
+        Seek(PlaybackLength);
+    }
 
     /// <summary>播放和暂停合成一个按钮:正在播就暂停,否则从当前位置播。</summary>
     [RelayCommand]
@@ -138,7 +125,8 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     private void NextFrame()
     {
         PausePlayback();
-        Seek(Timeline.GetNextFrameTime(PlayheadTime) ?? Duration);
+        _preview.RefreshVideoLength();
+        Seek(Timeline.GetNextFrameTime(PlayheadTime) ?? PlaybackLength);
     }
 
     /// <summary>
@@ -147,7 +135,10 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void AdvancePlayback(TimeSpan elapsed)
     {
-        if (_disposed || !_playback.Advance(elapsed))
+        if (_disposed) return;
+        _preview.RefreshVideoLength();
+        _playback.SetLength(PlaybackLength);
+        if (!_playback.Advance(elapsed))
         {
             return;
         }
@@ -163,6 +154,7 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     private void StartPlayback()
     {
         if (_disposed) return;
+        _preview.RefreshVideoLength();
         _playback.SetLength(PlaybackLength);
         _playback.Play(AdvancePlayback);
 
@@ -181,6 +173,7 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     {
         if (_disposed) return;
         PausePlayback();
+        _preview.RefreshVideoLength();
         _playback.SetLength(PlaybackLength);
         _playback.SeekTo(position);
 

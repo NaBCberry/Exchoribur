@@ -123,6 +123,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         Editing.StatusReported += Report;
         Playback.PositionChanged += OnPlaybackPositionChanged;
         Playback.ViewportRequested += OnPlaybackViewportRequested;
+        Preview.PropertyChanged += OnPreviewChanged;
 
         // 文件流程自己认得路,只通过 IProjectHost 这一张清单动界面状态。
         _projects = new ProjectSession(this, filePicker, namePrompt, unsavedPrompt, projectStore ?? AppServices.CreateProjectStore(), () => !_disposed);
@@ -171,6 +172,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
         Preview.ServiceCreated -= ApplyAudioSettings;
         Preview.StatusReported -= Report;
+        Preview.PropertyChanged -= OnPreviewChanged;
         Preview.Dispose();
 
         GC.SuppressFinalize(this);
@@ -304,7 +306,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     }
     private void ApplyAudioSettings() => _audio.Apply(Settings.Audio.AudioOutputDeviceId, Settings.Audio.AudioVolume);
 
-    private void OnEditingTimelineChanged(bool reset) => Playback.RefreshTimeline(reset);
+    private void OnEditingTimelineChanged(bool reset)
+    {
+        Playback.RefreshTimeline(reset);
+        UpdateTimelineViewport(reset);
+    }
+
+    private void OnPreviewChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(VideoPreviewViewModel.VideoLength)) UpdateTimelineViewport();
+    }
+
+    /// <summary>窗口边界必须覆盖完整播放范围,否则视频末段的播放头会被挡在画面外。</summary>
+    private void UpdateTimelineViewport(bool reset = false)
+    {
+        var start = Editing.TimelineStart;
+        if (Preview.VideoLength > TimeSpan.Zero && start > TimeSpan.Zero) start = TimeSpan.Zero;
+        var length = Playback.PlaybackLength - start;
+        if (reset) Editing.Viewport.SetContent(start, length);
+        else Editing.Viewport.UpdateContent(start, length);
+    }
 
     private void OnTimelineEdited(Timeline timeline)
     {

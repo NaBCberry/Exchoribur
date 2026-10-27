@@ -27,6 +27,19 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     [ObservableProperty]
     public partial bool HasVideo { get; set; }
 
+    [ObservableProperty]
+    public partial TimeSpan VideoLength { get; private set; }
+
+    /// <summary>媒体长度可能在 Load 返回后才可用;帧刷新和播放时钟都会重新读取。</summary>
+    internal void RefreshVideoLength()
+    {
+        // 停止后解码器可能暂时报 0,不能因此丢掉已知长度、把窗口缩回灯光末尾。
+        if (!_disposed && HasVideo && _video is { Length: var length } && length > TimeSpan.Zero)
+        {
+            VideoLength = length;
+        }
+    }
+
     public IVideoService Video
     {
         get
@@ -45,6 +58,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     private void OnFrameUpdated(object? sender, EventArgs e)
     {
         if (_disposed || !ReferenceEquals(sender, _video)) return;
+        RefreshVideoLength();
         if (!ReferenceEquals(_lastFrame, _video?.Frame))
         {
             _lastFrame = _video?.Frame;
@@ -72,6 +86,9 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         }
 
         HasVideo = true;
+        // 换媒体时不能沿用上一份视频的长度。
+        var length = Video.Length;
+        VideoLength = length > TimeSpan.Zero ? length : TimeSpan.Zero;
         StatusReported?.Invoke(string.Format(Strings.MainVideoLoadedFormat, fileName), false);
 
         return true;
@@ -86,6 +103,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         _lastFrame = null;
         if (video is not null) video.FrameUpdated -= OnFrameUpdated;
         HasVideo = false;
+        VideoLength = TimeSpan.Zero;
         VideoFrameVersion = 0;
         OnPropertyChanged(nameof(VideoFrame));
         video?.Dispose();

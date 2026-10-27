@@ -88,7 +88,6 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
         BlockEditor.SelectedFrames = BlockFrameRange.Empty;
         SyncEditorState();
         TimelineChanged?.Invoke(true);
-        Viewport.SetContent(TimelineStart, Duration - TimelineStart);
     }
 
     public void SetUndoDepth(int depth) => _editing.SetMaxUndoSteps(depth);

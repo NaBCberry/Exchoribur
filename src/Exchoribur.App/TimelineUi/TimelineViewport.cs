@@ -71,6 +71,26 @@ public sealed class TimelineViewport : ObservableObject
         RaiseChanged();
     }
 
+    /// <summary>更新内容边界;媒体时长稍后读出或编辑内容后,保留当前的缩放和位置。</summary>
+    public void UpdateContent(TimeSpan contentStart, TimeSpan contentLength)
+    {
+        var duration = contentLength > TimeSpan.Zero ? contentLength : TimeSpan.Zero;
+        if (_contentStart == contentStart && _duration == duration) return;
+        _contentStart = contentStart;
+        _duration = duration;
+        if (_isFitToWidth)
+        {
+            _scale = MinScale;
+            _start = _contentStart;
+        }
+        else
+        {
+            _scale = Math.Clamp(_scale, MinScale, MaxPixelsPerSecond);
+            ClampStart();
+        }
+        RaiseChanged();
+    }
+
     /// <summary>轨道区域的像素宽度变了(窗口缩放)。没手动缩放过就继续保持铺满。</summary>
     public void SetTrackWidth(double width)
     {
