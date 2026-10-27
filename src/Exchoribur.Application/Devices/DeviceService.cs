@@ -42,6 +42,7 @@ public sealed class DeviceService : IDeviceService
     private bool _stopping;
     private bool _disposeRequested;
     private bool _connecting;
+    private int _notificationQueued;
 
     public DeviceService(IDeviceChannels channels, ICallbackDispatcher dispatcher, string? deviceLogPath = null)
     {
@@ -289,8 +290,15 @@ public sealed class DeviceService : IDeviceService
         NotifyChanged();
     }
 
-    private void NotifyChanged() => _dispatcher.Post(() =>
+    private void NotifyChanged()
     {
+        // 快照一直更新,但界面繁忙时最多保留一次待处理通知,避免每个发送结果都排队。
+        if (Interlocked.Exchange(ref _notificationQueued, 1) == 0) _dispatcher.Post(PublishChanged);
+    }
+
+    private void PublishChanged()
+    {
+        Interlocked.Exchange(ref _notificationQueued, 0);
         lock (_sync)
         {
             if (_disposeRequested)
@@ -299,7 +307,7 @@ public sealed class DeviceService : IDeviceService
             }
         }
         Changed?.Invoke(this, EventArgs.Empty);
-    });
+    }
 
     private sealed record DeviceSnapshot(DeviceLinkState State, DeviceTarget? Target, string? LastError,
         long FramesSent, long Failures, DateTimeOffset? LastSentAt);

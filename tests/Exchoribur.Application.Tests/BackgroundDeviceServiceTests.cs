@@ -197,6 +197,46 @@ public sealed class BackgroundDeviceServiceTests
         public void Post(Action callback) => callback();
     }
 
+    [Fact]
+    public async Task A_busy_ui_receives_one_pending_notification_with_the_latest_device_snapshot()
+    {
+        using var channel = new TestChannel();
+        var dispatcher = new QueuedDispatcher();
+        await using var service = new DeviceService(new TestChannels(channel), dispatcher);
+        Assert.True(await service.ConnectAsync(Target, null).WaitAsync(Timeout));
+        for (var index = 0; index < 20; index++)
+        {
+            service.RequestSend(FrameOf((byte)(index % 15)), 100);
+            var deadline = DateTime.UtcNow + Timeout;
+            while (service.FramesSent <= index)
+            {
+                Assert.True(DateTime.UtcNow < deadline, "发送应在超时前完成");
+                await Task.Delay(1);
+            }
+        }
+        await service.DisconnectAsync().WaitAsync(Timeout);
+        Assert.Single(dispatcher.Callbacks);
+        var notifiedFrames = -1L;
+        service.Changed += (_, _) => notifiedFrames = service.FramesSent;
+        Assert.True(dispatcher.Callbacks.TryDequeue(out var callback));
+        callback();
+        Assert.Equal(20, notifiedFrames);
+
+        await service.DisconnectAsync().WaitAsync(Timeout);
+        Assert.Single(dispatcher.Callbacks);
+        await service.DisposeAsync();
+        notifiedFrames = -1;
+        Assert.True(dispatcher.Callbacks.TryDequeue(out callback));
+        callback();
+        Assert.Equal(-1, notifiedFrames);
+    }
+
+    private sealed class QueuedDispatcher : ICallbackDispatcher
+    {
+        public ConcurrentQueue<Action> Callbacks { get; } = new();
+        public void Post(Action callback) => Callbacks.Enqueue(callback);
+    }
+
     private sealed class TestChannels(params TestChannel[] channels) : IDeviceChannels, IDisposable
     {
         private readonly ConcurrentQueue<TestChannel> _channels = new(channels);
