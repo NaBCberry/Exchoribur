@@ -17,7 +17,7 @@ namespace Exchoribur.App.TimelineUi;
 /// 合成到一个控件是有意的:分成多个控件时,一次滚动里各层的重画可能落在不同的
 /// 合成帧上,看起来就是刻度先动、色块晚一拍,对不齐。
 /// </summary>
-public sealed class TimelineControl : Control
+public sealed partial class TimelineControl : Control
 {
     /// <summary>滚轮一格放大/缩小的比例。</summary>
     private const double ZoomPerWheelStep = 1.25;
@@ -437,6 +437,7 @@ public sealed class TimelineControl : Control
                 Math.Max(6, rowHeight - (BlockInset * 2)));
 
             DrawBlockBody(context, block, viewport, rect, trackWidth, timeDelta);
+            DrawEffects(context, block, viewport, rect, timeDelta);
             DrawBlockTitle(context, block, rect);
 
             var pen = Palette.SelectedBlockPen;
@@ -710,8 +711,21 @@ public sealed class TimelineControl : Control
             return;
         }
 
+        if (point.Properties.IsRightButtonPressed)
+        {
+            ShowEffectMenu(point.Position);
+            e.Handled = true;
+            return;
+        }
         if (!point.Properties.IsLeftButtonPressed)
         {
+            return;
+        }
+
+        if (BeginEffectDrag(point.Position))
+        {
+            e.Pointer.Capture(this);
+            e.Handled = true;
             return;
         }
 
@@ -738,9 +752,9 @@ public sealed class TimelineControl : Control
                     this,
                     new BlockCreateRequest(ChannelAt(point.Position.Y), TimeAt(point.Position.X)));
             }
-            else if (onBody)
+            else
             {
-                // 双击块的下半部分 = 打开块编辑器(单击只负责选中)。
+                // 双击外层块(包括标题栏)打开颜色编辑器。
                 SelectedBlocks = [hit];
                 BlockOpenRequested?.Invoke(this, hit);
             }
@@ -749,8 +763,8 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 点在块的下半部分(标题栏以下)= 选中并拖动整块。
-        if (hit is { } block && onBody)
+        // 未命中内部效果框时,标题栏和颜色区域都能拖动整块。
+        if (hit is { } block)
         {
             var selected = SelectedBlocks;
             if (selected is null || !selected.Contains(block))
@@ -774,7 +788,7 @@ public sealed class TimelineControl : Control
             return;
         }
 
-        // 其余情况(空白处、块的标题栏)= 框选。
+        // 其余空白区域用于框选。
         _isBoxSelecting = true;
         _boxStart = point.Position;
         _boxCurrent = point.Position;
@@ -788,6 +802,8 @@ public sealed class TimelineControl : Control
 
         var position = e.GetPosition(this);
 
+        if (MoveEffectDrag(position)) { e.Handled = true; return; }
+
         // 光标提示:在标尺带上换成"左右拖动",让用户知道这里能拖播放头。
         var onRulerBand = position.Y < TimelineLayout.RulerHeight;
 
@@ -795,6 +811,12 @@ public sealed class TimelineControl : Control
         {
             _showingScrubCursor = onRulerBand;
             Cursor = onRulerBand ? ScrubCursor : DefaultCursor;
+        }
+        if (!onRulerBand)
+        {
+            var effect = HitEffect(position);
+            Cursor = effect is { } hovered && (position.X - hovered.Rect.Left <= 5 || hovered.Rect.Right - position.X <= 5)
+                ? ScrubCursor : DefaultCursor;
         }
 
         if (_isPanning)
@@ -833,6 +855,13 @@ public sealed class TimelineControl : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (EndEffectDrag())
+        {
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
 
         if (_isBoxSelecting)
         {

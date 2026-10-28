@@ -400,6 +400,7 @@
                                 InvertTouchpadScroll="{Binding Settings.Editing.InvertTouchpadScroll}"
                                 BlockCreateRequested="OnBlockCreateRequested"
                                 BlockMoveRequested="OnBlockMoveRequested"
+                                EffectEditRequested="OnEffectEditRequested"
                                 BlockOpenRequested="OnBlockOpenRequested"
                                 Cursor="Hand" />
 

@@ -43,7 +43,7 @@ public static class BlockSampler
 
             var channel = block.Channel;
             channels[channel] = ++counts[channel] == 1
-                ? block.GetFrameAt(time - block.Start).State : Dark;
+                ? block.GetStateAt(time - block.Start) : Dark;
         }
 
         return channels;
