@@ -32,15 +32,60 @@ jobs:
       # 版本号可随 GitHub Actions 的弃用节奏上调。
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
+      # 保留原有检查名称,只跳过耗时步骤,避免必需检查因整个工作流未触发而挂起。
+      # 比较完整改动范围,不能只看最后一条 docs 提交,以免漏检同一 PR 中的代码。
+      - name: Detect code changes
+        id: changes
+        shell: pwsh
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_PR_BASE: ${{ github.event.pull_request.base.sha }}
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          $runChecks = $true
+          $base = switch ($env:CI_EVENT) {
+            'pull_request' { $env:CI_PR_BASE }
+            'push' { $env:CI_PUSH_BEFORE }
+            default { '' }
+          }
+          # 手动运行及没有有效基线的首次推送,始终执行完整检查。
+          if ($base -and $base -notmatch '^0+$') {
+            $changed = @(& git -c core.quotepath=false diff --name-only --no-renames $base HEAD)
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning '无法比较提交,执行完整代码检查。'
+            }
+            else {
+              $codeFiles = @($changed | Where-Object {
+                # 构建输入优先,即使扩展名是 Markdown 也不能跳过随包文件。
+                $buildInput = $_ -cmatch '^(src/|tests/|benchmarks/|scripts/|packaging/|licenses/|\.github/workflows/)'
+                $buildInput = $buildInput -or $_ -cin @('LICENSE', 'ACKNOWLEDGEMENTS.md', 'THIRD-PARTY-NOTICES.md')
+                $nonCode = $_ -cmatch '^(docs/|artwork/icon/preview/|\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE(/|$)|CODEOWNERS$|FUNDING\.yml$))'
+                $nonCode = $nonCode -or $_ -cin @('CODEOWNERS', '.gitmessage') -or $_ -clike '*.md' -or $_ -clike '*.rst'
+                $buildInput -or -not $nonCode
+              })
+              $runChecks = $codeFiles.Count -gt 0
+            }
+          }
+          "run=$($runChecks.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - name: Non-code-only change
+        if: steps.changes.outputs.run == 'false'
+        shell: pwsh
+        run: Write-Host '仅修改文档、仓库管理文件或预览素材,跳过编译、代码风格检查和测试。'
       - uses: actions/setup-dotnet@v6
+        if: steps.changes.outputs.run == 'true'
         with:
           global-json-file: global.json
       - name: Restore
+        if: steps.changes.outputs.run == 'true'
         run: dotnet restore Exchoribur.slnx
       - name: Build
+        if: steps.changes.outputs.run == 'true'
         run: dotnet build Exchoribur.slnx --configuration Release --no-restore
       - name: Check code style
+        if: steps.changes.outputs.run == 'true'
         run: dotnet format style Exchoribur.slnx --no-restore --verify-no-changes --diagnostics IDE0005 IDE0161 IDE1006
       - name: Test
+        if: steps.changes.outputs.run == 'true'
         run: dotnet test Exchoribur.slnx --configuration Release --no-build

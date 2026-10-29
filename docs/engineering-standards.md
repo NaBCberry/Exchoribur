@@ -71,6 +71,20 @@ Application/Core、App → 三个项目。Core 不引用其他业务项目。
 ## 验证与提交
 
 CI 在 Windows、macOS、Linux 上构建并测试,同时生成资源访问器并检查采用的代码规则。
+自动推送和 PR 检查会比较完整改动范围。以下改动不涉及构建输入时,跳过编译、
+代码风格检查和测试,保留原有检查结果:
+
+- `docs/`、Markdown (`*.md`) 和 reStructuredText (`*.rst`) 文档。
+- `.github/ISSUE_TEMPLATE/`、`.github/PULL_REQUEST_TEMPLATE/` 下的模板,
+  以及单文件 PR 模板。
+- 根目录或 `.github/` 下的 `CODEOWNERS`、`.github/FUNDING.yml`、`.gitmessage`。
+- `artwork/icon/preview/` 下未参与构建和打包的图标预览素材。
+
+`src/`、`tests/`、`benchmarks/`、`scripts/`、`packaging/`、`licenses/` 和
+`.github/workflows/` 中的文件始终执行代码检查。随包的 `LICENSE`、
+`ACKNOWLEDGEMENTS.md` 和 `THIRD-PARTY-NOTICES.md` 同样不跳过。
+判断以文件为准,`docs:` 标题中若包含代码改动仍会运行检查;手动运行始终完整检查。
+打标签和手动发布的构建、测试不受这条规则影响。
 本地测试通过不代表三平台真机、媒体或自绘效果已经验收。
 
 提交使用中文单行摘要:`type(scope): 摘要`,不写 body 和 footer。
