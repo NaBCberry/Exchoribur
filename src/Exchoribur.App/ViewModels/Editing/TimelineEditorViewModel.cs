@@ -92,6 +92,15 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
 
     public void SetUndoDepth(int depth) => _editing.SetMaxUndoSteps(depth);
 
+    public void ResizeBlock(BlockResizeRequest request)
+    {
+        if (!CanEdit || Timeline.FindBlock(request.BlockId) is not { } block || request.End <= request.Start
+            || (request.Start == block.Start && request.End == block.End)) return;
+        var updated = block.ResizedTo(request.Start, request.End);
+        ApplyEdit(new BlockSetEdit(Strings.BlockResizeAction, [block], [updated]));
+        SetBlockSelection([updated]);
+    }
+
     public void EditEffect(FlashEffectEditRequest request)
     {
         if (!CanEdit || Timeline.FindBlock(request.BlockId) is not { } block) return;

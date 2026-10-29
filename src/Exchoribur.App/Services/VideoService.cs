@@ -42,6 +42,7 @@ public sealed class VideoService : IVideoService
     public IReadOnlyList<AudioDeviceOption> GetAudioDevices() => _decoder.GetAudioDevices();
     public void ApplyAudioDevice(string? deviceId) => _decoder.ApplyAudioDevice(deviceId);
     public bool Load(string path) => _decoder.Load(path);
+    public Task<bool> LoadAsync(string path) => _decoder.LoadAsync(path);
     public void Play() => _decoder.Play();
     public void Pause() => _decoder.Pause();
     public void Stop() => _decoder.Stop();

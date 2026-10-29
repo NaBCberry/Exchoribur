@@ -100,15 +100,15 @@ internal static class TimelineGeometry
         => time < first ? first : time > last ? last : time;
 
     /// <summary>所有块合起来的时间范围;没有块时是 0 到 0。</summary>
-    public static (TimeSpan Start, TimeSpan End) ContentRange(IReadOnlyList<Block> blocks)
+    public static (TimeSpan Start, TimeSpan End) ContentRange(IReadOnlyList<Block> blocks, TimeSpan referenceDuration = default)
     {
         if (blocks.Count == 0)
         {
-            return (TimeSpan.Zero, TimeSpan.Zero);
+            return (TimeSpan.Zero, referenceDuration > TimeSpan.Zero ? referenceDuration : TimeSpan.Zero);
         }
 
-        var start = blocks[0].Start;
-        var end = blocks[0].End;
+        var start = referenceDuration > TimeSpan.Zero && blocks[0].Start > TimeSpan.Zero ? TimeSpan.Zero : blocks[0].Start;
+        var end = referenceDuration > TimeSpan.Zero && referenceDuration > blocks[0].End ? referenceDuration : blocks[0].End;
 
         foreach (var block in blocks)
         {

@@ -248,6 +248,10 @@ public sealed class TimelineViewport : ObservableObject
     public double MapTime(TimeSpan time)
         => (time - _start).TotalSeconds * _scale;
 
+    /// <summary>边缘拖动的时间换算,允许越过当前视口。</summary>
+    public TimeSpan MapXUnclamped(double x)
+        => _scale > 0 ? _start + TimeSpan.FromSeconds(x / _scale) : _start;
+
     /// <summary>轨道内横坐标 → 时间;超出可见范围时夹在两端。</summary>
     public TimeSpan MapX(double x)
     {

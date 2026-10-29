@@ -401,6 +401,7 @@
                                 InvertTouchpadScroll="{Binding Settings.Editing.InvertTouchpadScroll}"
                                 BlockCreateRequested="OnBlockCreateRequested"
                                 BlockMoveRequested="OnBlockMoveRequested"
+                                BlockResizeRequested="OnBlockResizeRequested"
                                 EffectEditRequested="OnEffectEditRequested"
                                 BlockOpenRequested="OnBlockOpenRequested"
                                 Cursor="Hand" />
@@ -453,6 +454,7 @@
                                     </StackPanel>
 
                                     <timeline:BlockEditorControl
+                                        ReferenceDuration="{Binding Preview.VideoLength}"
                                         Blocks="{Binding Editing.Blocks}"
                                         CurrentBlock="{Binding Editing.BlockEditor.CurrentBlock}"
                                         Viewport="{Binding Editing.BlockEditor.BlockEditorViewport}"

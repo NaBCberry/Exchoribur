@@ -13,6 +13,8 @@ public interface IMediaPlayback : IDisposable
     IReadOnlyList<AudioDeviceOption> GetAudioDevices();
     void ApplyAudioDevice(string? deviceId);
     bool Load(string path);
+    /// <summary>异步读取本地媒体信息后加载;实现不提供异步能力时沿用同步入口。</summary>
+    Task<bool> LoadAsync(string path) => Task.FromResult(Load(path));
     void Play();
     void Pause();
     void Stop();

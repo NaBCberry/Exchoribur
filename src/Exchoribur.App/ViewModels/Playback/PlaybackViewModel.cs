@@ -73,8 +73,8 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
         {
             PlayheadTime = TimeSpan.Zero;
             _playback.Reset();
-            _playback.SetLength(PlaybackLength);
         }
+        _playback.SetLength(PlaybackLength);
         CurrentFrame = BlockSampler.Sample(Timeline, PlayheadTime);
     }
 

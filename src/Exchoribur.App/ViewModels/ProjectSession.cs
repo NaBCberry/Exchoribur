@@ -215,7 +215,7 @@ internal sealed class ProjectSession(
 
             // 和原来一样:先清掉上一次的错误标记,再挂参考媒体(它可能又设上报错)。
             host.Report(string.Empty, error: false);
-            _ = document.MediaPath is { } media && host.OpenVideo(media);
+            if (document.MediaPath is { } media) await host.OpenVideoAsync(media);
 
             host.Report(string.Format(
                 Strings.ProjectStatusOpenedFormat,
@@ -357,7 +357,7 @@ internal sealed class ProjectSession(
         // 已经有工程:只是换掉参考媒体。
         if (host.Document is { } document)
         {
-            host.OpenVideo(path);
+            await host.OpenVideoAsync(path);
             document.AttachMedia(path);
             host.IsModified = document.IsModified;
             return;
@@ -371,7 +371,7 @@ internal sealed class ProjectSession(
 
         // 只导入视频也是新工程:参考媒体记在工程上,灯光数据等之后再导入。
         CreateDocument(name, path);
-        host.OpenVideo(path);
+        await host.OpenVideoAsync(path);
     }
 
     /// <summary>

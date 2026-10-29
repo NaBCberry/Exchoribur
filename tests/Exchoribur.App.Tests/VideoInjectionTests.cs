@@ -72,7 +72,7 @@ public sealed class VideoInjectionTests : IDisposable
     [Fact]
     public async Task Opening_a_project_allows_the_viewport_to_follow_video_past_the_last_light_block()
     {
-        var video = new StubVideoService { Length = TimeSpan.FromSeconds(30) };
+        var video = new StubVideoService { ParsedLength = TimeSpan.FromSeconds(30) };
         using var model = CreateViewModel(video);
         var media = Path.Combine(_directory, "show.mp4");
         File.WriteAllBytes(media, [0]);
@@ -83,6 +83,11 @@ public sealed class VideoInjectionTests : IDisposable
         model.Editing.Viewport.SetTrackWidth(600);
 
         Assert.True(await model.LoadProjectAsync(project));
+        Assert.Equal(TimeSpan.FromSeconds(30), model.Editing.Viewport.End);
+        Assert.Equal(0, video.PlayCalls);
+        Assert.False(model.IsLoading);
+        model.Editing.ResizeBlock(new Exchoribur.App.TimelineUi.BlockResizeRequest(block.Id, TimeSpan.Zero, TimeSpan.FromSeconds(28)));
+        Assert.Equal(TimeSpan.FromSeconds(28), model.Editing.Blocks[0].End);
         Assert.Equal(TimeSpan.FromSeconds(30), model.Editing.Viewport.End);
 
         model.Editing.Viewport.Zoom(3, 0);
@@ -241,6 +246,22 @@ public sealed class VideoInjectionTests : IDisposable
     }
 
     [Fact]
+    public async Task Clearing_a_preview_during_metadata_loading_does_not_restore_old_video()
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var video = new StubVideoService { PendingLoad = completion, ParsedLength = TimeSpan.FromSeconds(30) };
+        using var preview = new VideoPreviewViewModel(() => video);
+        var opening = preview.OpenVideoAsync("show.mp4");
+        Assert.False(opening.IsCompleted);
+        preview.Clear();
+        completion.SetResult(true);
+        Assert.False(await opening);
+        Assert.False(preview.HasVideo);
+        Assert.Equal(TimeSpan.Zero, preview.VideoLength);
+        Assert.Equal(1, video.DisposeCount);
+    }
+
+    [Fact]
     public void Volume_changes_keep_the_output_device_and_switching_or_recreating_reapplies_it()
     {
         var first = new StubVideoService();
@@ -274,6 +295,16 @@ public sealed class VideoInjectionTests : IDisposable
         public TimeSpan Position { get; private set; }
 
         public TimeSpan Length { get; set; }
+        public TimeSpan? ParsedLength { get; init; }
+        public TaskCompletionSource<bool>? PendingLoad { get; init; }
+        public int PlayCalls { get; private set; }
+
+        public async Task<bool> LoadAsync(string path)
+        {
+            if (PendingLoad is { } pending) await pending.Task;
+            Length = ParsedLength ?? Length;
+            return Load(path);
+        }
 
         public string? LoadedPath { get; private set; }
 
@@ -300,7 +331,11 @@ public sealed class VideoInjectionTests : IDisposable
             return LoadResult;
         }
 
-        public void Play() => FrameUpdated?.Invoke(this, EventArgs.Empty);
+        public void Play()
+        {
+            PlayCalls++;
+            FrameUpdated?.Invoke(this, EventArgs.Empty);
+        }
 
         public void Pause()
         {

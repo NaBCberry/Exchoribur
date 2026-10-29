@@ -76,6 +76,15 @@ public sealed class BlockEditorControl : Control
     public static readonly StyledProperty<IReadOnlyList<Block>?> BlocksProperty =
         AvaloniaProperty.Register<BlockEditorControl, IReadOnlyList<Block>?>(nameof(Blocks));
 
+    public static readonly StyledProperty<TimeSpan> ReferenceDurationProperty =
+        AvaloniaProperty.Register<BlockEditorControl, TimeSpan>(nameof(ReferenceDuration));
+
+    public TimeSpan ReferenceDuration
+    {
+        get => GetValue(ReferenceDurationProperty);
+        set => SetValue(ReferenceDurationProperty, value);
+    }
+
     public static readonly StyledProperty<Block?> CurrentBlockProperty =
         AvaloniaProperty.Register<BlockEditorControl, Block?>(
             nameof(CurrentBlock),
@@ -211,6 +220,12 @@ public sealed class BlockEditorControl : Control
             ApplyFocus();
             InvalidateVisual();
         }
+        else if (change.Property == ReferenceDurationProperty)
+        {
+            var (start, end) = TimelineGeometry.ContentRange(Blocks ?? [], ReferenceDuration);
+            Viewport?.UpdateContent(start, end - start);
+            InvalidateVisual();
+        }
         else if (change.Property == BlocksProperty)
         {
             // 换了数据:内容(整条轴)和取景都重来。
@@ -262,13 +277,13 @@ public sealed class BlockEditorControl : Control
 
         var blocks = Blocks;
 
-        if (blocks is not { Count: > 0 })
+        if (blocks is not { Count: > 0 } && ReferenceDuration <= TimeSpan.Zero)
         {
             viewport.SetContent(TimeSpan.Zero);
             return;
         }
 
-        var (start, end) = TimelineGeometry.ContentRange(blocks);
+        var (start, end) = TimelineGeometry.ContentRange(blocks ?? [], ReferenceDuration);
 
         viewport.SetContent(start, end - start);
     }

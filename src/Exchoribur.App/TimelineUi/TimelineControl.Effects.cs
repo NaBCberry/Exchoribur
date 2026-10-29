@@ -36,6 +36,8 @@ public sealed partial class TimelineControl
         {
             var effect = _effectDragBlock?.Id == block.Id && _effectPreview?.Id == stored.Id ? _effectPreview : stored;
             var rect = EffectRect(block, effect, viewport, parent, delta);
+            rect = rect.Intersect(parent);
+            if (rect.Width <= 0 || rect.Height <= 0) continue;
             context.DrawRectangle(Palette.DimScrim, _selectedEffect == effect.Id ? Palette.SelectedBlockPen : Palette.BlockPen, rect);
             using (context.PushClip(rect))
                 context.DrawText(GetBlockText(EffectName(effect.Mode), 11.5), new Point(rect.X + 3, rect.Y + 1));
@@ -126,6 +128,7 @@ public sealed partial class TimelineControl
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        _blockResize = null;
         _effectDragBlock = null;
         _effectPreview = _effectOriginal = null;
         InvalidateVisual();

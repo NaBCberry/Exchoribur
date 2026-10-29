@@ -119,6 +119,30 @@ public sealed class Block
     public Block WithEffects(IReadOnlyList<FlashEffect> effects)
         => new(Id, Name, Channel, Start, Length, _frames, LinkGroupId, effects);
 
+    /// <summary>调整边界而非播放速度;内容保持绝对时间,新增区域延续首尾颜色。</summary>
+    public Block ResizedTo(TimeSpan start, TimeSpan end)
+    {
+        if (end <= start) throw new ArgumentOutOfRangeException(nameof(end));
+        var length = end - start;
+        var shift = start - Start;
+        var frames = new List<BlockFrame> { new(TimeSpan.Zero, GetFrameAt(shift).State) };
+        foreach (var frame in _frames)
+        {
+            var offset = frame.Offset - shift;
+            if (offset > TimeSpan.Zero && offset < length) frames.Add(new BlockFrame(offset, frame.State));
+        }
+        var effects = new List<FlashEffect>();
+        foreach (var effect in Effects)
+        {
+            var first = effect.Offset - shift;
+            var last = effect.End - shift;
+            if (first < TimeSpan.Zero) first = TimeSpan.Zero;
+            if (last > length) last = length;
+            if (last > first) effects.Add(new FlashEffect(effect.Id, first, last - first, effect.Mode));
+        }
+        return new Block(Id, Name, Channel, start, length, frames, LinkGroupId, effects);
+    }
+
     /// <summary>时刻落在块范围内(左闭右开)。</summary>
     public bool Contains(TimeSpan time) => time >= Start && time < End;
 

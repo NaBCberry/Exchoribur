@@ -416,13 +416,15 @@ public sealed partial class TimelineControl : Control
         {
             var dragging = _isDraggingBlocks && selected is not null && selected.Contains(block);
             var timeDelta = dragging ? _dragTimeDelta : TimeSpan.Zero;
-            var start = block.Start + timeDelta;
+            var resize = _blockResize?.Block.Id == block.Id ? _blockResize : null;
+            var start = resize?.Start ?? (block.Start + timeDelta);
+            var end = resize?.End ?? (start + block.Length);
             var channel = dragging
                 ? Math.Clamp(block.Channel + _dragChannelDelta, 0, Frame.ChannelCount - 1)
                 : block.Channel;
 
             var x0 = TimelineLayout.TrackLeft + viewport.MapTime(start);
-            var x1 = TimelineLayout.TrackLeft + viewport.MapTime(start + block.Length);
+            var x1 = TimelineLayout.TrackLeft + viewport.MapTime(end);
 
             if (x1 <= TimelineLayout.TrackLeft || x0 >= TimelineLayout.TrackLeft + trackWidth)
             {
@@ -436,8 +438,8 @@ public sealed partial class TimelineControl : Control
                 Math.Max(3, x1 - x0),
                 Math.Max(6, rowHeight - (BlockInset * 2)));
 
-            DrawBlockBody(context, block, viewport, rect, trackWidth, timeDelta);
-            DrawEffects(context, block, viewport, rect, timeDelta);
+            DrawBlockBody(context, block, viewport, rect, trackWidth, timeDelta, resize?.Start, resize?.End);
+            using (context.PushClip(rect)) DrawEffects(context, block, viewport, rect, timeDelta);
             DrawBlockTitle(context, block, rect);
 
             var pen = Palette.SelectedBlockPen;
@@ -461,7 +463,9 @@ public sealed partial class TimelineControl : Control
         TimelineViewport viewport,
         Rect rect,
         double trackWidth,
-        TimeSpan timeDelta)
+        TimeSpan timeDelta,
+        TimeSpan? rangeStart,
+        TimeSpan? rangeEnd)
     {
         var bodyTop = rect.Y + BlockTitleHeight;
         var bodyHeight = rect.Height - BlockTitleHeight;
@@ -482,7 +486,7 @@ public sealed partial class TimelineControl : Control
             viewport,
             TimelineLayout.TrackLeft,
             TimelineLayout.TrackLeft + trackWidth,
-            timeDelta);
+            timeDelta, rangeStart, rangeEnd);
 
         foreach (var run in _colorRuns)
         {
@@ -722,6 +726,12 @@ public sealed partial class TimelineControl : Control
             return;
         }
 
+        if (e.ClickCount == 1 && BeginBlockResize(point.Position))
+        {
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
         if (BeginEffectDrag(point.Position))
         {
             e.Pointer.Capture(this);
@@ -802,7 +812,7 @@ public sealed partial class TimelineControl : Control
 
         var position = e.GetPosition(this);
 
-        if (MoveEffectDrag(position)) { e.Handled = true; return; }
+        if (MoveBlockResize(position) || MoveEffectDrag(position)) { e.Handled = true; return; }
 
         // 光标提示:在标尺带上换成"左右拖动",让用户知道这里能拖播放头。
         var onRulerBand = position.Y < TimelineLayout.RulerHeight;
@@ -815,7 +825,7 @@ public sealed partial class TimelineControl : Control
         if (!onRulerBand)
         {
             var effect = HitEffect(position);
-            Cursor = effect is { } hovered && (position.X - hovered.Rect.Left <= 5 || hovered.Rect.Right - position.X <= 5)
+            Cursor = HitBlockResizeEdge(position) is not null || effect is { } hovered && (position.X - hovered.Rect.Left <= 5 || hovered.Rect.Right - position.X <= 5)
                 ? ScrubCursor : DefaultCursor;
         }
 
@@ -856,7 +866,7 @@ public sealed partial class TimelineControl : Control
     {
         base.OnPointerReleased(e);
 
-        if (EndEffectDrag())
+        if (EndBlockResize() || EndEffectDrag())
         {
             e.Pointer.Capture(null);
             e.Handled = true;

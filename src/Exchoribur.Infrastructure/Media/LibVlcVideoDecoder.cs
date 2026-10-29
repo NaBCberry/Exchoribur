@@ -25,6 +25,8 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
     private VlcMedia? _media;
 
     private bool _disposed;
+    private long _knownLengthMilliseconds;
+    private CancellationTokenSource? _parseCancellation;
 
     public LibVlcVideoDecoder()
     {
@@ -142,7 +144,8 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
     {
         get
         {
-            var length = _player?.Length ?? 0;
+            var known = Volatile.Read(ref _knownLengthMilliseconds);
+            var length = known > 0 ? known : _player?.Length ?? 0;
             return length > 0 ? TimeSpan.FromMilliseconds(length) : TimeSpan.Zero;
         }
     }
@@ -160,6 +163,10 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             return false;
         }
 
+        _parseCancellation?.Cancel();
+        _parseCancellation?.Dispose();
+        _parseCancellation = new CancellationTokenSource();
+        Volatile.Write(ref _knownLengthMilliseconds, 0);
         _player.Stop();
         lock (_sync) _latest = null;
         _media?.Dispose();
@@ -167,6 +174,25 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
         _media.AddOption(":start-paused");
 
         return _player.Play(_media);
+    }
+
+    /// <summary>暂停加载时也先解析本地元数据,让工程打开完成前就得到视频总长。</summary>
+    public async Task<bool> LoadAsync(string path)
+    {
+        if (!Load(path) || _media is not { } media || _parseCancellation is not { } cancellation) return false;
+        try
+        {
+            await media.Parse(MediaParseOptions.ParseLocal, 10000, cancellation.Token).ConfigureAwait(false);
+            // Parse 可能在原生解析回调内同步续接;先退出回调再发布结果,
+            // 避免调用方随即释放播放器时阻塞原生解析线程自身。
+            await Task.Yield();
+            if (_disposed || !ReferenceEquals(media, _media) || cancellation.IsCancellationRequested) return false;
+            var duration = media.Duration;
+            if (duration > 0) Volatile.Write(ref _knownLengthMilliseconds, duration);
+            return true;
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (ObjectDisposedException) { return false; }
     }
 
     /// <summary>停止并回到开头。libvlc 的 Stop 会把媒体卸下来,重新挂上以便再次播放。</summary>
@@ -307,9 +333,11 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             _disposed = true;
         }
         // 不持锁等待 VLC:它停止时会等待正在运行的回调,并调用格式清理。
+        _parseCancellation?.Cancel();
         _player?.Dispose();
         _media?.Dispose();
         _libVlc?.Dispose();
+        _parseCancellation?.Dispose();
         lock (_sync)
         {
             _activeBuffer?.Dispose();

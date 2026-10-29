@@ -341,6 +341,31 @@ public sealed class TimelineEditingTests : IDisposable
         Assert.Empty(model.Editing.Blocks[0].Effects);
     }
 
+    [Fact]
+    public async Task Resizing_a_block_updates_editor_viewport_and_can_be_undone_and_redone()
+    {
+        using var model = await OpenAsync();
+        var editing = model.Editing;
+        var block = editing.Blocks[0];
+        var effect = new FlashEffect(Guid.NewGuid(), TimeSpan.Zero, TimeSpan.FromSeconds(2), FlashMode.Blink1Hz);
+        editing.EditEffect(new FlashEffectEditRequest(block.Id, effect.Id, effect));
+        var before = editing.Blocks[0];
+        editing.BlockEditor.OpenBlockEditor(before);
+        editing.Viewport.SetTrackWidth(600);
+        editing.ResizeBlock(new BlockResizeRequest(block.Id, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(6)));
+        var resized = editing.Blocks[0];
+        Assert.Equal(TimeSpan.FromSeconds(1), resized.Start);
+        Assert.Equal(TimeSpan.FromSeconds(5), resized.Length);
+        Assert.Equal(TimeSpan.FromSeconds(1), Assert.Single(resized.Effects).Length);
+        Assert.Same(resized, editing.BlockEditor.CurrentBlock);
+        Assert.Equal(TimeSpan.FromSeconds(6), editing.Viewport.End);
+        Assert.True(model.IsModified);
+        editing.UndoEditsCommand.Execute(null);
+        Assert.Same(before, editing.Blocks[0]);
+        editing.RedoEditsCommand.Execute(null);
+        Assert.Same(resized, editing.Blocks[0]);
+    }
+
     private async Task<MainViewModel> OpenAsync()
     {
         // 设置也换成临时的:不然测试会读用户真实的那份设置文件(比如他改过默认块长度)。

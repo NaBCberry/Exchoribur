@@ -18,6 +18,7 @@ internal static class BlockColorRuns
     /// 把 block 落在 [windowLeft, windowRight] 里的部分追加到 runs。
     /// 窗口用的是控件坐标,和矩形一样含左侧通道名列的宽度。
     /// timeDelta 是拖动预览的时间偏移:裁剪和取色都按预览起点算,不改动块的内容。
+    /// rangeStart/rangeEnd 可覆盖预览边界,但取色仍使用原内容的时间,用于边缘缩放。
     /// </summary>
     public static void Append(
         List<BlockColorRun> runs,
@@ -25,7 +26,9 @@ internal static class BlockColorRuns
         TimelineViewport viewport,
         double windowLeft,
         double windowRight,
-        TimeSpan timeDelta = default)
+        TimeSpan timeDelta = default,
+        TimeSpan? rangeStart = null,
+        TimeSpan? rangeEnd = null)
     {
         var frames = block.Frames;
         if (frames.Count == 0 || viewport.Scale <= 0 || windowRight <= windowLeft)
@@ -34,8 +37,8 @@ internal static class BlockColorRuns
         }
 
         var start = block.Start + timeDelta;
-        var blockLeft = TimelineLayout.TrackLeft + viewport.MapTime(start);
-        var blockRight = TimelineLayout.TrackLeft + viewport.MapTime(start + block.Length);
+        var blockLeft = TimelineLayout.TrackLeft + viewport.MapTime(rangeStart ?? start);
+        var blockRight = TimelineLayout.TrackLeft + viewport.MapTime(rangeEnd ?? (start + block.Length));
 
         var left = Math.Max(blockLeft, windowLeft);
         var right = Math.Min(blockRight, windowRight);

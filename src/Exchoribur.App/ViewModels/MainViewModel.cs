@@ -299,6 +299,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Editing.Timeline, time);
     bool IProjectHost.OpenVideo(string path) => Preview.OpenVideo(path);
+    Task<bool> IProjectHost.OpenVideoAsync(string path) => Preview.OpenVideoAsync(path);
     void IProjectHost.ClearVideo()
     {
         Playback.PausePlayback();
@@ -314,7 +315,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     private void OnPreviewChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(VideoPreviewViewModel.VideoLength)) UpdateTimelineViewport();
+        if (e.PropertyName == nameof(VideoPreviewViewModel.VideoLength))
+        {
+            Playback.RefreshTimeline(false);
+            UpdateTimelineViewport();
+        }
     }
 
     /// <summary>窗口边界必须覆盖完整播放范围,否则视频末段的播放头会被挡在画面外。</summary>

@@ -285,6 +285,16 @@ public class TimelineGeometryTests
         Assert.Equal(750, rect.Width);
     }
 
+    [Fact]
+    public void Editor_content_includes_video_tail_and_negative_preparation()
+    {
+        var block = CreateBlock(0, -2, 12);
+        var range = TimelineGeometry.ContentRange([block], TimeSpan.FromSeconds(30));
+        Assert.Equal(TimeSpan.FromSeconds(-2), range.Start);
+        Assert.Equal(TimeSpan.FromSeconds(30), range.End);
+        Assert.Equal(TimeSpan.FromSeconds(30), TimelineGeometry.ContentRange([], TimeSpan.FromSeconds(30)).End);
+    }
+
     private static TimelineViewport CreateViewport(double durationSeconds, double trackWidth)
     {
         var viewport = new TimelineViewport();
