@@ -73,6 +73,65 @@ public sealed class EditorKeyboardTests
         });
 
     [Fact]
+    public Task Inserting_a_frame_keeps_the_playhead_and_manual_editor_view_through_undo_and_redo()
+        => InWindow((window, model, editor, _) =>
+        {
+            Click(window, editor, FramePoint(editor, 2));
+            var viewport = editor.Viewport!;
+            viewport.ShowRange(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+            model.Playback.PlayheadTime = TimeSpan.FromSeconds(2.5);
+            var start = viewport.Start;
+            var scale = viewport.Scale;
+            var head = model.Playback.PlayheadTime;
+            var headX = viewport.MapTime(head);
+
+            Press(window, Key.N);
+            Assert.Equal(4, Assert.Single(model.Editing.Blocks).Frames.Count);
+            AssertView();
+            model.Editing.UndoEditsCommand.Execute(null);
+            Assert.Equal(3, Assert.Single(model.Editing.Blocks).Frames.Count);
+            AssertView();
+            model.Editing.RedoEditsCommand.Execute(null);
+            Assert.Equal(4, Assert.Single(model.Editing.Blocks).Frames.Count);
+            AssertView();
+
+            void AssertView()
+            {
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(head, model.Playback.PlayheadTime);
+                Assert.Equal(head, editor.PlayheadTime);
+                Assert.Equal(start, viewport.Start);
+                Assert.Equal(scale, viewport.Scale);
+                Assert.Equal(headX, viewport.MapTime(head));
+            }
+        });
+
+    [Fact]
+    public Task Switching_blocks_still_focuses_even_when_their_focus_time_and_spacing_are_equal()
+        => InWindow((window, model, editor, _) =>
+        {
+            Click(window, editor, FramePoint(editor, 2));
+            model.Editing.CopyBlockToOtherChannelsCommand.Execute(null);
+            var first = model.Editing.Blocks.Single(block => block.Channel == 1);
+            var second = model.Editing.Blocks.Single(block => block.Channel == 2);
+            model.Editing.BlockEditor.OpenBlockEditor(first);
+            Dispatcher.UIThread.RunJobs();
+            var focus = editor.FocusTime;
+            var spacing = editor.FocusSpacing;
+            editor.Viewport!.ShowRange(TimeSpan.FromSeconds(2.5), TimeSpan.FromSeconds(1));
+
+            model.Editing.BlockEditor.OpenBlockEditor(second);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(second.Id, editor.CurrentBlock!.Id);
+            Assert.Equal(focus, editor.FocusTime);
+            Assert.Equal(spacing, editor.FocusSpacing);
+            Assert.Equal(TimeSpan.FromSeconds(1), editor.Viewport.Start);
+            Assert.Equal(TimeSpan.FromSeconds(4), editor.Viewport.VisibleDuration);
+            Assert.Equal(TimeSpan.FromSeconds(2), model.Playback.PlayheadTime);
+        });
+
+    [Fact]
     public Task Delete_and_N_in_a_text_box_only_edit_text()
         => InWindow((window, model, editor, _) =>
         {

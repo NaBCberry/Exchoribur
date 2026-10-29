@@ -204,7 +204,8 @@ public sealed class BlockEditorControl : Control
             }
 
             UpdateTrackWidth();
-            ResetContent();
+            _focusApplied = false;
+            UpdateContent(reset: true);
             ApplyFocus();
             InvalidateVisual();
         }
@@ -223,14 +224,20 @@ public sealed class BlockEditorControl : Control
         }
         else if (change.Property == ReferenceDurationProperty)
         {
-            var (start, end) = TimelineGeometry.ContentRange(Blocks ?? [], ReferenceDuration);
-            Viewport?.UpdateContent(start, end - start);
+            UpdateContent();
+            ApplyFocus();
             InvalidateVisual();
         }
         else if (change.Property == BlocksProperty)
         {
-            // 换了数据:内容(整条轴)和取景都重来。
-            ResetContent();
+            // 内容更新只调整可浏览的边界,保留手动缩放和平移。
+            UpdateContent();
+            ApplyFocus();
+            InvalidateVisual();
+        }
+        else if (change.Property == CurrentBlockProperty
+            && change.GetOldValue<Block?>()?.Id != change.GetNewValue<Block?>()?.Id)
+        {
             _focusApplied = false;
             ApplyFocus();
             InvalidateVisual();
@@ -256,7 +263,8 @@ public sealed class BlockEditorControl : Control
         var viewport = Viewport;
         var spacing = FocusSpacing > TimeSpan.Zero ? FocusSpacing : TimeSpan.FromSeconds(1);
 
-        if (viewport is null || TimelineLayout.GetTrackWidth(Bounds.Width) <= 0)
+        if (CurrentBlock is null || viewport is null || viewport.Duration <= TimeSpan.Zero
+            || TimelineLayout.GetTrackWidth(Bounds.Width) <= 0)
         {
             return;
         }
@@ -267,7 +275,7 @@ public sealed class BlockEditorControl : Control
     }
 
     /// <summary>把视口的内容设成整条轴(所有块合起来的时间范围)。</summary>
-    private void ResetContent()
+    private void UpdateContent(bool reset = false)
     {
         var viewport = Viewport;
 
@@ -276,17 +284,9 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
-        var blocks = Blocks;
-
-        if (blocks is not { Count: > 0 } && ReferenceDuration <= TimeSpan.Zero)
-        {
-            viewport.SetContent(TimeSpan.Zero);
-            return;
-        }
-
-        var (start, end) = TimelineGeometry.ContentRange(blocks ?? [], ReferenceDuration);
-
-        viewport.SetContent(start, end - start);
+        var (start, end) = TimelineGeometry.ContentRange(Blocks ?? [], ReferenceDuration);
+        if (reset) viewport.SetContent(start, end - start);
+        else viewport.UpdateContent(start, end - start);
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
