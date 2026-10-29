@@ -31,7 +31,7 @@ public sealed partial class TimelineControl
     {
         if (HitBlockResizeEdge(point) is not { } hit) return false;
         SelectedBlocks = [hit.Block];
-        _blockResize = new BlockResizeGesture(hit.Block, hit.Left, ResizeTimeAt(point.X));
+        _blockResize = new BlockResizeGesture(hit.Block, hit.Left, ResizeTimeAt(point.X), ReferenceDuration, SnapTolerance);
         Cursor = ScrubCursor;
         InvalidateVisual();
         return true;

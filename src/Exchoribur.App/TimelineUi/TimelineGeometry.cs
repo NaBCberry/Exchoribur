@@ -11,6 +11,25 @@ namespace Exchoribur.App.TimelineUi;
 /// <remarks>所有横坐标都是控件坐标,已经含左侧通道名列的宽度。</remarks>
 internal static class TimelineGeometry
 {
+    /// <summary>先限制输入再写双向绑定,避免界面保留已被模型纠正的越界位置。</summary>
+    public static TimeSpan ClampPlayhead(TimeSpan time, TimeSpan videoEnd, TimelineViewport viewport)
+    {
+        var end = videoEnd > TimeSpan.Zero ? videoEnd : viewport.ContentStart + viewport.Duration;
+        return TimeSpan.FromTicks(Math.Clamp(time.Ticks, 0, Math.Max(0, end.Ticks)));
+    }
+
+    /// <summary>灰色蒙版只覆盖可见轨道,两端共用同一套坐标计算。</summary>
+    public static IEnumerable<Rect> UnplayableRegions(TimelineViewport viewport, TimeSpan videoEnd,
+        double trackWidth, double top, double height)
+    {
+        var zeroX = Math.Clamp(viewport.MapTime(TimeSpan.Zero), 0, trackWidth);
+        if (zeroX > 0) yield return new Rect(TimelineLayout.TrackLeft, top, zeroX, height);
+        if (videoEnd <= TimeSpan.Zero) yield break;
+        var endX = Math.Clamp(viewport.MapTime(videoEnd), 0, trackWidth);
+        if (endX < trackWidth)
+            yield return new Rect(TimelineLayout.TrackLeft + endX, top, trackWidth - endX, height);
+    }
+
     // ---- 主时间轴 ----
 
     /// <summary>块所在的整行矩形:命中判定和框选用它(比画出来的块上下各高一点)。</summary>

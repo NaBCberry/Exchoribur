@@ -361,6 +361,9 @@ public sealed class BlockEditorControl : Control
             DrawOtherBlocks(context, current, viewport, bodyTop, bodyHeight, trackWidth);
             DrawCurrentBlock(context, current, viewport, bodyTop, bodyHeight, trackWidth);
             DrawFrameSelection(context, current, viewport, bodyTop, bodyHeight);
+            foreach (var rect in TimelineGeometry.UnplayableRegions(viewport, ReferenceDuration,
+                trackWidth, bodyTop, bodyHeight))
+                context.FillRectangle(Palette.UnplayableMask, rect);
         }
 
         DrawPlayhead(context, viewport, height);
@@ -621,7 +624,7 @@ public sealed class BlockEditorControl : Control
 
         // 点哪一帧就把播放头挪到那一帧:选中它,播放也从这里开始(写入的是同一套播放状态)。
         var frame = block.Frames[FrameIndexAt(block, viewport, point.Position.X)];
-        PlayheadTime = block.Start + frame.Offset;
+        PlayheadTime = TimelineGeometry.ClampPlayhead(block.Start + frame.Offset, ReferenceDuration, viewport);
 
         SelectFrameAt(point.Position.X, extend: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         e.Handled = true;
@@ -720,7 +723,7 @@ public sealed class BlockEditorControl : Control
     {
         if (Viewport is { } viewport)
         {
-            PlayheadTime = viewport.MapX(x - TrackLeft);
+            PlayheadTime = TimelineGeometry.ClampPlayhead(viewport.MapX(x - TrackLeft), ReferenceDuration, viewport);
         }
     }
 

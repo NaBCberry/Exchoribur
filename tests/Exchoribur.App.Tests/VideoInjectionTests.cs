@@ -228,6 +228,94 @@ public sealed class VideoInjectionTests : IDisposable
         Assert.Equal(1, video.DisposeCount);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(100)]
+    public void Seeking_stays_in_video_while_overhanging_lights_remain_visible(double target)
+    {
+        var video = new StubVideoService { Length = TimeSpan.FromSeconds(10) };
+        using var model = CreateViewModel(video);
+        var block = new Block(Block.NewId(), "越界", 0, TimeSpan.FromSeconds(-2),
+            TimeSpan.FromSeconds(17), [new BlockFrame(TimeSpan.Zero, default)]);
+        model.Editing.LoadTimeline(new Timeline([block], []));
+        model.Editing.Viewport.SetTrackWidth(600);
+        Assert.True(model.Preview.OpenVideo("show.mp4"));
+        Assert.Equal(TimeSpan.FromSeconds(-2), model.Editing.Viewport.Start);
+        Assert.Equal(TimeSpan.FromSeconds(15), model.Editing.Viewport.End);
+        Assert.Equal(TimeSpan.FromSeconds(10), model.Playback.PlaybackLength);
+
+        model.Playback.PlayheadTime = TimeSpan.FromSeconds(target);
+        var expected = TimeSpan.FromSeconds(Math.Clamp(target, 0, 10));
+        Assert.Equal(expected, model.Playback.PlayheadTime);
+        Assert.Equal(expected, video.Position);
+        model.Playback.GoToEndCommand.Execute(null);
+        Assert.Equal(TimeSpan.FromSeconds(10), model.Playback.PlayheadTime);
+    }
+
+    [Theory]
+    [InlineData(false, 10)]
+    [InlineData(true, 3)]
+    public void Playback_stops_or_loops_at_video_end_even_when_lights_extend_further(bool loop, int expected)
+    {
+        var video = new StubVideoService { Length = TimeSpan.FromSeconds(10) };
+        using var model = CreateViewModel(video);
+        model.Editing.LoadTimeline(new Timeline([
+            new Block(Block.NewId(), "越界", 0, TimeSpan.Zero, TimeSpan.FromSeconds(20),
+                [new BlockFrame(TimeSpan.Zero, default)])], []));
+        Assert.True(model.Preview.OpenVideo("show.mp4"));
+        model.Playback.IsLooping = loop;
+        model.Playback.TogglePlayCommand.Execute(null);
+        model.Playback.AdvancePlayback(TimeSpan.FromSeconds(13));
+        Assert.Equal(TimeSpan.FromSeconds(expected), model.Playback.PlayheadTime);
+        Assert.Equal(loop, model.Playback.IsPlaying);
+    }
+
+    [Fact]
+    public void Shorter_replacement_video_clamps_an_existing_playhead()
+    {
+        var video = new StubVideoService { Length = TimeSpan.FromSeconds(30) };
+        using var model = CreateViewModel(video);
+        Assert.True(model.Preview.OpenVideo("long.mp4"));
+        model.Playback.PlayheadTime = TimeSpan.FromSeconds(25);
+        video.Length = TimeSpan.FromSeconds(10);
+        Assert.True(model.Preview.OpenVideo("short.mp4"));
+        Assert.Equal(TimeSpan.FromSeconds(10), model.Playback.PlayheadTime);
+        Assert.Equal(TimeSpan.FromSeconds(10), video.Position);
+    }
+
+    [Theory]
+    [InlineData(2, 4, 6, 10)]
+    [InlineData(-2, 4, 20, 24)]
+    [InlineData(2, 12, 20, 32)]
+    public void Editing_enforces_the_same_video_bounds_and_undo_restores_original(
+        double start, double end, double expectedMove, double expectedResizeEnd)
+    {
+        var video = new StubVideoService { Length = TimeSpan.FromSeconds(10) };
+        using var model = CreateViewModel(video);
+        var block = new Block(Block.NewId(), "灯光", 0, TimeSpan.FromSeconds(start),
+            TimeSpan.FromSeconds(end - start), [new BlockFrame(TimeSpan.Zero, default)]);
+        var host = (IProjectHost)model;
+        host.Document = new TimelineDocument("工程", new Timeline([block], []));
+        host.Timeline = host.Document.Timeline;
+        Assert.True(model.Preview.OpenVideo("show.mp4"));
+        model.Editing.SelectedBlocks = [block];
+        model.Editing.MoveSelectedBlocks(TimeSpan.FromSeconds(20), 0);
+        Assert.Equal(block.Start + TimeSpan.FromSeconds(expectedMove), model.Editing.Blocks[0].Start);
+        model.Editing.UndoEditsCommand.Execute(null);
+        Assert.Equal(block, model.Editing.Blocks[0]);
+        model.Editing.ResizeBlock(new Exchoribur.App.TimelineUi.BlockResizeRequest(
+            block.Id, block.Start, block.End + TimeSpan.FromSeconds(20)));
+        Assert.Equal(TimeSpan.FromSeconds(expectedResizeEnd), model.Editing.Blocks[0].End);
+        model.Editing.UndoEditsCommand.Execute(null);
+        Assert.Equal(block, model.Editing.Blocks[0]);
+        model.Editing.ResizeBlock(new Exchoribur.App.TimelineUi.BlockResizeRequest(
+            block.Id, block.Start - TimeSpan.FromSeconds(20), block.End));
+        var expectedStart = start >= 0 && end <= 10 ? 0 : start - 20;
+        Assert.Equal(TimeSpan.FromSeconds(expectedStart), model.Editing.Blocks[0].Start);
+        model.Editing.UndoEditsCommand.Execute(null);
+        Assert.Equal(block, model.Editing.Blocks[0]);
+    }
+
     private MainViewModel CreateViewModel(IVideoService video)
     {
         // 设置文件写到临时目录,别碰用户真实的那份。

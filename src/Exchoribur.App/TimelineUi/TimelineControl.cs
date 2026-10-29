@@ -91,6 +91,8 @@ public sealed partial class TimelineControl : Control
     private TimeSpan _dragAnchorTime;
     private int _dragAnchorChannel;
     private TimeSpan[] _snapPoints = [];
+    private TimeSpan SnapTolerance => Viewport is { Scale: > 0 } viewport
+        ? TimeSpan.FromSeconds(8 / viewport.Scale) : TimeSpan.Zero;
     private TimeSpan _dragTimeDelta;
     private int _dragChannelDelta;
 
@@ -107,6 +109,15 @@ public sealed partial class TimelineControl : Control
     /// <summary>播放头位置。拖动时间轴时会回写(绑定要 TwoWay)。</summary>
     public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty =
         AvaloniaProperty.Register<TimelineControl, TimeSpan>(nameof(PlayheadTime));
+
+    public static readonly StyledProperty<TimeSpan> ReferenceDurationProperty =
+        AvaloniaProperty.Register<TimelineControl, TimeSpan>(nameof(ReferenceDuration));
+
+    public TimeSpan ReferenceDuration
+    {
+        get => GetValue(ReferenceDurationProperty);
+        set => SetValue(ReferenceDurationProperty, value);
+    }
 
     /// <summary>选中的块。框选、点选都会回写(绑定要 TwoWay)。</summary>
     public static readonly StyledProperty<IReadOnlyList<Block>?> SelectedBlocksProperty =
@@ -138,6 +149,7 @@ public sealed partial class TimelineControl : Control
             BlocksProperty,
             MarkersProperty,
             PlayheadTimeProperty,
+            ReferenceDurationProperty,
             SelectedBlocksProperty,
             CurrentBlockIdProperty,
             BottomOverlayHeightProperty);
@@ -315,14 +327,14 @@ public sealed partial class TimelineControl : Control
 
         var blocks = Blocks;
 
-        if (blocks is { Count: > 0 } && Viewport is { Scale: > 0 } viewport)
+        if (Viewport is { Scale: > 0 } viewport)
         {
             DrawTimeRuler(context, viewport);
 
             // 色块和块的边框都裁在轨道区里:视口外的部分横坐标是负数,不裁会盖到左边的通道名。
             using (context.PushClip(trackRect))
             {
-                DrawBlocks(context, blocks, viewport, rowHeight, trackWidth);
+                if (blocks is { Count: > 0 }) DrawBlocks(context, blocks, viewport, rowHeight, trackWidth);
                 DrawOverlaps(context, viewport, rowHeight);
             }
 
@@ -551,25 +563,14 @@ public sealed partial class TimelineControl : Control
     }
 
     /// <summary>
-    /// 0 之前的"预备片段"区域:数据是真的,但播放头走不到那里,
+    /// 0 之前和视频结束之后的区域:数据是真的,但播放头走不到那里,
     /// 所以盖一层半透明灰表示不可播放。
     /// </summary>
     private void DrawUnplayableRegion(DrawingContext context, TimelineViewport viewport, double trackHeight)
     {
-        if (viewport.Start >= TimeSpan.Zero)
-        {
-            return;
-        }
-
-        var width = viewport.MapTime(TimeSpan.Zero) - TimelineLayout.TrackLeft;
-        if (width <= 0)
-        {
-            return;
-        }
-
-        context.FillRectangle(
-            Palette.UnplayableMask,
-            new Rect(TimelineLayout.TrackLeft, TimelineLayout.RulerHeight, width, trackHeight));
+        foreach (var rect in TimelineGeometry.UnplayableRegions(viewport, ReferenceDuration,
+            TimelineLayout.GetTrackWidth(Bounds.Width), TimelineLayout.RulerHeight, trackHeight))
+            context.FillRectangle(Palette.UnplayableMask, rect);
     }
 
     /// <summary>
@@ -1001,7 +1002,7 @@ public sealed partial class TimelineControl : Control
     private void StartBlockDrag(Point position)
     {
         _isDraggingBlocks = true;
-        _dragAnchorTime = TimeAt(position.X);
+        _dragAnchorTime = ResizeTimeAt(position.X);
         _dragAnchorChannel = ChannelAt(position.Y);
         _dragTimeDelta = TimeSpan.Zero;
         _dragChannelDelta = 0;
@@ -1025,7 +1026,7 @@ public sealed partial class TimelineControl : Control
             return;
         }
 
-        var delta = TimeAt(position.X) - _dragAnchorTime;
+        var delta = ResizeTimeAt(position.X) - _dragAnchorTime;
         var channelDelta = ChannelAt(position.Y) - _dragAnchorChannel;
 
         // 吸附:让第一个被拖的块落到吸附点上,其余块保持相对位置。
@@ -1033,8 +1034,11 @@ public sealed partial class TimelineControl : Control
         if (anchor is not null)
         {
             var target = BlockSnap.Snap(anchor.Start + delta, _snapPoints);
-            delta = target - anchor.Start;
+            if ((target - (anchor.Start + delta)).Duration() <= SnapTolerance)
+                delta = target - anchor.Start;
         }
+
+        delta = new BlockPlaybackBounds(ReferenceDuration).MoveDelta(selected, delta, SnapTolerance);
 
         _dragTimeDelta = delta;
         _dragChannelDelta = channelDelta;
@@ -1128,7 +1132,7 @@ public sealed partial class TimelineControl : Control
             return;
         }
 
-        PlayheadTime = TimelineGeometry.TimeAt(x, viewport);
+        PlayheadTime = TimelineGeometry.ClampPlayhead(TimelineGeometry.TimeAt(x, viewport), ReferenceDuration, viewport);
     }
 
     // ---- 文字与颜色缓存 ----
