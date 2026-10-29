@@ -215,6 +215,11 @@ public sealed class Timeline
 
             // 块的结束时刻也是一个"状态会变"的点:块外自动回落。
             times.Add(block.End);
+            foreach (var effect in block.Effects)
+            {
+                times.Add(block.Start + effect.Offset);
+                times.Add(block.Start + effect.End);
+            }
         }
 
         return Array.AsReadOnly(times.Distinct().OrderBy(time => time).ToArray());

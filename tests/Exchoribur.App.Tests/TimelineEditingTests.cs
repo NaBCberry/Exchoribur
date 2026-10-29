@@ -320,6 +320,27 @@ public sealed class TimelineEditingTests : IDisposable
         Assert.Equal(start, editing.Viewport.Start);
     }
 
+    [Fact]
+    public async Task Effect_edits_move_with_parent_and_share_undo_history()
+    {
+        using var model = await OpenAsync();
+        var parent = model.Editing.Blocks[0];
+        var effect = new FlashEffect(Guid.NewGuid(), TimeSpan.Zero, TimeSpan.FromMilliseconds(500), FlashMode.Blink2Hz);
+        model.Editing.EditEffect(new FlashEffectEditRequest(parent.Id, effect.Id, effect));
+        Assert.Equal(effect, Assert.Single(model.Editing.Blocks[0].Effects));
+        model.Editing.MoveSelectedBlocks(TimeSpan.FromSeconds(2), 1);
+        Assert.Equal(effect, Assert.Single(model.Editing.Blocks[0].Effects));
+        Assert.Equal(FlashMode.Blink2Hz, BlockSampler.SampleChannels(model.Editing.Timeline, TimeSpan.FromSeconds(2))[1].Mode);
+        model.Editing.UndoEditsCommand.Execute(null);
+        Assert.Equal(parent.Start, model.Editing.Blocks[0].Start);
+        model.Editing.UndoEditsCommand.Execute(null);
+        Assert.Empty(model.Editing.Blocks[0].Effects);
+        model.Editing.RedoEditsCommand.Execute(null);
+        Assert.Equal(effect, Assert.Single(model.Editing.Blocks[0].Effects));
+        model.Editing.EditEffect(new FlashEffectEditRequest(parent.Id, effect.Id, null));
+        Assert.Empty(model.Editing.Blocks[0].Effects);
+    }
+
     private async Task<MainViewModel> OpenAsync()
     {
         // 设置也换成临时的:不然测试会读用户真实的那份设置文件(比如他改过默认块长度)。

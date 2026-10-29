@@ -92,6 +92,16 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
 
     public void SetUndoDepth(int depth) => _editing.SetMaxUndoSteps(depth);
 
+    public void EditEffect(FlashEffectEditRequest request)
+    {
+        if (!CanEdit || Timeline.FindBlock(request.BlockId) is not { } block) return;
+        var effects = block.Effects.Where(effect => effect.Id != request.EffectId).ToList();
+        if (request.Effect is { } replacement) effects.Add(replacement);
+        var updated = block.WithEffects(effects);
+        ApplyEdit(new BlockSetEdit(Strings.EffectEdit, [block], [updated]));
+        SetBlockSelection([updated]);
+    }
+
     /// <summary>主时间轴上选中的块。</summary>
     [ObservableProperty]
     public partial IReadOnlyList<Block> SelectedBlocks { get; set; } = [];
@@ -369,7 +379,8 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
                     channel,
                     block.Start,
                     block.Length,
-                    block.Frames));
+                    block.Frames,
+                    effects: block.Effects.Select(effect => new FlashEffect(Guid.NewGuid(), effect.Offset, effect.Length, effect.Mode)).ToArray()));
             }
         }
 

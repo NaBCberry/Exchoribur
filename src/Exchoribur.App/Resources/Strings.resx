@@ -915,4 +915,13 @@
   <data name="ProjectStatusCreatedFormat" xml:space="preserve">
     <value>已新建工程「{0}」。</value>
   </data>
+  <data name="EffectSlow" xml:space="preserve"><value>慢速闪烁</value></data>
+  <data name="EffectMedium" xml:space="preserve"><value>中速闪烁</value></data>
+  <data name="EffectFast" xml:space="preserve"><value>快速闪烁</value></data>
+  <data name="EffectDelete" xml:space="preserve"><value>删除闪烁效果</value></data>
+  <data name="EffectEdit" xml:space="preserve"><value>编辑闪烁效果</value></data>
+  <data name="ChannelModeSolid" xml:space="preserve"><value>常亮</value></data>
+  <data name="ChannelModeFast" xml:space="preserve"><value>快闪</value></data>
+  <data name="ChannelModeMedium" xml:space="preserve"><value>中闪</value></data>
+  <data name="ChannelModeSlow" xml:space="preserve"><value>慢闪</value></data>
 </root>

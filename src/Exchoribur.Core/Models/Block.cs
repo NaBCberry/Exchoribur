@@ -20,7 +20,8 @@ public sealed class Block
         TimeSpan start,
         TimeSpan length,
         IReadOnlyList<BlockFrame> frames,
-        Guid? linkGroupId = null)
+        Guid? linkGroupId = null,
+        IReadOnlyList<FlashEffect>? effects = null)
     {
         if (channel < 0 || channel >= Frame.ChannelCount)
         {
@@ -60,6 +61,10 @@ public sealed class Block
                     nameof(frames));
             }
         }
+        Effects = Array.AsReadOnly((effects ?? ReadFrameEffects()).ToArray());
+        if (Effects.Select(effect => effect.Id).Distinct().Count() != Effects.Count
+            || Effects.Any(effect => effect.End > length))
+            throw new ArgumentException("闪烁效果必须位于父块内部且 ID 唯一。", nameof(effects));
     }
 
     /// <summary>出生证明:新建块时用它生成 id。</summary>
@@ -83,6 +88,36 @@ public sealed class Block
 
     /// <summary>内容:按偏移排好序的状态变化点。</summary>
     public IReadOnlyList<BlockFrame> Frames => _framesView;
+
+    public IReadOnlyList<FlashEffect> Effects { get; }
+
+    public ChannelState GetStateAt(TimeSpan offset)
+    {
+        var state = GetFrameAt(offset).State;
+        var mode = FlashEffect.IsBlink(state.Mode) ? FlashMode.Solid : state.Mode;
+        // 重叠时后添加的效果优先,结果与保存后的集合顺序一致。
+        foreach (var effect in Effects)
+            if (offset >= effect.Offset && offset < effect.End) mode = effect.Mode;
+        return new ChannelState(state.Color, mode);
+    }
+
+    private IReadOnlyList<FlashEffect> ReadFrameEffects()
+    {
+        var effects = new List<FlashEffect>();
+        for (var index = 0; index < _frames.Length;)
+        {
+            var first = index++;
+            while (index < _frames.Length && _frames[index].State.Mode == _frames[first].State.Mode) index++;
+            var end = index < _frames.Length ? _frames[index].Offset : Length;
+            var start = first == 0 ? TimeSpan.Zero : _frames[first].Offset;
+            if (FlashEffect.IsBlink(_frames[first].State.Mode) && end > start)
+                effects.Add(new FlashEffect(Guid.NewGuid(), start, end - start, _frames[first].State.Mode));
+        }
+        return effects;
+    }
+
+    public Block WithEffects(IReadOnlyList<FlashEffect> effects)
+        => new(Id, Name, Channel, Start, Length, _frames, LinkGroupId, effects);
 
     /// <summary>时刻落在块范围内(左闭右开)。</summary>
     public bool Contains(TimeSpan time) => time >= Start && time < End;
@@ -139,9 +174,13 @@ public sealed class Block
         LinkGroupId = linkGroupId;
         _frames = source._frames;
         _framesView = source._framesView;
+        Effects = source.Effects;
     }
 
     /// <summary>换内容;不传长度就沿用原来的长度。</summary>
     public Block WithContent(IReadOnlyList<BlockFrame> frames, TimeSpan? length = null)
-        => new(Id, Name, Channel, Start, length ?? Length, frames, LinkGroupId);
+        => new(Id, Name, Channel, Start, length ?? Length, frames, LinkGroupId,
+            Effects.Where(effect => effect.Offset < (length ?? Length)).Select(effect =>
+                effect.End <= (length ?? Length) ? effect : new FlashEffect(effect.Id, effect.Offset,
+                    (length ?? Length) - effect.Offset, effect.Mode)).ToArray());
 }
