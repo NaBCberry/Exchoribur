@@ -77,8 +77,8 @@ Exchoribur 是一个使用 C# 与 Avalonia 开发的桌面灯光编排工具。�
 | `Ctrl+A` | 选中所有编排块 |
 | `Ctrl+D` | 将选中块复制到其他通道 |
 | `Space` | 播放 / 暂停（主窗口文本输入时不触发） |
-| `Delete` | 删除选中块 |
-| `Insert` / `Shift+Delete` | 在块内插入帧 / 删除选中帧 |
+| `Delete` | 删除选中块/帧 |
+| `N` | 在块内插入帧 |
 | `Esc` | 主窗口清除块选区；独立视频窗口退出全屏 |
 
 <a id="development"></a>
