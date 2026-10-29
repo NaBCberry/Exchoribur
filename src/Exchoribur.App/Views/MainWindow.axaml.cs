@@ -219,6 +219,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnEffectEditRequested(object? sender, FlashEffectEditRequest request)
+    {
+        if (DataContext is MainViewModel model) model.Editing.EditEffect(request);
+    }
+
     /// <summary>双击块的下半部分:打开块编辑器(单击只负责选中)。</summary>
     private void OnBlockOpenRequested(object? sender, Block block)
     {

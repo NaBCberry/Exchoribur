@@ -114,6 +114,11 @@ public static class TimelineJson
             .Append(block.LinkGroupId is { } group ? Quote(group.ToString()) : "null")
             .Append(",\n");
 
+        builder.Append("      \"Effects\": ").Append(JsonSerializer.Serialize(block.Effects.Select(effect => new
+        {
+            Id = effect.Id.ToString(), Offset = effect.Offset.TotalMilliseconds,
+            Length = effect.Length.TotalMilliseconds, Mode = (byte)effect.Mode
+        }))).Append(",\n");
         builder.Append("      \"Frames\": ");
 
         if (block.Frames.Count == 0)
@@ -210,7 +215,11 @@ public static class TimelineJson
                 TimeSpan.FromMilliseconds(dto.Start),
                 TimeSpan.FromMilliseconds(dto.Length),
                 frames,
-                linkGroup);
+                linkGroup,
+                dto.Effects?.Select(effect => new FlashEffect(
+                    Guid.TryParse(effect.Id, out var effectId) ? effectId : Guid.NewGuid(),
+                    TimeSpan.FromMilliseconds(effect.Offset), TimeSpan.FromMilliseconds(effect.Length),
+                    (FlashMode)effect.Mode)).ToArray());
         }
         catch (ArgumentException exception)
         {
@@ -246,6 +255,15 @@ public static class TimelineJson
         public double Length { get; set; }
         public string? LinkGroup { get; set; }
         public List<FrameDto> Frames { get; set; } = [];
+        public List<EffectDto>? Effects { get; set; }
+    }
+
+    private sealed class EffectDto
+    {
+        public string? Id { get; set; }
+        public double Offset { get; set; }
+        public double Length { get; set; }
+        public byte Mode { get; set; }
     }
 
     private sealed class FrameDto
