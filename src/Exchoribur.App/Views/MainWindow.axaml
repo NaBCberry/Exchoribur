@@ -33,9 +33,6 @@
         <KeyBinding Gesture="Ctrl+A" Command="{Binding Editing.SelectAllCommand}" />
         <KeyBinding Gesture="Ctrl+D" Command="{Binding Editing.CopyBlockToOtherChannelsCommand}" />
         <KeyBinding Gesture="Escape" Command="{Binding Editing.ClearSelectionCommand}" />
-        <KeyBinding Gesture="Delete" Command="{Binding Editing.DeleteSelectedBlocksCommand}" />
-        <KeyBinding Gesture="Shift+Delete" Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}" />
-        <KeyBinding Gesture="Insert" Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -129,14 +126,14 @@
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuInsertFrame}"
                           Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}"
-                          InputGesture="Insert">
+                          InputGesture="N">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.InsertFrame}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuDeleteFrames}"
                           Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}"
-                          InputGesture="Shift+Delete">
+                          InputGesture="Delete">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
                     </MenuItem.Icon>
@@ -390,6 +387,7 @@
                                 Grid.RowSpan="2"
                                 Grid.Column="0"
                                 Blocks="{Binding Editing.Blocks}"
+                                ReferenceDuration="{Binding Preview.VideoLength}"
                                 Markers="{Binding Editing.Markers}"
                                 Viewport="{Binding Editing.Viewport}"
                                 PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}"
@@ -401,6 +399,7 @@
                                 InvertTouchpadScroll="{Binding Settings.Editing.InvertTouchpadScroll}"
                                 BlockCreateRequested="OnBlockCreateRequested"
                                 BlockMoveRequested="OnBlockMoveRequested"
+                                BlockResizeRequested="OnBlockResizeRequested"
                                 EffectEditRequested="OnEffectEditRequested"
                                 BlockOpenRequested="OnBlockOpenRequested"
                                 Cursor="Hand" />
@@ -453,6 +452,7 @@
                                     </StackPanel>
 
                                     <timeline:BlockEditorControl
+                                        ReferenceDuration="{Binding Preview.VideoLength}"
                                         Blocks="{Binding Editing.Blocks}"
                                         CurrentBlock="{Binding Editing.BlockEditor.CurrentBlock}"
                                         Viewport="{Binding Editing.BlockEditor.BlockEditorViewport}"

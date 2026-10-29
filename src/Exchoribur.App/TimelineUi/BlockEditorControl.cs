@@ -76,6 +76,15 @@ public sealed class BlockEditorControl : Control
     public static readonly StyledProperty<IReadOnlyList<Block>?> BlocksProperty =
         AvaloniaProperty.Register<BlockEditorControl, IReadOnlyList<Block>?>(nameof(Blocks));
 
+    public static readonly StyledProperty<TimeSpan> ReferenceDurationProperty =
+        AvaloniaProperty.Register<BlockEditorControl, TimeSpan>(nameof(ReferenceDuration));
+
+    public TimeSpan ReferenceDuration
+    {
+        get => GetValue(ReferenceDurationProperty);
+        set => SetValue(ReferenceDurationProperty, value);
+    }
+
     public static readonly StyledProperty<Block?> CurrentBlockProperty =
         AvaloniaProperty.Register<BlockEditorControl, Block?>(
             nameof(CurrentBlock),
@@ -113,6 +122,7 @@ public sealed class BlockEditorControl : Control
 
     static BlockEditorControl()
     {
+        FocusableProperty.OverrideDefaultValue<BlockEditorControl>(true);
         AffectsRender<BlockEditorControl>(
             BlocksProperty,
             CurrentBlockProperty,
@@ -211,6 +221,12 @@ public sealed class BlockEditorControl : Control
             ApplyFocus();
             InvalidateVisual();
         }
+        else if (change.Property == ReferenceDurationProperty)
+        {
+            var (start, end) = TimelineGeometry.ContentRange(Blocks ?? [], ReferenceDuration);
+            Viewport?.UpdateContent(start, end - start);
+            InvalidateVisual();
+        }
         else if (change.Property == BlocksProperty)
         {
             // 换了数据:内容(整条轴)和取景都重来。
@@ -262,13 +278,13 @@ public sealed class BlockEditorControl : Control
 
         var blocks = Blocks;
 
-        if (blocks is not { Count: > 0 })
+        if (blocks is not { Count: > 0 } && ReferenceDuration <= TimeSpan.Zero)
         {
             viewport.SetContent(TimeSpan.Zero);
             return;
         }
 
-        var (start, end) = TimelineGeometry.ContentRange(blocks);
+        var (start, end) = TimelineGeometry.ContentRange(blocks ?? [], ReferenceDuration);
 
         viewport.SetContent(start, end - start);
     }
@@ -346,6 +362,9 @@ public sealed class BlockEditorControl : Control
             DrawOtherBlocks(context, current, viewport, bodyTop, bodyHeight, trackWidth);
             DrawCurrentBlock(context, current, viewport, bodyTop, bodyHeight, trackWidth);
             DrawFrameSelection(context, current, viewport, bodyTop, bodyHeight);
+            foreach (var rect in TimelineGeometry.UnplayableRegions(viewport, ReferenceDuration,
+                trackWidth, bodyTop, bodyHeight))
+                context.FillRectangle(Palette.UnplayableMask, rect);
         }
 
         DrawPlayhead(context, viewport, height);
@@ -578,6 +597,8 @@ public sealed class BlockEditorControl : Control
             return;
         }
 
+        Focus();
+
         // 顶部刻度带:擦洗播放头。
         if (point.Position.Y < RulerHeight)
         {
@@ -606,7 +627,7 @@ public sealed class BlockEditorControl : Control
 
         // 点哪一帧就把播放头挪到那一帧:选中它,播放也从这里开始(写入的是同一套播放状态)。
         var frame = block.Frames[FrameIndexAt(block, viewport, point.Position.X)];
-        PlayheadTime = block.Start + frame.Offset;
+        PlayheadTime = TimelineGeometry.ClampPlayhead(block.Start + frame.Offset, ReferenceDuration, viewport);
 
         SelectFrameAt(point.Position.X, extend: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         e.Handled = true;
@@ -705,7 +726,7 @@ public sealed class BlockEditorControl : Control
     {
         if (Viewport is { } viewport)
         {
-            PlayheadTime = viewport.MapX(x - TrackLeft);
+            PlayheadTime = TimelineGeometry.ClampPlayhead(viewport.MapX(x - TrackLeft), ReferenceDuration, viewport);
         }
     }
 

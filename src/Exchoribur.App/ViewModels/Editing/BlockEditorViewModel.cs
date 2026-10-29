@@ -199,7 +199,7 @@ public sealed partial class BlockEditorViewModel : ViewModelBase
             return;
         }
 
-        if (SelectedFrames.IsEmpty)
+        if (SelectedFrames.IsEmpty || SelectedFrames.First >= block.Frames.Count)
         {
             _context.Report(Strings.MainHintSelectFramesFirst, error: true);
             return;

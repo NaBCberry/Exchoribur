@@ -27,6 +27,8 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
 
     private readonly Func<TimeSpan> _position;
 
+    private readonly Func<TimeSpan> _videoLength;
+
     private bool _syncingSelection;
 
     private bool _disposed;
@@ -43,7 +45,7 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
 
     internal TimelineEditorViewModel(INamePrompt? namePrompt, Func<bool> hasDocument,
         Func<string> timelineName, Func<TimeSpan> defaultLength, Func<int> undoDepth,
-        Func<TimeSpan> position, ColorEditorViewModel color)
+        Func<TimeSpan> position, ColorEditorViewModel color, Func<TimeSpan> videoLength)
     {
         _namePrompt = namePrompt;
         _hasDocument = hasDocument;
@@ -51,6 +53,7 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
         _defaultLength = defaultLength;
         _undoDepth = undoDepth;
         _position = position;
+        _videoLength = videoLength;
         BlockEditor = new BlockEditorViewModel(this, color);
     }
     bool IBlockEditingContext.CanEdit => !_disposed && _editing.IsActive && _hasDocument();
@@ -91,6 +94,17 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
     }
 
     public void SetUndoDepth(int depth) => _editing.SetMaxUndoSteps(depth);
+
+    public void ResizeBlock(BlockResizeRequest request)
+    {
+        if (!CanEdit || Timeline.FindBlock(request.BlockId) is not { } block || request.End <= request.Start
+            || (request.Start == block.Start && request.End == block.End)) return;
+        var (start, end) = new BlockPlaybackBounds(_videoLength()).ClampResize(block, request.Start, request.End);
+        if (end <= start || (start == block.Start && end == block.End)) return;
+        var updated = block.ResizedTo(start, end);
+        ApplyEdit(new BlockSetEdit(Strings.BlockResizeAction, [block], [updated]));
+        SetBlockSelection([updated]);
+    }
 
     public void EditEffect(FlashEffectEditRequest request)
     {
@@ -277,6 +291,8 @@ public sealed partial class TimelineEditorViewModel : ViewModelBase, IBlockEditi
 
         var before = new List<Block>();
         var after = new List<Block>();
+
+        timeDelta = new BlockPlaybackBounds(_videoLength()).MoveDelta(SelectedBlocks, timeDelta);
 
         foreach (var block in SelectedBlocks)
         {

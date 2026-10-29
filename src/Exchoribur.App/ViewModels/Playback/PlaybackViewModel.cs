@@ -56,6 +56,13 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     partial void OnPlayheadTimeChanged(TimeSpan value)
     {
         if (_disposed) return;
+        var clamped = TimeSpan.FromTicks(Math.Clamp(value.Ticks, 0, Math.Max(0, PlaybackLength.Ticks)));
+        if (clamped != value)
+        {
+            PlayheadTime = clamped;
+            return;
+        }
+        _playback.SetLength(PlaybackLength);
         CurrentFrame = BlockSampler.Sample(Timeline, value);
         OnPropertyChanged(nameof(PlayheadText));
         if (value != _playback.Position)
@@ -73,13 +80,18 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
         {
             PlayheadTime = TimeSpan.Zero;
             _playback.Reset();
-            _playback.SetLength(PlaybackLength);
+        }
+        _playback.SetLength(PlaybackLength);
+        if (PlayheadTime > PlaybackLength || PlayheadTime < TimeSpan.Zero)
+        {
+            PlayheadTime = _playback.Position;
+            _playback.FollowPosition(PlayheadTime);
         }
         CurrentFrame = BlockSampler.Sample(Timeline, PlayheadTime);
     }
 
-    /// <summary>播放和主视口共用的结束时间,同时覆盖灯光内容和参考视频。</summary>
-    public TimeSpan PlaybackLength => _preview.VideoLength > Duration ? _preview.VideoLength : Duration;
+    /// <summary>有视频时按视频结束;越界的灯光仍可编辑,但不能播放。</summary>
+    public TimeSpan PlaybackLength => _preview.VideoLength > TimeSpan.Zero ? _preview.VideoLength : Duration;
 
     [RelayCommand]
     private void GoToStart() => Seek(TimeSpan.Zero);

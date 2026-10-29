@@ -12,6 +12,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
 
     private bool _disposed;
     private WriteableBitmap? _lastFrame;
+    private int _loadVersion;
 
     public event Action? ServiceCreated;
 
@@ -70,6 +71,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     public bool OpenVideo(string path)
     {
         if (_disposed) return false;
+        _loadVersion++;
         var fileName = Path.GetFileName(path);
 
         if (!Video.IsAvailable)
@@ -94,10 +96,35 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         return true;
     }
 
+    public async Task<bool> OpenVideoAsync(string path)
+    {
+        if (_disposed) return false;
+        var version = ++_loadVersion;
+        var video = Video;
+        var name = Path.GetFileName(path);
+        if (!video.IsAvailable)
+        {
+            StatusReported?.Invoke(string.Format(Strings.MainVideoUnavailableFormat, video.ErrorMessage), true);
+            return false;
+        }
+        var loaded = await video.LoadAsync(path);
+        if (_disposed || version != _loadVersion || !ReferenceEquals(video, _video)) return false;
+        if (!loaded)
+        {
+            StatusReported?.Invoke(string.Format(Strings.MainVideoOpenFailedFormat, name), true);
+            return false;
+        }
+        HasVideo = true;
+        VideoLength = video.Length > TimeSpan.Zero ? video.Length : TimeSpan.Zero;
+        StatusReported?.Invoke(string.Format(Strings.MainVideoLoadedFormat, name), false);
+        return true;
+    }
+
     /// <summary>新建工程时移除参考视频;模型仍可用于下一次导入。</summary>
     public void Clear()
     {
         if (_disposed) return;
+        _loadVersion++;
         var video = _video;
         _video = null;
         _lastFrame = null;

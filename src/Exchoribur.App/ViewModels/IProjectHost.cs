@@ -41,6 +41,7 @@ internal interface IProjectHost
 
     /// <summary>打开参考视频;解码器不可用或文件打不开时返回 false。</summary>
     bool OpenVideo(string path);
+    Task<bool> OpenVideoAsync(string path) => Task.FromResult(OpenVideo(path));
 
     /// <summary>暂停播放并清理当前参考视频,不创建新的播放器。</summary>
     void ClearVideo();

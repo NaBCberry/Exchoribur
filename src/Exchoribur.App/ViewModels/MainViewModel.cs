@@ -115,7 +115,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         // 子模型只接收需要的取值入口,不持有整个主窗口。
         Editing = new TimelineEditorViewModel(namePrompt, () => Document is not null,
             () => TimelineName, () => Settings.Editing.DefaultBlockLength, () => Settings.Editing.UndoDepthValue,
-            () => Playback?.PlayheadTime ?? TimeSpan.Zero, Color);
+            () => Playback?.PlayheadTime ?? TimeSpan.Zero, Color, () => Preview.VideoLength);
         Playback = new PlaybackViewModel(clock, () => Editing.Timeline, Preview);
         Editing.EditStarting += Playback.PausePlayback;
         Editing.TimelineChanged += OnEditingTimelineChanged;
@@ -299,6 +299,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     Frame IDeviceHost.SampleFrameAt(TimeSpan time) => BlockSampler.Sample(Editing.Timeline, time);
     bool IProjectHost.OpenVideo(string path) => Preview.OpenVideo(path);
+    Task<bool> IProjectHost.OpenVideoAsync(string path) => Preview.OpenVideoAsync(path);
     void IProjectHost.ClearVideo()
     {
         Playback.PausePlayback();
@@ -314,7 +315,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
 
     private void OnPreviewChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(VideoPreviewViewModel.VideoLength)) UpdateTimelineViewport();
+        if (e.PropertyName == nameof(VideoPreviewViewModel.VideoLength))
+        {
+            Playback.RefreshTimeline(false);
+            UpdateTimelineViewport();
+        }
     }
 
     /// <summary>窗口边界必须覆盖完整播放范围,否则视频末段的播放头会被挡在画面外。</summary>
@@ -322,7 +327,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     {
         var start = Editing.TimelineStart;
         if (Preview.VideoLength > TimeSpan.Zero && start > TimeSpan.Zero) start = TimeSpan.Zero;
-        var length = Playback.PlaybackLength - start;
+        var end = TimeSpan.FromTicks(Math.Max(Editing.Duration.Ticks, Playback.PlaybackLength.Ticks));
+        var length = end - start;
         if (reset) Editing.Viewport.SetContent(start, length);
         else Editing.Viewport.UpdateContent(start, length);
     }
