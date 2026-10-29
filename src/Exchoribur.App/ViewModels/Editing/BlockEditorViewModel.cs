@@ -84,12 +84,16 @@ public sealed partial class BlockEditorViewModel : ViewModelBase
         }
     }
 
-    partial void OnCurrentBlockChanged(Block? value)
+    partial void OnCurrentBlockChanged(Block? oldValue, Block? newValue)
     {
         OnPropertyChanged(nameof(CurrentBlockId));
         OnPropertyChanged(nameof(CurrentBlockChannel));
-        OnPropertyChanged(nameof(CurrentBlockFocus));
-        OnPropertyChanged(nameof(CurrentBlockSpacing));
+        // 编辑、撤销和重做会替换同一个块的对象,但不应重新定位镜头。
+        if (oldValue?.Id != newValue?.Id)
+        {
+            OnPropertyChanged(nameof(CurrentBlockFocus));
+            OnPropertyChanged(nameof(CurrentBlockSpacing));
+        }
         OnPropertyChanged(nameof(HasCurrentBlock));
         OnPropertyChanged(nameof(CurrentBlockTitle));
     }
