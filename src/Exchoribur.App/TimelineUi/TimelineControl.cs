@@ -145,6 +145,7 @@ public sealed partial class TimelineControl : Control
 
     static TimelineControl()
     {
+        FocusableProperty.OverrideDefaultValue<TimelineControl>(true);
         AffectsRender<TimelineControl>(
             BlocksProperty,
             MarkersProperty,
@@ -726,6 +727,8 @@ public sealed partial class TimelineControl : Control
         {
             return;
         }
+
+        Focus();
 
         if (e.ClickCount == 1 && BeginBlockResize(point.Position))
         {

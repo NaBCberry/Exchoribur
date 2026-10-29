@@ -33,9 +33,6 @@
         <KeyBinding Gesture="Ctrl+A" Command="{Binding Editing.SelectAllCommand}" />
         <KeyBinding Gesture="Ctrl+D" Command="{Binding Editing.CopyBlockToOtherChannelsCommand}" />
         <KeyBinding Gesture="Escape" Command="{Binding Editing.ClearSelectionCommand}" />
-        <KeyBinding Gesture="Delete" Command="{Binding Editing.DeleteSelectedBlocksCommand}" />
-        <KeyBinding Gesture="Shift+Delete" Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}" />
-        <KeyBinding Gesture="Insert" Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -129,14 +126,14 @@
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuInsertFrame}"
                           Command="{Binding Editing.BlockEditor.InsertFrameAtPlayheadCommand}"
-                          InputGesture="Insert">
+                          InputGesture="N">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.InsertFrame}" />
                     </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="{x:Static res:Strings.MainMenuDeleteFrames}"
                           Command="{Binding Editing.BlockEditor.DeleteSelectedFramesCommand}"
-                          InputGesture="Shift+Delete">
+                          InputGesture="Delete">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.Delete}" />
                     </MenuItem.Icon>

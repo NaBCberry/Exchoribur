@@ -122,6 +122,7 @@ public sealed class BlockEditorControl : Control
 
     static BlockEditorControl()
     {
+        FocusableProperty.OverrideDefaultValue<BlockEditorControl>(true);
         AffectsRender<BlockEditorControl>(
             BlocksProperty,
             CurrentBlockProperty,
@@ -595,6 +596,8 @@ public sealed class BlockEditorControl : Control
         {
             return;
         }
+
+        Focus();
 
         // 顶部刻度带:擦洗播放头。
         if (point.Position.Y < RulerHeight)
