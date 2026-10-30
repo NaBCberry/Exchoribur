@@ -65,7 +65,11 @@ internal static unsafe class FfmpegAudioDecoder
             var origin = format->start_time == ffmpeg.AV_NOPTS_VALUE ? 0 : format->start_time / (double)ffmpeg.AV_TIME_BASE;
             if (format->duration > 0 && format->duration != ffmpeg.AV_NOPTS_VALUE)
                 duration = TimeSpan.FromSeconds(format->duration / (double)ffmpeg.AV_TIME_BASE);
-            var builder = new SpectrumBuilder();
+            // 流信息和共同原点确定之后再丢弃其他流,保留原有音轨选择及时间基准。
+            for (var i = 0; i < format->nb_streams; i++)
+                if (i != index) format->streams[i]->discard = AVDiscard.AVDISCARD_ALL;
+            using var transform = new FfmpegRealFourierTransform(ffmpeg.RootPath);
+            var builder = new SpectrumBuilder(transform);
             using var samples = new ResampledAudio(codec, builder, origin,
                 stream->start_time == ffmpeg.AV_NOPTS_VALUE ? origin : stream->start_time * ffmpeg.av_q2d(stream->time_base),
                 duration, progress);

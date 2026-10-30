@@ -5,10 +5,12 @@ namespace Exchoribur.Core.Audio;
 /// <summary>流式短时傅里叶变换。时间戳保留音轨偏移和断点,静音用零填充。</summary>
 public sealed class SpectrumBuilder
 {
-    private const int Size = 4096;
+    public const int WindowSize = 4096;
+    private const int Size = WindowSize;
+    private readonly IRealFourierTransform _transform;
     private readonly float[] _window = new float[Size];
     private readonly double[] _hann = new double[Size];
-    private readonly Complex[] _fft = new Complex[Size];
+    private readonly Complex[] _fft = new Complex[(Size / 2) + 1];
     private readonly byte[] _previous = new byte[AudioSpectrogram.BandCount];
     private int _lastColumn = -1;
     private readonly List<byte> _data = [];
@@ -17,10 +19,12 @@ public sealed class SpectrumBuilder
     private double? _expected;
     public int Columns => _data.Count / AudioSpectrogram.BandCount;
 
-    public SpectrumBuilder()
+    /// <summary>变换实例由调用方负责创建和释放。</summary>
+    public SpectrumBuilder(IRealFourierTransform transform)
     {
+        ArgumentNullException.ThrowIfNull(transform);
+        _transform = transform;
         for (var i = 0; i < Size; i++) _hann[i] = .5 - (.5 * Math.Cos(2 * Math.PI * i / (Size - 1)));
-
     }
 
     public void Append(ReadOnlySpan<float> samples, TimeSpan timestamp)
@@ -66,30 +70,7 @@ public sealed class SpectrumBuilder
 
     private void Emit()
     {
-        for (var i = 0; i < Size; i++) _fft[i] = new Complex(_window[i] * _hann[i], 0);
-        for (int i = 1, j = 0; i < Size; i++)
-        {
-            var bit = Size >> 1;
-            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
-            j ^= bit;
-            if (i < j) (_fft[i], _fft[j]) = (_fft[j], _fft[i]);
-        }
-        for (var length = 2; length <= Size; length <<= 1)
-        {
-            var root = Complex.FromPolarCoordinates(1, -2 * Math.PI / length);
-            for (var start = 0; start < Size; start += length)
-            {
-                var factor = Complex.One;
-                for (var j = 0; j < length / 2; j++)
-                {
-                    var a = _fft[start + j];
-                    var b = _fft[start + j + (length / 2)] * factor;
-                    _fft[start + j] = a + b;
-                    _fft[start + j + (length / 2)] = a - b;
-                    factor *= root;
-                }
-            }
-        }
+        _transform.Transform(_window, _hann, _fft);
         var column = Math.Max(0, (int)Math.Round(_nextCenter / ((double)AudioSpectrogram.HopSize / AudioSpectrogram.SampleRate)));
         // 显式限制损坏时间戳造成的分配,约 12 小时音频。
         if (column >= 1_000_000) throw new InvalidDataException("Audio timestamps exceed analysis capacity.");
