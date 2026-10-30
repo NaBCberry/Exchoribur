@@ -1,3 +1,4 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.ViewModels;
 using Exchoribur.App.ViewModels.Updates;
 using Exchoribur.Application.Abstractions;
@@ -20,7 +21,7 @@ public sealed class UpdateViewModelTests : IDisposable
     {
         var section = new UpdateViewModel(new UpdateCoordinator(new FakeUpdateFeed(), () => false, () => false));
 
-        Assert.Equal("还没有检查过。", section.UpdateStatusText);
+        Assert.Equal(Strings.UpdateStatusIdle, section.UpdateStatusText);
         Assert.True(section.IsUpdateSupported);
         Assert.False(section.IsUpdateBusy);
         Assert.False(section.CanDownloadUpdate);
@@ -37,7 +38,7 @@ public sealed class UpdateViewModelTests : IDisposable
 
         await section.CheckAsync();
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", section.UpdateStatusText);
+        Assert.Equal(string.Format(Strings.UpdateStatusAvailableFormat, "9.9.9"), section.UpdateStatusText);
         Assert.True(section.CanDownloadUpdate);
     }
 
@@ -50,7 +51,7 @@ public sealed class UpdateViewModelTests : IDisposable
             () => false));
 
         Assert.False(section.IsUpdateSupported);
-        Assert.Equal("这一份不是安装版(旁边没有安装信息),不检查更新。", section.UpdateStatusText);
+        Assert.Equal(Strings.UpdateStatusUnsupported, section.UpdateStatusText);
     }
 
     [Fact]
@@ -67,7 +68,7 @@ public sealed class UpdateViewModelTests : IDisposable
 
         await viewModel.Updates.Status.CheckCommand.ExecuteAsync(null);
 
-        Assert.Equal("发现新版本 v9.9.9,可以下载并安装。", viewModel.Updates.Status.UpdateStatusText);
+        Assert.Equal(string.Format(Strings.UpdateStatusAvailableFormat, "9.9.9"), viewModel.Updates.Status.UpdateStatusText);
         Assert.Contains(nameof(UpdateViewModel.UpdateStatusText), relayed);
         Assert.Contains(nameof(UpdateViewModel.CanDownloadUpdate), relayed);
     }

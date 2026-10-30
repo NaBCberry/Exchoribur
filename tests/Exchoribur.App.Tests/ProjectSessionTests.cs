@@ -1,3 +1,4 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Core.Models;
@@ -48,7 +49,7 @@ public sealed class ProjectSessionTests : IDisposable
         await session.SaveAsync();
 
         Assert.True(host.LastMessageIsError);
-        Assert.Contains("还没有工程", host.LastMessage);
+        Assert.Equal(Strings.ProjectStatusNoProjectToSave, host.LastMessage);
         Assert.False(host.IsSaving);
     }
 

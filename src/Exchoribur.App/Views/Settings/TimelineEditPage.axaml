@@ -18,8 +18,6 @@
                 </Grid>
                 <TextBlock Classes="note"
                            Text="{Binding Editing.UndoDepthHint}" />
-                <TextBlock Classes="note"
-                           Text="{x:Static res:Strings.SettingsTimelineUndoDepthNote}" />
             </StackPanel>
         </Border>
     </StackPanel>

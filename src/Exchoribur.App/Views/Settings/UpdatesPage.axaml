@@ -59,8 +59,6 @@
                             IsEnabled="{Binding Updates.Status.CanInstallUpdate}"
                             Padding="12,4" />
                 </StackPanel>
-
-                <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsUpdatesInstallNote}" />
             </StackPanel>
         </Border>
     </StackPanel>

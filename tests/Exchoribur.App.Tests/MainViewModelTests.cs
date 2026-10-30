@@ -1,3 +1,4 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Application.Projects;
@@ -139,7 +140,7 @@ public sealed class MainViewModelTests : IDisposable
         await viewModel.SaveProjectCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Contains("还没有工程", viewModel.StatusText);
+        Assert.Equal(Strings.ProjectStatusNoProjectToSave, viewModel.StatusText);
         Assert.False(viewModel.IsSaving);
     }
 

@@ -1,7 +1,9 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.Services;
 using Exchoribur.App.TimelineUi;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Application.Settings;
+using Exchoribur.Core.Formatting;
 using Exchoribur.Core.Models;
 
 namespace Exchoribur.App.Tests;
@@ -58,7 +60,7 @@ public sealed class TimelineEditingTests : IDisposable
         // CH3 本来什么都没有,所以新块里的第一帧就是黑场。
         Assert.Equal(BlockSampler.Dark, Assert.Single(created.Frames).State);
 
-        Assert.Contains("建了一个块", viewModel.StatusText);
+        Assert.Equal(string.Format(Strings.MainStatusBlockCreatedFormat, 3, Timecode.Format(TimeSpan.Zero)), viewModel.StatusText);
         Assert.True(viewModel.Editing.CanUndo);
         Assert.Equal(created, viewModel.Editing.BlockEditor.CurrentBlock);
     }
@@ -108,7 +110,7 @@ public sealed class TimelineEditingTests : IDisposable
         viewModel.Editing.CopyBlockToOtherChannelsCommand.Execute(null);
 
         Assert.Equal(Frame.ChannelCount, viewModel.Editing.Blocks.Count);
-        Assert.Contains("无法播放", viewModel.StatusText);
+        Assert.Equal(string.Format(Strings.MainStatusCopiedToOtherChannelsFormat, Frame.ChannelCount - 1, Frame.ChannelCount - 1), viewModel.StatusText);
 
         viewModel.Editing.UndoEditsCommand.Execute(null);
 
@@ -236,7 +238,7 @@ public sealed class TimelineEditingTests : IDisposable
         viewModel.Editing.BlockEditor.DeleteSelectedFramesCommand.Execute(null);
 
         Assert.Equal(2, viewModel.Editing.Blocks[0].Frames.Count);
-        Assert.Contains("删掉 1 帧", viewModel.StatusText);
+        Assert.Equal(string.Format(Strings.MainStatusFramesDeletedFormat, 1), viewModel.StatusText);
     }
 
     [Fact]

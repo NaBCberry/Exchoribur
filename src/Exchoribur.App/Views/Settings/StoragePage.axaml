@@ -22,8 +22,6 @@
         <Border Classes="settingsGroup">
             <StackPanel Spacing="6">
                 <TextBlock Classes="rowLabel" Text="{x:Static res:Strings.SettingsResetButton}" />
-                <TextBlock Classes="note"
-                           Text="{x:Static res:Strings.SettingsStorageResetNote}" />
                 <Button Content="{Binding Storage.ResetButtonText}"
                         Command="{Binding Storage.ResetToDefaultsCommand}"
                         HorizontalAlignment="Left"

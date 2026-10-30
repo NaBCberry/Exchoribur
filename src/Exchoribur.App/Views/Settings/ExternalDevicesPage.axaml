@@ -102,8 +102,6 @@
                                    Text="{Binding DeviceDefaults.DeviceFrameAdvanceText}" />
                     </StackPanel>
                 </Grid>
-
-                <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesFrameAdvanceNote}" />
             </StackPanel>
         </Border>
 
@@ -122,8 +120,6 @@
                 <TextBlock Classes="note" Text="{Binding DeviceDefaults.DeviceLicenseHint}" />
             </StackPanel>
         </Border>
-
-        <TextBlock Classes="note" Text="{x:Static res:Strings.SettingsDevicesLiveNote}" />
     </StackPanel>
 
 </UserControl>

@@ -1,3 +1,4 @@
+using Exchoribur.App.Resources;
 using Exchoribur.App.ViewModels;
 using Exchoribur.Application.Projects;
 
@@ -39,14 +40,14 @@ public sealed class ProjectLoadProgressTests : IDisposable
     }
 
     [Theory]
-    [InlineData(ProjectLoadStage.Media, 0.42, "解出参考视频 42%")]
-    [InlineData(ProjectLoadStage.Timeline, 0.1, "读时间轴数据")]
-    public void The_status_text_names_the_stage(ProjectLoadStage stage, double fraction, string expected)
+    [InlineData(ProjectLoadStage.Media, 0.42, nameof(Strings.ProjectLoadProgressMediaFormat))]
+    [InlineData(ProjectLoadStage.Timeline, 0.1, nameof(Strings.ProjectLoadProgressTimelineFormat))]
+    public void The_status_text_names_the_stage(ProjectLoadStage stage, double fraction, string expectedKey)
     {
         var text = ProjectSession.DescribeLoadProgress("演出.exb", new ProjectLoadProgress(stage, fraction));
 
         Assert.Contains("演出.exb", text);
-        Assert.Contains(expected, text);
+        Assert.Equal(string.Format(Strings.ResourceManager.GetString(expectedKey)!, "演出.exb", fraction * 100), text);
     }
 
     private MainViewModel CreateViewModel()
