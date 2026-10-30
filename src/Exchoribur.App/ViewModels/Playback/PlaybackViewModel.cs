@@ -142,8 +142,8 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 时钟每过一帧调一次(测试里直接喂时间)。播放头是主时钟:
-    /// 灯光时间轴跟着它走,视频也跟着它走,所以两边永远是同一条时间线。
+    /// 界面时钟唤醒后读取媒体进度;无媒体时按 elapsed 推进。
+    /// 灯光取样与设备发送共用这里发布的播放头,不反向定位媒体追赶墙钟。
     /// </summary>
     public void AdvancePlayback(TimeSpan elapsed)
     {
@@ -160,7 +160,6 @@ public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
 
         // 播放时让播放头一直留在画面里:跑出画面就整页翻过去,落点在视口左边靠右一点。
         ViewportRequested?.Invoke(PlayheadTime, true);
-        _playback.CorrectDrift();
     }
 
     private void StartPlayback()

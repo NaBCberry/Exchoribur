@@ -24,6 +24,16 @@ internal static class Program
 
     public static async Task Main(string[] args)
     {
+        if (args is ["--audio-synthetic"])
+        {
+            await AudioSpectrumBenchmark.RunSyntheticAsync();
+            return;
+        }
+        if (args is ["--audio", var media])
+        {
+            await AudioSpectrumBenchmark.RunAsync(media);
+            return;
+        }
         var results = new List<Measurement>();
         foreach (var count in new[] { 10_000, 100_000 })
         {

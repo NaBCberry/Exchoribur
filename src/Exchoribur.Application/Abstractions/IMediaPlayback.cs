@@ -9,6 +9,8 @@ public interface IMediaPlayback : IDisposable
     bool IsAvailable { get; }
     double Volume { get; set; }
     TimeSpan Position { get; }
+    /// <summary>媒体主导的播放位置;不提供时沿用独立时钟。位置须已换算到媒体起点零秒。</summary>
+    MediaPlaybackPosition? PlaybackPosition => null;
     TimeSpan Length { get; }
     IReadOnlyList<AudioDeviceOption> GetAudioDevices();
     void ApplyAudioDevice(string? deviceId);
@@ -20,3 +22,5 @@ public interface IMediaPlayback : IDisposable
     void Stop();
     void Seek(TimeSpan position);
 }
+
+public readonly record struct MediaPlaybackPosition(TimeSpan Position, bool HasEnded);

@@ -328,8 +328,13 @@
             </Grid>
 
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形;调色盘是浮在时间轴上的弹出面板 -->
-            <Grid Grid.Column="1" Margin="0,8,8,8" RowDefinitions="*,110">
-                <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
+            <Grid Grid.Column="1" Margin="0,8,8,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="4*" MinHeight="260" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="*" MinHeight="80" />
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Classes="panel">
                     <DockPanel>
                         <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
                         <Border DockPanel.Dock="Bottom"
@@ -468,14 +473,33 @@
                     </DockPanel>
                 </Border>
 
-                <Border Grid.Row="1" Classes="panel">
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="7">
-                        <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
-                        <TextBlock Classes="hint" Text="{x:Static res:Strings.MainAudioWaveformPlaceholder}" />
-                    </StackPanel>
+                <GridSplitter Grid.Row="1"
+                              ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              Background="Transparent"
+                              Cursor="SizeNorthSouth" />
+
+                <Border Grid.Row="2" Classes="panel">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <Grid Grid.Column="0" ClipToBounds="True">
+                            <timeline:AudioSpectrumControl Data="{Binding Spectrum.Data}"
+                                Viewport="{Binding Editing.Viewport}"
+                                ReferenceDuration="{Binding Preview.VideoLength}"
+                                PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
+                                        IsVisible="{Binding Spectrum.ShowMessage}" MaxWidth="320">
+                                <TextBlock Classes="hint" Text="{Binding Spectrum.Message}" HorizontalAlignment="Center" />
+                                <ProgressBar Width="220" Height="6" Minimum="0" Maximum="100"
+                                    Value="{Binding Spectrum.Progress}" IsIndeterminate="{Binding Spectrum.IsIndeterminate}"
+                                    IsVisible="{Binding Spectrum.IsAnalyzing}" />
+                                <Button Content="{x:Static res:Strings.AudioSpectrumRetry}"
+                                    Command="{Binding Spectrum.RetryCommand}" IsVisible="{Binding Spectrum.CanRetry}"
+                                    HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Border Grid.Column="1" Width="220" IsVisible="{Binding Editing.BlockEditor.HasCurrentBlock}" />
+                        <Border Grid.Column="2" Width="260" IsVisible="{Binding IsDevicePanelOpen}" />
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>

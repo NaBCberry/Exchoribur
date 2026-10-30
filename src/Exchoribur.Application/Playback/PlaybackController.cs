@@ -4,7 +4,7 @@ using Exchoribur.Application.Abstractions;
 namespace Exchoribur.Application.Playback;
 
 /// <summary>
-/// 播放状态机:播放头怎么走、什么时候把视频拉回来对表。
+/// 播放状态机:有媒体时跟随媒体位置,没有媒体时按节拍推进。
 /// 只管"时间怎么变",不碰界面状态——播放头画在哪、按钮亮不亮由主视图模型发布。
 /// </summary>
 /// <remarks>
@@ -17,13 +17,6 @@ public sealed class PlaybackController(
     Func<IMediaPlayback?> video,
     Action publishPlayingState)
 {
-    /// <summary>
-    /// 视频和播放头之间允许差多少。容差给得大是故意的:libvlc 报的时间本身有
-    /// 几百毫秒的粒度,容差太小就会一直去 seek,每 seek 一次画面就顿一下,
-    /// 看着就是"卡一下动一下"。两个时钟都按真实时间走,长期飘移不大。
-    /// </summary>
-    private const double SyncToleranceMilliseconds = 2000;
-
     private readonly PlaybackState _state = new();
 
     public bool IsPlaying => _state.IsPlaying;
@@ -43,6 +36,7 @@ public sealed class PlaybackController(
     /// <summary>从当前位置开始播。没有内容可播时什么都不做。</summary>
     public void Play(Action<TimeSpan> onTick)
     {
+        var restart = _state.Position >= _state.Duration && _state.Duration > TimeSpan.Zero;
         _state.Play();
 
         if (!_state.IsPlaying)
@@ -51,13 +45,12 @@ public sealed class PlaybackController(
         }
 
         publishPlayingState();
-        clock?.Start(onTick);
-
         if (hasVideo() && video() is { } player)
         {
+            if (restart) player.Seek(TimeSpan.Zero);
             player.Play();
-            player.Seek(_state.Position);
         }
+        clock?.Start(onTick);
     }
 
     /// <summary>暂停。本来就没在播就什么都不做。</summary>
@@ -100,6 +93,27 @@ public sealed class PlaybackController(
     /// <summary>时钟走一步。返回播放头有没有往前动,界面据此决定要不要重画。</summary>
     public bool Advance(TimeSpan elapsed)
     {
+        if (!_state.IsPlaying) return false;
+        if (hasVideo() && video() is { PlaybackPosition: { } media } player)
+        {
+            var previous = _state.Position;
+            _state.Seek(media.HasEnded ? _state.Duration : media.Position);
+            if (media.HasEnded)
+            {
+                if (_state.Loop)
+                {
+                    _state.Seek(TimeSpan.Zero);
+                    player.Seek(TimeSpan.Zero);
+                    player.Play();
+                }
+                else
+                {
+                    _state.Pause();
+                    clock?.Stop();
+                }
+            }
+            return previous != _state.Position || media.HasEnded;
+        }
         if (!_state.Advance(elapsed))
         {
             return false;
@@ -124,20 +138,4 @@ public sealed class PlaybackController(
         }
     }
 
-    /// <summary>
-    /// 视频是跟着播放头走的,但它是独立解码的,时间长了会飘。偏得不多就不动它
-    /// (频繁 seek 会卡),超过容差才拉回来一次。
-    /// </summary>
-    public void CorrectDrift()
-    {
-        if (!_state.IsPlaying || !hasVideo() || video() is not { } player)
-        {
-            return;
-        }
-
-        if (Math.Abs((player.Position - _state.Position).TotalMilliseconds) > SyncToleranceMilliseconds)
-        {
-            player.Seek(_state.Position);
-        }
-    }
 }

@@ -32,6 +32,15 @@
 - 版权:Copyright (c) .NET Foundation and Contributors
 - 来源:<https://github.com/CommunityToolkit/dotnet>
 
+### ScottPlot
+
+- 用途:音频频谱色表,默认 Inferno;沿用本项目的频谱绘制与时间轴
+- 许可:MIT License
+- 版权:Copyright (c) 2018 Scott Harden / Harden Technologies, LLC
+- 来源:<https://github.com/ScottPlot/ScottPlot>
+- 许可全文:随程序发布,见 `licenses/ScottPlot.txt`
+- 内含组件的上游声明:随程序发布,见 `licenses/ScottPlot-NOTICES.txt`
+
 ### SkiaSharp 与 HarfBuzzSharp
 
 - 用途:图形栅格化与文本排版,由 Avalonia 带进来(发布目录里的
@@ -87,6 +96,22 @@
 - 修改说明:分发的是上游未经修改的构建,程序通过动态链接调用,用户可以换成
   自己的构建。Linux 上由发行版提供,不随本项目分发。随包附带的插件里有一
   部分另有许可(多为 GPLv2 及以上),同样是上游原样分发。
+
+### FFmpeg.AutoGen 与 FFmpeg
+
+- 用途:频谱的独立离线音频解复用、解码及重采样;视频预览继续使用 libvlc。
+- 托管接口:FFmpeg.AutoGen 8.1.0,MIT 许可,Copyright Ruslan Balanukhin;
+  全文见 `licenses/FFmpeg.AutoGen.txt`,来源 <https://github.com/Ruslan-B/FFmpeg.AutoGen>。
+- 原生库:Windows x64 随包提供 FFmpeg 8.1 的 LGPL shared 构建,启用 version3,
+  许可为 LGPL-3.0-or-later。全文及其引用的 GPLv3 全文分别位于
+  `licenses/LGPL-3.0.txt`、`licenses/GPL-3.0.txt`。
+- 来源与校验:固定 BtbN 构建和 SHA256 记录在 `scripts/prepare-ffmpeg.ps1`,
+  发布目录 `ffmpeg/BUILD-SOURCE.txt` 同时保留下载地址、FFmpeg 源码版本与构建配方。
+  FFmpeg 开发者版权及上游许可保留在 `ffmpeg/LICENSE.txt`。
+- 修改说明:未经修改的四个动态库,不包含命令行程序;用户可以替换为兼容的动态库。
+  构建源代码见 <https://github.com/FFmpeg/FFmpeg/tree/611cec792a>,
+  构建配方及其外部库来源见 <https://github.com/BtbN/FFmpeg-Builds/tree/76318bc>。
+  macOS/Linux 使用兼容的系统动态库,也可以指定独立的库目录,不混用不同 ABI 版本。
 
 ## 未随产物分发
 

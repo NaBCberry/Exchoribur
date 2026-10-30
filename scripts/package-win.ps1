@@ -77,6 +77,7 @@ foreach ($dir in @($publishDir, $releaseDir)) {
 }
 
 Write-Host "==> 发布 $Runtime($Configuration)"
+& (Join-Path $PSScriptRoot 'prepare-ffmpeg.ps1') -Runtime $Runtime
 Invoke-Dotnet @(
     'publish', (Join-Path $repoRoot 'src/Exchoribur.App/Exchoribur.App.csproj'),
     '-c', $Configuration,
