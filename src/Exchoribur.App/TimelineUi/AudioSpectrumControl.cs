@@ -37,13 +37,14 @@ public sealed class AudioSpectrumControl : Control
     private readonly List<(double Y, FormattedText Text, double LabelY)> _ticks = [];
     private Pen? _frequencyGridPen;
     private static readonly double[] FrequencyTicks = [24000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20];
+    // 修改这一行即可切换色表,例如 new ScottPlot.Colormaps.Viridis()。
+    private static readonly ScottPlot.IColormap SpectrumColormap = new ScottPlot.Colormaps.Inferno();
+    // 只在初始化时生成色表,绘制每个像素时直接查表。
     private static readonly uint[] Palette = Enumerable.Range(0, 256).Select(index =>
     {
         var x = Math.Pow(Math.Clamp(((index / 255.0) - .12) / .88, 0, 1), 1.5);
-        var red = (byte)(255 * Math.Clamp((x - .55) / .45, 0, 1));
-        var green = (byte)(255 * Math.Clamp((x - .2) / .6, 0, 1));
-        var blue = (byte)(255 * Math.Clamp(x * 2, 0, 1) * (1 - Math.Clamp((x - .55) / .45, 0, 1)));
-        return 0xff000000u | ((uint)red << 16) | ((uint)green << 8) | blue;
+        var color = SpectrumColormap.GetColor(x);
+        return 0xff000000u | ((uint)color.Red << 16) | ((uint)color.Green << 8) | color.Blue;
     }).ToArray();
 
     static AudioSpectrumControl()

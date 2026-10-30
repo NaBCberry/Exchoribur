@@ -32,6 +32,15 @@
 - 版权:Copyright (c) .NET Foundation and Contributors
 - 来源:<https://github.com/CommunityToolkit/dotnet>
 
+### ScottPlot
+
+- 用途:音频频谱色表,默认 Inferno;沿用本项目的频谱绘制与时间轴
+- 许可:MIT License
+- 版权:Copyright (c) 2018 Scott Harden / Harden Technologies, LLC
+- 来源:<https://github.com/ScottPlot/ScottPlot>
+- 许可全文:随程序发布,见 `licenses/ScottPlot.txt`
+- 内含组件的上游声明:随程序发布,见 `licenses/ScottPlot-NOTICES.txt`
+
 ### SkiaSharp 与 HarfBuzzSharp
 
 - 用途:图形栅格化与文本排版,由 Avalonia 带进来(发布目录里的

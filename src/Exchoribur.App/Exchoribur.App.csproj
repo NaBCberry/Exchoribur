@@ -49,6 +49,9 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="ScottPlot" Version="5.1.59" />
+    <!-- 只使用色表;沿用 Avalonia 的 Linux Skia 库,避免同名原生文件打包冲突。 -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.0" ExcludeAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
