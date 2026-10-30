@@ -114,6 +114,7 @@ public static class TimelineJson
             .Append(block.LinkGroupId is { } group ? Quote(group.ToString()) : "null")
             .Append(",\n");
 
+
         builder.Append("      \"Effects\": ").Append(JsonSerializer.Serialize(block.Effects.Select(effect => new
         {
             Id = effect.Id.ToString(), Offset = effect.Offset.TotalMilliseconds,
@@ -208,7 +209,7 @@ public static class TimelineJson
 
         try
         {
-            return new Block(
+            var block = new Block(
                 id,
                 dto.Name ?? Block.DefaultName,
                 dto.Channel,
@@ -216,15 +217,48 @@ public static class TimelineJson
                 TimeSpan.FromMilliseconds(dto.Length),
                 frames,
                 linkGroup,
-                dto.Effects?.Select(effect => new FlashEffect(
-                    Guid.TryParse(effect.Id, out var effectId) ? effectId : Guid.NewGuid(),
-                    TimeSpan.FromMilliseconds(effect.Offset), TimeSpan.FromMilliseconds(effect.Length),
-                    (FlashMode)effect.Mode)).ToArray());
+                dto.Effects?.Select(ReadEffect).ToArray());
+            return dto.Effects is not null && dto.Frames.Any(frame => frame.Mode >= 4)
+                ? CompleteImportedEffects(dto, block) : block;
         }
         catch (ArgumentException exception)
         {
             throw new FormatException($"块「{dto.Name}」读不出来:{exception.Message}", exception);
         }
+    }
+
+    private static FlashEffect ReadEffect(EffectDto dto)
+    {
+        if (!FlashModes.TryFromRawValue(dto.Mode, out var mode))
+            throw new FormatException($"不认识的闪烁效果模式 {dto.Mode}。");
+        return new FlashEffect(Guid.TryParse(dto.Id, out var id) ? id : Guid.NewGuid(),
+            TimeSpan.FromMilliseconds(dto.Offset), TimeSpan.FromMilliseconds(dto.Length), mode);
+    }
+
+    // 只在导入扩展帧码时补齐旧效果列表。保存后的标准帧码不会再次触发补齐。
+    private static Block CompleteImportedEffects(BlockDto dto, Block block)
+    {
+        var legacy = new Block(block.Id, block.Name, block.Channel, block.Start, block.Length,
+            dto.Frames.Select(frame => new BlockFrame(TimeSpan.FromMilliseconds(frame.Offset),
+                new ChannelState(default, frame.Mode >= 4 ? (FlashMode)(frame.Mode % 4) : FlashMode.Solid))).ToArray());
+        var added = new List<FlashEffect>();
+        var covered = block.Effects.OrderBy(effect => effect.Offset).ToArray();
+        foreach (var effect in legacy.Effects)
+        {
+            var cursor = effect.Offset;
+            foreach (var existing in covered)
+            {
+                if (existing.End <= cursor) continue;
+                if (existing.Offset >= effect.End) break;
+                if (existing.Offset > cursor)
+                    added.Add(new FlashEffect(Guid.NewGuid(), cursor, existing.Offset - cursor, effect.Mode));
+                if (existing.End > cursor) cursor = existing.End;
+                if (cursor >= effect.End) break;
+            }
+            if (cursor < effect.End)
+                added.Add(new FlashEffect(Guid.NewGuid(), cursor, effect.End - cursor, effect.Mode));
+        }
+        return added.Count == 0 ? block : block.WithEffects(added.Concat(block.Effects).ToArray());
     }
 
     private static string Quote(string text) => JsonSerializer.Serialize(text, TextOptions);

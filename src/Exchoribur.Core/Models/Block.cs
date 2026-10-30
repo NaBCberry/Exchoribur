@@ -94,6 +94,7 @@ public sealed class Block
     public ChannelState GetStateAt(TimeSpan offset)
     {
         var state = GetFrameAt(offset).State;
+        // 所有闪烁均由效果框控制,移走或删除效果后不能由原始帧码继续触发。
         var mode = FlashEffect.IsBlink(state.Mode) ? FlashMode.Solid : state.Mode;
         // 重叠时后添加的效果优先,结果与保存后的集合顺序一致。
         foreach (var effect in Effects)
