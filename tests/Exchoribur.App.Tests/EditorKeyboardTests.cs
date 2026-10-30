@@ -18,6 +18,52 @@ public sealed class EditorKeyboardCollection;
 [Collection("Editor keyboard")]
 public sealed class EditorKeyboardTests
 {
+    [Fact]
+    public Task Frame_clipboard_shortcuts_preserve_the_playhead_and_editor_view()
+        => InWindow((window, model, editor, _) =>
+        {
+            Click(window, editor, FramePoint(editor, 2));
+            Press(window, Key.C, RawInputModifiers.Control);
+            Assert.False(model.Editing.CanUndo);
+            model.Playback.PlayheadTime = TimeSpan.FromSeconds(1);
+            editor.Viewport!.ShowRange(TimeSpan.FromSeconds(.5), TimeSpan.FromSeconds(2));
+            var start = editor.Viewport.Start;
+            var scale = editor.Viewport.Scale;
+            Press(window, Key.V, RawInputModifiers.Control);
+            Assert.Equal([0, 1, 2, 4], Assert.Single(model.Editing.Blocks).Frames.Select(frame => frame.Offset.TotalSeconds));
+            Press(window, Key.X, RawInputModifiers.Control);
+            Assert.Equal([0, 2, 4], Assert.Single(model.Editing.Blocks).Frames.Select(frame => frame.Offset.TotalSeconds));
+            Press(window, Key.V, RawInputModifiers.Control);
+            Assert.Equal(4, Assert.Single(model.Editing.Blocks).Frames.Count);
+            model.Editing.UndoEditsCommand.Execute(null);
+            Assert.Equal(3, Assert.Single(model.Editing.Blocks).Frames.Count);
+            model.Editing.RedoEditsCommand.Execute(null);
+            Assert.Equal(4, Assert.Single(model.Editing.Blocks).Frames.Count);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(TimeSpan.FromSeconds(1), model.Playback.PlayheadTime);
+            Assert.Equal(start, editor.Viewport.Start);
+            Assert.Equal(scale, editor.Viewport.Scale);
+        });
+
+    [Fact]
+    public Task Frame_clipboard_shortcuts_do_not_apply_to_the_timeline_or_text_fields()
+        => InWindow((window, model, editor, timeline) =>
+        {
+            Click(window, editor, FramePoint(editor, 2));
+            Press(window, Key.C, RawInputModifiers.Control);
+            Click(window, timeline, new Point(TimelineLayout.TrackLeft + 30, TimelineLayout.RulerHeight + 6));
+            Press(window, Key.X, RawInputModifiers.Control);
+            Press(window, Key.V, RawInputModifiers.Control);
+            Assert.False(model.Editing.CanUndo);
+            var input = window.GetVisualDescendants().OfType<TextBox>().First(box => box.IsEffectivelyVisible);
+            input.Focus();
+            Press(window, Key.C, RawInputModifiers.Control);
+            Press(window, Key.X, RawInputModifiers.Control);
+            Press(window, Key.V, RawInputModifiers.Control);
+            Assert.Equal(3, Assert.Single(model.Editing.Blocks).Frames.Count);
+            Assert.False(model.Editing.CanUndo);
+        });
+
     [Theory]
     [InlineData(RawInputModifiers.None)]
     [InlineData(RawInputModifiers.Shift)]
