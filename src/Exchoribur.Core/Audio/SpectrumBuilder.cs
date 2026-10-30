@@ -5,7 +5,7 @@ namespace Exchoribur.Core.Audio;
 /// <summary>流式短时傅里叶变换。时间戳保留音轨偏移和断点,静音用零填充。</summary>
 public sealed class SpectrumBuilder
 {
-    private const int Size = 2048;
+    private const int Size = 4096;
     private readonly float[] _window = new float[Size];
     private readonly double[] _hann = new double[Size];
     private readonly Complex[] _fft = new Complex[Size];

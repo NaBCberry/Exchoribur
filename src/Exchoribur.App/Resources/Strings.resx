@@ -932,5 +932,7 @@
   <data name="AudioSpectrumFailed" xml:space="preserve"><value>音频解析失败，请重试</value></data>
   <data name="AudioSpectrumRetry" xml:space="preserve"><value>重新解析</value></data>
   <data name="AudioSpectrumLow" xml:space="preserve"><value>20 Hz</value></data>
-  <data name="AudioSpectrumHigh" xml:space="preserve"><value>11 kHz</value></data>
+  <data name="AudioSpectrumHigh" xml:space="preserve"><value>24 kHz</value></data>
+  <data name="AudioSpectrumHertzFormat" xml:space="preserve"><value>{0:0} Hz</value></data>
+  <data name="AudioSpectrumKilohertzFormat" xml:space="preserve"><value>{0:0.##} kHz</value></data>
 </root>

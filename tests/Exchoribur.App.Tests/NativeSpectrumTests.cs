@@ -5,6 +5,27 @@ namespace Exchoribur.App.Tests;
 public sealed class NativeSpectrumTests
 {
     [WindowsMediaFact]
+    public async Task High_frequency_audio_is_decoded_above_the_previous_bandwidth()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"native-high-spectrum-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var path = Path.Combine(directory, "high.wav");
+            WriteWave(path, 48000, 1, 23000);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var result = await new FfmpegSpectrumAnalyzer(Path.Combine(directory, "cache"))
+                .AnalyzeAsync(path, TimeSpan.FromSeconds(1), new Progress<double>(), cancellation.Token);
+            Assert.NotNull(result);
+            var peak = Enumerable.Range(0, result.Bands).MaxBy(band => result.Intensity(0, 10, band));
+            Assert.InRange(result.Intensity(0, 10, peak), 200, 255);
+            Assert.InRange(23000, Exchoribur.Core.Audio.AudioSpectrogram.BandFrequency(peak),
+                Exchoribur.Core.Audio.AudioSpectrogram.BandFrequency(peak + 1));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [WindowsMediaFact]
     public async Task Container_origin_and_delayed_aac_keep_the_same_timeline_after_a_global_timestamp_shift()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"native-pts-{Guid.NewGuid():N}");
@@ -98,7 +119,7 @@ public sealed class NativeSpectrumTests
         }
     }
 
-    private static void WriteWave(string path, int rate, int seconds)
+    private static void WriteWave(string path, int rate, int seconds, int frequency = 1000)
     {
         var count = rate * seconds;
         using var writer = new BinaryWriter(File.Create(path));
@@ -107,6 +128,6 @@ public sealed class NativeSpectrumTests
         writer.Write(rate); writer.Write(rate * 2); writer.Write((short)2); writer.Write((short)16);
         writer.Write("data"u8); writer.Write(count * 2);
         for (var i = 0; i < count; i++)
-            writer.Write((short)(20000 * Math.Sin(2 * Math.PI * 1000 * i / rate)));
+            writer.Write((short)(20000 * Math.Sin(2 * Math.PI * frequency * i / rate)));
     }
 }

@@ -8,9 +8,11 @@ public sealed class AudioSpectrogram
     public int Bands { get; }
     public int Columns => _levels[0].Length / Bands;
     public int LevelCount => _levels.Length;
-    public const int SampleRate = 22050;
+    public const int SampleRate = 48000;
+    public const double MinimumFrequency = 20;
+    public const double MaximumFrequency = SampleRate / 2.0;
     public const int BandCount = 96;
-    public const int HopSize = 1024;
+    public const int HopSize = 2048;
     public static TimeSpan ColumnStep => TimeSpan.FromSeconds((double)HopSize / SampleRate);
 
     public AudioSpectrogram(TimeSpan step, int bands, ReadOnlySpan<byte> intensities)
@@ -45,5 +47,10 @@ public sealed class AudioSpectrogram
 
     public byte[] CopyIntensities() => (byte[])_levels[0].Clone();
     public static double BandFrequency(int band)
-        => 20 * Math.Pow((SampleRate / 2.0) / 20, (double)band / BandCount);
+        => MinimumFrequency * Math.Pow(MaximumFrequency / MinimumFrequency, (double)band / BandCount);
+
+    /// <summary>频率在对数纵轴上的位置:最低为 0,最高为 1。</summary>
+    public static double FrequencyPosition(double frequency)
+        => Math.Log(Math.Clamp(frequency, MinimumFrequency, MaximumFrequency) / MinimumFrequency)
+            / Math.Log(MaximumFrequency / MinimumFrequency);
 }

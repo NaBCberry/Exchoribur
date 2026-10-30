@@ -31,6 +31,12 @@ public sealed class AudioSpectrumControl : Control
     private bool _scrubbing;
     private int[] _pixels = [];
     private TimelinePalette? _palette;
+    private double _axisHeight = -1;
+    private FontFamily? _axisFont;
+    private string? _axisCulture;
+    private readonly List<(double Y, FormattedText Text, double LabelY)> _ticks = [];
+    private Pen? _frequencyGridPen;
+    private static readonly double[] FrequencyTicks = [24000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20];
     private static readonly uint[] Palette = Enumerable.Range(0, 256).Select(index =>
     {
         var x = Math.Pow(Math.Clamp(((index / 255.0) - .12) / .88, 0, 1), 1.5);
@@ -76,6 +82,7 @@ public sealed class AudioSpectrumControl : Control
         if (Viewport is not { Scale: > 0 } viewport) return;
         var width = Math.Max(1, (int)TimelineLayout.GetTrackWidth(Bounds.Width));
         var track = new Rect(TimelineLayout.TrackLeft, 0, width, Bounds.Height);
+        UpdateFrequencyAxis(palette);
         using (context.PushClip(track))
         {
             if (Data is { } data)
@@ -85,16 +92,47 @@ public sealed class AudioSpectrumControl : Control
                     UpdateBitmap(data, viewport, width);
                 if (_bitmap is { } bitmap) context.DrawImage(bitmap, track);
             }
+            using (context.PushOpacity(.2))
+                foreach (var tick in _ticks)
+                {
+                    var y = Math.Clamp(tick.Y, .5, Math.Max(.5, Bounds.Height - .5));
+                    context.DrawLine(_frequencyGridPen!, new Point(track.Left, y), new Point(track.Right, y));
+                }
             foreach (var rect in TimelineGeometry.UnplayableRegions(viewport, ReferenceDuration, width, 0, Bounds.Height))
                 context.FillRectangle(palette.UnplayableMask, rect);
             var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
             context.DrawLine(palette.PlayheadPen, new Point(x, 0), new Point(x, Bounds.Height));
         }
-        var typeface = new Typeface(TextElement.GetFontFamily(this));
-        context.DrawText(new FormattedText(Strings.AudioSpectrumHigh, System.Globalization.CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight, typeface, 9, Brushes.Gray), new Point(2, 4));
-        context.DrawText(new FormattedText(Strings.AudioSpectrumLow, System.Globalization.CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight, typeface, 9, Brushes.Gray), new Point(2, Math.Max(18, Bounds.Height - 16)));
+        foreach (var tick in _ticks) context.DrawText(tick.Text, new Point(2, tick.LabelY));
+    }
+
+    private void UpdateFrequencyAxis(TimelinePalette palette)
+    {
+        var font = TextElement.GetFontFamily(this);
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        // 播放头每次刷新不重新排版刻度,只在面板高度、字体或语言变化时更新。
+        if (_axisHeight == Bounds.Height && Equals(_axisFont, font) && _axisCulture == culture.Name) return;
+        _axisHeight = Bounds.Height;
+        _axisFont = font;
+        _axisCulture = culture.Name;
+        _frequencyGridPen ??= new Pen(palette.DimText, 1);
+        _ticks.Clear();
+        var typeface = new Typeface(font);
+        var previousBottom = double.NegativeInfinity;
+        foreach (var frequency in FrequencyTicks)
+        {
+            var label = string.Format(culture,
+                frequency >= 1000 ? Strings.AudioSpectrumKilohertzFormat : Strings.AudioSpectrumHertzFormat,
+                frequency >= 1000 ? frequency / 1000 : frequency);
+            var text = new FormattedText(label, culture, FlowDirection.LeftToRight, typeface, 9, palette.DimText);
+            var y = (1 - AudioSpectrogram.FrequencyPosition(frequency)) * Bounds.Height;
+            var labelY = Math.Clamp(y - (text.Height / 2), 0, Math.Max(0, Bounds.Height - text.Height));
+            // 缩小频谱面板时省略拥挤的中间刻度,保留上下限。
+            if (frequency != AudioSpectrogram.MinimumFrequency && frequency != AudioSpectrogram.MaximumFrequency
+                && (labelY < previousBottom + 3 || labelY + text.Height + 3 > Bounds.Height - text.Height)) continue;
+            _ticks.Add((y, text, labelY));
+            previousBottom = labelY + text.Height;
+        }
     }
 
     private void UpdateBitmap(AudioSpectrogram data, TimelineViewport viewport, int width)

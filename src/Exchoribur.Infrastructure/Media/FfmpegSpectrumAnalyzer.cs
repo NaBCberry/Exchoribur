@@ -23,7 +23,7 @@ public sealed class FfmpegSpectrumAnalyzer : IAudioSpectrumAnalyzer
             return await Task.Run(() =>
             {
                 var file = new FileInfo(path);
-                var identity = $"spectrum-ffmpeg-v1|{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
+                var identity = $"spectrum-ffmpeg-v2-48k|{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
                 var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
                 var cache = Path.Combine(_cacheDirectory, key + ".bin");
                 if (ReadCache(cache) is { } saved) return saved;
