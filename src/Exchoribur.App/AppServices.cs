@@ -19,6 +19,7 @@ internal static class AppServices
     public static IFileAccess CreateFileAccess() => new SystemFileAccess();
     public static IUpdateFeed CreateUpdateFeed() => new GithubReleaseUpdateFeed();
     public static IVideoService CreateVideo() => new VideoService(new LibVlcVideoDecoder());
+    public static IAudioSpectrumAnalyzer CreateSpectrumAnalyzer() => new FfmpegSpectrumAnalyzer();
     public static IDeviceService CreateDevice(string? logPath)
         => new DeviceService(new SystemDeviceChannels(logPath), new UiCallbackDispatcher(), logPath);
 }

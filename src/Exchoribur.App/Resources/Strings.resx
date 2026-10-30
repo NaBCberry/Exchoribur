@@ -925,4 +925,12 @@
   <data name="ChannelModeMedium" xml:space="preserve"><value>中闪</value></data>
   <data name="ChannelModeSlow" xml:space="preserve"><value>慢闪</value></data>
   <data name="BlockResizeAction" xml:space="preserve"><value>调整颜色块边界</value></data>
+  <data name="AudioSpectrumEmpty" xml:space="preserve"><value>导入参考视频后显示音频频谱</value></data>
+  <data name="AudioSpectrumAnalyzing" xml:space="preserve"><value>正在解析音频…</value></data>
+  <data name="AudioSpectrumProgressFormat" xml:space="preserve"><value>正在解析音频 {0:0}%</value></data>
+  <data name="AudioSpectrumNoAudio" xml:space="preserve"><value>该媒体没有可解析的音轨</value></data>
+  <data name="AudioSpectrumFailed" xml:space="preserve"><value>音频解析失败，请重试</value></data>
+  <data name="AudioSpectrumRetry" xml:space="preserve"><value>重新解析</value></data>
+  <data name="AudioSpectrumLow" xml:space="preserve"><value>20 Hz</value></data>
+  <data name="AudioSpectrumHigh" xml:space="preserve"><value>11 kHz</value></data>
 </root>

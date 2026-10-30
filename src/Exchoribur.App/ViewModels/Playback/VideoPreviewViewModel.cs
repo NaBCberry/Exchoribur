@@ -15,6 +15,8 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     private int _loadVersion;
 
     public event Action? ServiceCreated;
+    public event Action<string, TimeSpan>? MediaOpened;
+    public event Action? MediaCleared;
 
     public event Action<string, bool>? StatusReported;
 
@@ -73,6 +75,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         if (_disposed) return false;
         _loadVersion++;
         var fileName = Path.GetFileName(path);
+        MediaCleared?.Invoke();
 
         if (!Video.IsAvailable)
         {
@@ -91,6 +94,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         // 换媒体时不能沿用上一份视频的长度。
         var length = Video.Length;
         VideoLength = length > TimeSpan.Zero ? length : TimeSpan.Zero;
+        MediaOpened?.Invoke(path, VideoLength);
         StatusReported?.Invoke(string.Format(Strings.MainVideoLoadedFormat, fileName), false);
 
         return true;
@@ -100,6 +104,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
     {
         if (_disposed) return false;
         var version = ++_loadVersion;
+        MediaCleared?.Invoke();
         var video = Video;
         var name = Path.GetFileName(path);
         if (!video.IsAvailable)
@@ -116,6 +121,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         }
         HasVideo = true;
         VideoLength = video.Length > TimeSpan.Zero ? video.Length : TimeSpan.Zero;
+        MediaOpened?.Invoke(path, VideoLength);
         StatusReported?.Invoke(string.Format(Strings.MainVideoLoadedFormat, name), false);
         return true;
     }
@@ -126,6 +132,7 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
         if (_disposed) return;
         _loadVersion++;
         var video = _video;
+        MediaCleared?.Invoke();
         _video = null;
         _lastFrame = null;
         if (video is not null) video.FrameUpdated -= OnFrameUpdated;
@@ -147,6 +154,8 @@ public sealed partial class VideoPreviewViewModel(Func<IVideoService> factory) :
             _video = null;
         }
         ServiceCreated = null;
+        MediaOpened = null;
+        MediaCleared = null;
         StatusReported = null;
     }
 }

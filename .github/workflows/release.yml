@@ -136,6 +136,9 @@ jobs:
       # 发布前照跑一遍测试:本地打的标签不一定经过 CI
       - name: Restore
         run: dotnet restore Exchoribur.slnx
+      - name: Prepare audio decoder
+        shell: pwsh
+        run: ./scripts/prepare-ffmpeg.ps1
       - name: Build
         run: dotnet build Exchoribur.slnx --configuration Release --no-restore
       - name: Test

@@ -80,6 +80,10 @@ jobs:
       - name: Restore
         if: steps.changes.outputs.run == 'true'
         run: dotnet restore Exchoribur.slnx
+      - name: Prepare audio decoder
+        if: steps.changes.outputs.run == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/prepare-ffmpeg.ps1
       - name: Build
         if: steps.changes.outputs.run == 'true'
         run: dotnet build Exchoribur.slnx --configuration Release --no-restore

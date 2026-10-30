@@ -469,13 +469,26 @@
                 </Border>
 
                 <Border Grid.Row="1" Classes="panel">
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="7">
-                        <Path Classes="icon title" Data="{x:Static controls:Icons.AudioWaveform}" />
-                        <TextBlock Classes="hint" Text="{x:Static res:Strings.MainAudioWaveformPlaceholder}" />
-                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <Grid Grid.Column="0" ClipToBounds="True">
+                            <timeline:AudioSpectrumControl Data="{Binding Spectrum.Data}"
+                                Viewport="{Binding Editing.Viewport}"
+                                ReferenceDuration="{Binding Preview.VideoLength}"
+                                PlayheadTime="{Binding Playback.PlayheadTime, Mode=TwoWay}" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
+                                        IsVisible="{Binding Spectrum.ShowMessage}" MaxWidth="320">
+                                <TextBlock Classes="hint" Text="{Binding Spectrum.Message}" HorizontalAlignment="Center" />
+                                <ProgressBar Width="220" Height="6" Minimum="0" Maximum="100"
+                                    Value="{Binding Spectrum.Progress}" IsIndeterminate="{Binding Spectrum.IsIndeterminate}"
+                                    IsVisible="{Binding Spectrum.IsAnalyzing}" />
+                                <Button Content="{x:Static res:Strings.AudioSpectrumRetry}"
+                                    Command="{Binding Spectrum.RetryCommand}" IsVisible="{Binding Spectrum.CanRetry}"
+                                    HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Border Grid.Column="1" Width="220" IsVisible="{Binding Editing.BlockEditor.HasCurrentBlock}" />
+                        <Border Grid.Column="2" Width="260" IsVisible="{Binding IsDevicePanelOpen}" />
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>

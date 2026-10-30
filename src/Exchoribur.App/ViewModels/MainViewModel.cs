@@ -29,6 +29,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     public PlaybackViewModel Playback { get; }
 
     public VideoPreviewViewModel Preview { get; }
+    public AudioSpectrumViewModel Spectrum { get; }
 
     private readonly ProjectSession _projects;
 
@@ -84,10 +85,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         IExternalLauncher? externalLauncher,
         Func<IVideoService>? videoFactory,
         IDeviceService? device = null,
-        IProjectStore? projectStore = null)
+        IProjectStore? projectStore = null,
+        IAudioSpectrumAnalyzer? spectrumAnalyzer = null)
     {
         // 播放器是懒创建的,所以这里传的是"取播放器"的方法。
         Preview = new VideoPreviewViewModel(videoFactory ?? AppServices.CreateVideo);
+        Spectrum = new AudioSpectrumViewModel(spectrumAnalyzer ?? AppServices.CreateSpectrumAnalyzer());
+        Preview.MediaOpened += Spectrum.Open;
+        Preview.MediaCleared += Spectrum.Clear;
         Preview.ServiceCreated += ApplyAudioSettings;
         Preview.StatusReported += Report;
         _audio = audio ?? new VideoAudioDeviceController(() => Preview.CreatedService);
@@ -171,6 +176,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
         _deviceShutdown = _deviceService?.DisposeAsync().AsTask() ?? Task.CompletedTask;
 
         Preview.ServiceCreated -= ApplyAudioSettings;
+        Preview.MediaOpened -= Spectrum.Open;
+        Preview.MediaCleared -= Spectrum.Clear;
+        Spectrum.Dispose();
         Preview.StatusReported -= Report;
         Preview.PropertyChanged -= OnPreviewChanged;
         Preview.Dispose();
@@ -181,7 +189,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IAsyncDisposabl
     public ValueTask DisposeAsync()
     {
         Dispose();
-        return new ValueTask(_deviceShutdown);
+        return new ValueTask(Task.WhenAll(_deviceShutdown, Spectrum.Completion));
     }
 
     /// <summary>当前工程。还没导入任何东西时是 null。</summary>

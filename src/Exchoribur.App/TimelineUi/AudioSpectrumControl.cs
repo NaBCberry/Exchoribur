@@ -1,0 +1,161 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Documents;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Exchoribur.App.Resources;
+using Exchoribur.Core.Audio;
+
+namespace Exchoribur.App.TimelineUi;
+
+/// <summary>与主轨道共用时间映射,缓存可见频谱位图,播放头移动时只重画竖线。</summary>
+public sealed class AudioSpectrumControl : Control
+{
+    public static readonly StyledProperty<AudioSpectrogram?> DataProperty = AvaloniaProperty.Register<AudioSpectrumControl, AudioSpectrogram?>(nameof(Data));
+    public static readonly StyledProperty<TimelineViewport?> ViewportProperty = AvaloniaProperty.Register<AudioSpectrumControl, TimelineViewport?>(nameof(Viewport));
+    public static readonly StyledProperty<TimeSpan> PlayheadTimeProperty = AvaloniaProperty.Register<AudioSpectrumControl, TimeSpan>(nameof(PlayheadTime));
+    public static readonly StyledProperty<TimeSpan> ReferenceDurationProperty = AvaloniaProperty.Register<AudioSpectrumControl, TimeSpan>(nameof(ReferenceDuration));
+    public AudioSpectrogram? Data { get => GetValue(DataProperty); set => SetValue(DataProperty, value); }
+    public TimelineViewport? Viewport { get => GetValue(ViewportProperty); set => SetValue(ViewportProperty, value); }
+    public TimeSpan PlayheadTime { get => GetValue(PlayheadTimeProperty); set => SetValue(PlayheadTimeProperty, value); }
+    public TimeSpan ReferenceDuration { get => GetValue(ReferenceDurationProperty); set => SetValue(ReferenceDurationProperty, value); }
+    private WriteableBitmap? _bitmap;
+    private AudioSpectrogram? _lastData;
+    private TimeSpan _lastStart;
+    private double _lastScale;
+    private TimelineViewport? _subscribed;
+    private bool _scrubbing;
+    private int[] _pixels = [];
+    private TimelinePalette? _palette;
+    private static readonly uint[] Palette = Enumerable.Range(0, 256).Select(index =>
+    {
+        var x = Math.Pow(Math.Clamp(((index / 255.0) - .12) / .88, 0, 1), 1.5);
+        var red = (byte)(255 * Math.Clamp((x - .55) / .45, 0, 1));
+        var green = (byte)(255 * Math.Clamp((x - .2) / .6, 0, 1));
+        var blue = (byte)(255 * Math.Clamp(x * 2, 0, 1) * (1 - Math.Clamp((x - .55) / .45, 0, 1)));
+        return 0xff000000u | ((uint)red << 16) | ((uint)green << 8) | blue;
+    }).ToArray();
+
+    static AudioSpectrumControl()
+        => AffectsRender<AudioSpectrumControl>(DataProperty, ViewportProperty, PlayheadTimeProperty, ReferenceDurationProperty);
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == ViewportProperty) Subscribe();
+    }
+    private void Subscribe()
+    {
+        if (_subscribed is not null) _subscribed.PropertyChanged -= ViewChanged;
+        _subscribed = Viewport;
+        if (_subscribed is not null) _subscribed.PropertyChanged += ViewChanged;
+    }
+    private void ViewChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Subscribe();
+    }
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_subscribed is not null) _subscribed.PropertyChanged -= ViewChanged;
+        _subscribed = null;
+        _bitmap?.Dispose();
+        _bitmap = null;
+    }
+
+    public override void Render(DrawingContext context)
+    {
+        var palette = _palette ??= TimelinePalette.Resolve(this);
+        context.FillRectangle(palette.TrackBackground, new Rect(Bounds.Size));
+        if (Viewport is not { Scale: > 0 } viewport) return;
+        var width = Math.Max(1, (int)TimelineLayout.GetTrackWidth(Bounds.Width));
+        var track = new Rect(TimelineLayout.TrackLeft, 0, width, Bounds.Height);
+        using (context.PushClip(track))
+        {
+            if (Data is { } data)
+            {
+                if (_bitmap is null || _bitmap.PixelSize.Width != width || _bitmap.PixelSize.Height != data.Bands
+                    || !ReferenceEquals(data, _lastData) || viewport.Start != _lastStart || viewport.Scale != _lastScale)
+                    UpdateBitmap(data, viewport, width);
+                if (_bitmap is { } bitmap) context.DrawImage(bitmap, track);
+            }
+            foreach (var rect in TimelineGeometry.UnplayableRegions(viewport, ReferenceDuration, width, 0, Bounds.Height))
+                context.FillRectangle(palette.UnplayableMask, rect);
+            var x = TimelineLayout.TrackLeft + viewport.MapTime(PlayheadTime);
+            context.DrawLine(palette.PlayheadPen, new Point(x, 0), new Point(x, Bounds.Height));
+        }
+        var typeface = new Typeface(TextElement.GetFontFamily(this));
+        context.DrawText(new FormattedText(Strings.AudioSpectrumHigh, System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight, typeface, 9, Brushes.Gray), new Point(2, 4));
+        context.DrawText(new FormattedText(Strings.AudioSpectrumLow, System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight, typeface, 9, Brushes.Gray), new Point(2, Math.Max(18, Bounds.Height - 16)));
+    }
+
+    private void UpdateBitmap(AudioSpectrogram data, TimelineViewport viewport, int width)
+    {
+        if (_bitmap is null || _bitmap.PixelSize != new PixelSize(width, data.Bands))
+        {
+            _bitmap?.Dispose();
+            _bitmap = new WriteableBitmap(new PixelSize(width, data.Bands), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+        }
+        if (_pixels.Length != width * data.Bands) _pixels = new int[width * data.Bands];
+        var level = data.LevelFor(1 / viewport.Scale);
+        var step = data.Step.TotalSeconds * (1L << level);
+        for (var x = 0; x < width; x++)
+        {
+            var start = viewport.Start.TotalSeconds + (x / viewport.Scale);
+            var first = Math.Max(0, (int)Math.Floor(start / step));
+            var count = (data.Columns + (1 << level) - 1) >> level;
+            var last = Math.Min(count - 1, (int)Math.Floor((start + (1 / viewport.Scale)) / step));
+            for (var band = 0; band < data.Bands; band++)
+            {
+                byte intensity = 0;
+                for (var column = first; column <= last; column++) intensity = Math.Max(intensity, data.Intensity(level, column, band));
+                _pixels[((data.Bands - band - 1) * width) + x] = (int)Palette[intensity];
+            }
+        }
+        using (var buffer = _bitmap.Lock())
+            for (var row = 0; row < data.Bands; row++)
+                Marshal.Copy(_pixels, row * width, buffer.Address + (row * buffer.RowBytes), width);
+        _lastData = data;
+        _lastStart = viewport.Start;
+        _lastScale = viewport.Scale;
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _scrubbing = true;
+        e.Pointer.Capture(this);
+        Seek(e.GetPosition(this).X);
+        e.Handled = true;
+    }
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (_scrubbing) Seek(e.GetPosition(this).X);
+    }
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        _scrubbing = false;
+        e.Pointer.Capture(null);
+    }
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _scrubbing = false;
+    }
+    private void Seek(double x)
+    {
+        if (Viewport is { } viewport)
+            PlayheadTime = TimelineGeometry.ClampPlayhead(viewport.MapX(x - TimelineLayout.TrackLeft), ReferenceDuration, viewport);
+    }
+}
