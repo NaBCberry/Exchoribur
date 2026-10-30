@@ -37,6 +37,7 @@ public sealed class VideoService : IVideoService
     public bool IsAvailable => !_disposed && _decoder.IsAvailable;
     public double Volume { get => _decoder.Volume; set => _decoder.Volume = value; }
     public TimeSpan Position => _decoder.Position;
+    public MediaPlaybackPosition? PlaybackPosition => _decoder.PlaybackPosition;
     public TimeSpan Length => _decoder.Length;
     public event EventHandler? FrameUpdated;
     public IReadOnlyList<AudioDeviceOption> GetAudioDevices() => _decoder.GetAudioDevices();

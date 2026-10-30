@@ -99,6 +99,34 @@ internal static unsafe class FfmpegAudioDecoder
         }
     }
 
+    internal static (TimeSpan Origin, TimeSpan Duration) ReadTimelineInfo(string path)
+    {
+        Initialize();
+        AVFormatContext* format = null;
+        try
+        {
+            Check(ffmpeg.avformat_open_input(&format, path, null, null));
+            Check(ffmpeg.avformat_find_stream_info(format, null));
+            var origin = format->start_time == ffmpeg.AV_NOPTS_VALUE ? 0
+                : format->start_time / (double)ffmpeg.AV_TIME_BASE;
+            var end = origin;
+            for (var i = 0; i < format->nb_streams; i++)
+            {
+                var stream = format->streams[i];
+                if (stream->duration <= 0 || stream->duration == ffmpeg.AV_NOPTS_VALUE
+                    || (stream->codecpar->codec_type != AVMediaType.AVMEDIA_TYPE_VIDEO
+                        && stream->codecpar->codec_type != AVMediaType.AVMEDIA_TYPE_AUDIO)) continue;
+                var start = stream->start_time == ffmpeg.AV_NOPTS_VALUE ? origin : stream->start_time * ffmpeg.av_q2d(stream->time_base);
+                end = Math.Max(end, start + (stream->duration * ffmpeg.av_q2d(stream->time_base)));
+            }
+            // 部分 MP4 的容器 duration 是绝对结束点,另一些是净时长,不能直接减起点。
+            var duration = end > origin ? end - origin
+                : format->duration > 0 ? format->duration / (double)ffmpeg.AV_TIME_BASE : 0;
+            return (TimeSpan.FromSeconds(origin), TimeSpan.FromSeconds(duration));
+        }
+        finally { ffmpeg.avformat_close_input(&format); }
+    }
+
     private static void Receive(AVCodecContext* codec, AVFrame* frame, AVRational timeBase,
         ResampledAudio samples, CancellationToken token)
     {

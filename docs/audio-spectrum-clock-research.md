@@ -39,9 +39,39 @@ libavformat/libavcodec/libswresample,而不继续增加经验偏移。
 验证应包括零偏移与已知延迟、不同封装、音视频重排和编码延迟、不同启动负载,
 以及长音轨的开头/中间/结尾。多次解析同一文件的媒体时间映射必须与启动时刻无关。
 
+## 播放控制修复
+
+频谱媒体时间正确并不代表播放头与声音一致。对预览路径的对照测量发现:
+应用开始墙钟计时后执行 Play 再 Seek,即便已经在起点,Seek 仍造成额外起播等待。
+因此常规开始和恢复只 Play;手动跳转、循环和结尾重播才定位。
+停止或结束后重播时创建不含 start-paused 的媒体输入;若明确指定非零位置,
+则等待新输入 Playing 后执行一次定位。不混用 start-time 选项在不同封装中的解释,
+常规开始与暂停恢复仍不执行这次定位。
+
+实际播放器通过 TimeChanged 发布媒体位置,等待首次媒体进度时不推进播放头。
+两次通知之间使用单调时钟推算,最多外推 500 ms,缓冲/暂停时冻结,定位后重新建立
+锚点。500 ms 是缺少新媒体通知时的外推上限,不是媒体偏移或精度承诺。
+界面和灯光共用媒体位置,不再通过反复 Seek 让视频追赶墙钟。无视频时仍独立计时。
+
+加载元数据时统一容器起点。非零起点素材使用 VLC 的 AVFormat 解复用模块,
+该模块在原生端减去 start_time,并在定位时加回,界面不重复扣除。
+VLC 3 的 MP4 模块在 TrackTimeToSampleChunk 中处理空白编辑段的定位存在缺陷,
+仅将读取位置减起点不能修复,因此对非零起点素材不继续使用该定位路径。
+时长优先使用音视频轨道最晚结束点减共同起点;不能盲目从容器 duration 减起点,
+不同封装对该字段的表达存在差异。现有同步 Load 入口为兼容入口,工程与视频导入
+使用读取共同原点和时长的 LoadAsync。
+
+合成白闪的原生对照中,2/4 秒处的播放头分别约为 2.005/4.001 秒;
+暂停一秒恢复后的 4 秒白闪约为 4.003 秒。演唱会素材首次媒体进度约 165 ms。
+非零起点 AVFormat 路径中,白闪约为 2.026/4.027 秒（期望 2.022/4.022 秒）。
+从一秒重播时,0.5 秒处的额外白闪被跳过,后续白闪为 2.028/4.025 秒。
+这些是本机特定样本的验证结果,不能替代实际音频输出设备或其他平台的验收。
+
 ## 一手资料
 
 - [VLC 3.0.23 decoder.c](https://github.com/videolan/vlc/blob/3.0.23/src/input/decoder.c)
+- [MP4 编辑段定位](https://github.com/videolan/vlc/blob/3.0.23/modules/demux/mp4/mp4.c#L2859)
+- [AVFormat 时间与定位换算](https://github.com/videolan/vlc/blob/3.0.23/modules/demux/avformat/demux.c#L802)
 - [VLC 3.0.23 clock.c](https://github.com/videolan/vlc/blob/3.0.23/src/input/clock.c)
 - [VLC 3.0.23 smem.c](https://github.com/videolan/vlc/blob/3.0.23/modules/stream_out/smem.c)
 - [VLC 时钟架构说明中的旧时钟系统](https://github.com/videolan/vlc/blob/master/doc/clock.md)

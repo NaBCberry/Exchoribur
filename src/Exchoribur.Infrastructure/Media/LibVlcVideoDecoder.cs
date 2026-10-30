@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Exchoribur.Application.Abstractions;
 using Exchoribur.Application.Playback;
@@ -15,6 +16,7 @@ namespace Exchoribur.Infrastructure.Media;
 public sealed class LibVlcVideoDecoder : IVideoDecoder
 {
     private readonly object _sync = new();
+    private readonly object _controlSync = new();
     private FrameBuffer? _activeBuffer;
     private FrameBuffer? _latest;
 
@@ -27,6 +29,13 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
     private bool _disposed;
     private long _knownLengthMilliseconds;
     private CancellationTokenSource? _parseCancellation;
+    private readonly MediaPositionClock _clock = new(() => Stopwatch.GetElapsedTime(0));
+    private volatile bool _playRequested;
+    private TimeSpan _restartPosition;
+    private volatile bool _needsRestart;
+    private string? _mediaPath;
+    private int _resumeAfterLoad;
+    private bool _useAvformat;
 
     public LibVlcVideoDecoder()
     {
@@ -35,6 +44,29 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             VlcCore.Initialize();
             _libVlc = new LibVLC();
             _player = new MediaPlayer(_libVlc);
+            _player.TimeChanged += (_, e) => _clock.Observe(ToTimeline(e.Time));
+            _player.Paused += (_, _) => _clock.Suspend();
+            _player.Playing += (_, _) =>
+            {
+                if (Interlocked.Exchange(ref _resumeAfterLoad, 0) == 0) return;
+                var media = _media;
+                // 原生回调只发布状态,控制调用另行调度,避免等待当前回调自身。
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        lock (_controlSync)
+                        {
+                            if (_disposed || !_playRequested || !ReferenceEquals(media, _media)) return;
+                            Seek(_restartPosition);
+                        }
+                    }
+                    catch (ObjectDisposedException) { }
+                });
+            };
+            _player.Stopped += (_, _) => _clock.Suspend();
+            _player.EndReached += (_, _) => { _needsRestart = true; _clock.Suspend(ended: true); };
+            _player.Buffering += (_, e) => { if (e.Cache < 100) _clock.Suspend(); else if (_playRequested) _clock.Resume(); };
 
             // 保留解码器提供的原始宽高,仅协商像素格式与内存布局。
             _player.SetVideoFormatCallbacks(SetupVideoFormat, CleanupVideoFormat);
@@ -137,7 +169,10 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
         : OperatingSystem.IsMacOS() ? "auhal"
         : "pulse";
 
-    public TimeSpan Position => TimeSpan.FromMilliseconds(_player?.Time ?? 0);
+    private static TimeSpan ToTimeline(long milliseconds)
+        => TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
+    public TimeSpan Position => ToTimeline(_player?.Time ?? 0);
+    public MediaPlaybackPosition? PlaybackPosition => _clock.Read();
 
     /// <summary>视频总长;媒体还没读出来时为 0。</summary>
     public TimeSpan Length
@@ -158,22 +193,32 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
     /// </summary>
     public bool Load(string path)
     {
-        if (_libVlc is null || _player is null)
+        lock (_controlSync)
         {
-            return false;
+            if (_libVlc is null || _player is null)
+            {
+                return false;
+            }
+
+            _parseCancellation?.Cancel();
+            _parseCancellation?.Dispose();
+            _parseCancellation = new CancellationTokenSource();
+            Volatile.Write(ref _knownLengthMilliseconds, 0);
+            _playRequested = false;
+            Interlocked.Exchange(ref _resumeAfterLoad, 0);
+            _restartPosition = TimeSpan.Zero;
+            _player.Stop();
+            _clock.Reset(TimeSpan.Zero);
+            lock (_sync) _latest = null;
+            _media?.Dispose();
+            _media = new VlcMedia(_libVlc, path, FromType.FromPath);
+            _useAvformat = false;
+            _mediaPath = path;
+            _needsRestart = false;
+            _media.AddOption(":start-paused");
+
+            return _player.Play(_media);
         }
-
-        _parseCancellation?.Cancel();
-        _parseCancellation?.Dispose();
-        _parseCancellation = new CancellationTokenSource();
-        Volatile.Write(ref _knownLengthMilliseconds, 0);
-        _player.Stop();
-        lock (_sync) _latest = null;
-        _media?.Dispose();
-        _media = new VlcMedia(_libVlc, path, FromType.FromPath);
-        _media.AddOption(":start-paused");
-
-        return _player.Play(_media);
     }
 
     /// <summary>暂停加载时也先解析本地元数据,让工程打开完成前就得到视频总长。</summary>
@@ -187,39 +232,121 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
             // 避免调用方随即释放播放器时阻塞原生解析线程自身。
             await Task.Yield();
             if (_disposed || !ReferenceEquals(media, _media) || cancellation.IsCancellationRequested) return false;
-            var duration = media.Duration;
+            (TimeSpan Origin, TimeSpan Duration) timeline;
+            try { timeline = await Task.Run(() => FfmpegAudioDecoder.ReadTimelineInfo(path), cancellation.Token).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is DllNotFoundException or NotSupportedException or InvalidDataException)
+            { timeline = default; } // 系统缺少独立解码库时仍允许预览。
+            if (_disposed || !ReferenceEquals(media, _media) || cancellation.IsCancellationRequested) return false;
+            if (timeline.Origin != TimeSpan.Zero && _player is { } player && _libVlc is { } vlc)
+            {
+                // VLC 3 的 MP4 定位没有完整扣除空白编辑段,不能仅通过加减原点修复。
+                // AVFormat 模块内部统一了 PTS 与 seek 的 start_time,对这类输入单独使用。
+                var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                EventHandler<EventArgs> paused = (_, _) => ready.TrySetResult();
+                player.Paused += paused;
+                try
+                {
+                    lock (_controlSync)
+                    {
+                        if (_disposed || !ReferenceEquals(media, _media)) return false;
+                        player.Stop();
+                        var replacement = new VlcMedia(vlc, path, FromType.FromPath);
+                        replacement.AddOption(":demux=avformat");
+                        replacement.AddOption(":start-paused");
+                        _media = replacement;
+                        _useAvformat = true;
+                        if (!player.Play(replacement)) return false;
+                        media.Dispose();
+                        media = replacement;
+                    }
+                    await ready.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellation.Token).ConfigureAwait(false);
+                }
+                finally { player.Paused -= paused; }
+                if (_disposed || !ReferenceEquals(media, _media) || cancellation.IsCancellationRequested) return false;
+            }
+            // AVFormat 已在原生端减去 start_time,不重复归一化。
+            _clock.Reset(TimeSpan.Zero);
+            var duration = timeline.Duration > TimeSpan.Zero ? (long)Math.Ceiling(timeline.Duration.TotalMilliseconds) : media.Duration;
             if (duration > 0) Volatile.Write(ref _knownLengthMilliseconds, duration);
             return true;
         }
         catch (OperationCanceledException) { return false; }
+        catch (TimeoutException) { return false; }
         catch (ObjectDisposedException) { return false; }
     }
 
     /// <summary>停止并回到开头。libvlc 的 Stop 会把媒体卸下来,重新挂上以便再次播放。</summary>
     public void Stop()
     {
-        if (_player is not { } player)
+        lock (_controlSync)
         {
-            return;
-        }
+            _playRequested = false;
+            Interlocked.Exchange(ref _resumeAfterLoad, 0);
+            _restartPosition = TimeSpan.Zero;
+            if (_player is not { } player)
+            {
+                return;
+            }
 
-        player.Stop();
+            player.Stop();
+            _needsRestart = true;
+            _clock.Reset(TimeSpan.Zero);
 
-        if (_media is not null)
-        {
-            player.Media = _media;
+            if (_media is not null)
+            {
+                player.Media = _media;
+            }
         }
     }
 
-    public void Play() => _player?.Play();
+    public void Play()
+    {
+        lock (_controlSync)
+        {
+            _playRequested = true;
+            _clock.Resume();
+            if (_needsRestart && _player is { } player && _libVlc is { } vlc && _mediaPath is { } path)
+            {
+                // 重新创建输入,不继承首次加载的 start-paused。常规暂停恢复不经过这里。
+                var previous = _media;
+                var media = new VlcMedia(vlc, path, FromType.FromPath);
+                if (_useAvformat) media.AddOption(":demux=avformat");
+                // 只对明确的非零重播请求,在输入启动就绪后执行一次定位。
+                if (_restartPosition > TimeSpan.Zero)
+                {
+                    Interlocked.Exchange(ref _resumeAfterLoad, 1);
+                }
+                _media = media;
+                _needsRestart = false;
+                player.Play(media);
+                previous?.Dispose();
+                return;
+            }
+            _player?.Play();
+        }
+    }
 
-    public void Pause() => _player?.SetPause(true);
+    public void Pause()
+    {
+        lock (_controlSync)
+        {
+            _playRequested = false;
+            _clock.Suspend();
+            _player?.SetPause(true);
+        }
+    }
 
     public void Seek(TimeSpan position)
     {
-        if (_player is { } player)
+        lock (_controlSync)
         {
-            player.Time = (long)Math.Max(0, position.TotalMilliseconds);
+            if (_player is { } player)
+            {
+                _restartPosition = position;
+                _clock.Reset(position, seeking: true);
+                if (_needsRestart) return;
+                player.Time = (long)Math.Max(0, position.TotalMilliseconds);
+            }
         }
     }
 
@@ -334,7 +461,7 @@ public sealed class LibVlcVideoDecoder : IVideoDecoder
         }
         // 不持锁等待 VLC:它停止时会等待正在运行的回调,并调用格式清理。
         _parseCancellation?.Cancel();
-        _player?.Dispose();
+        lock (_controlSync) _player?.Dispose();
         _media?.Dispose();
         _libVlc?.Dispose();
         _parseCancellation?.Dispose();
