@@ -328,8 +328,13 @@
             </Grid>
 
             <!-- 右栏:时间轴(主区域)+ 与时间轴对齐的音频波形;调色盘是浮在时间轴上的弹出面板 -->
-            <Grid Grid.Column="1" Margin="0,8,8,8" RowDefinitions="*,110">
-                <Border Grid.Row="0" Classes="panel" Margin="0,0,0,8">
+            <Grid Grid.Column="1" Margin="0,8,8,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="4*" MinHeight="260" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="*" MinHeight="80" />
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Classes="panel">
                     <DockPanel>
                         <!-- 底部留一条窄条专门放缩放按钮,不压在轨道色块上 -->
                         <Border DockPanel.Dock="Bottom"
@@ -468,7 +473,13 @@
                     </DockPanel>
                 </Border>
 
-                <Border Grid.Row="1" Classes="panel">
+                <GridSplitter Grid.Row="1"
+                              ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              Background="Transparent"
+                              Cursor="SizeNorthSouth" />
+
+                <Border Grid.Row="2" Classes="panel">
                     <Grid ColumnDefinitions="*,Auto,Auto">
                         <Grid Grid.Column="0" ClipToBounds="True">
                             <timeline:AudioSpectrumControl Data="{Binding Spectrum.Data}"
