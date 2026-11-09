@@ -16,10 +16,21 @@ public sealed class LightStatusLayoutTests
     }
 
     [Fact]
-    public void Missing_or_unrepresented_modes_leave_every_indicator_off()
+    public void All_four_bit_modes_light_the_indicator_for_their_modulo_four_behavior()
+    {
+        int[] indicators = [0, 3, 2, 1];
+        for (byte raw = 0; raw < 16; raw++)
+        {
+            Assert.True(FlashModes.TryFromRawValue(raw, out var mode));
+            Assert.Equal(new[] { indicators[raw % 4] }, Enumerable.Range(0, 4)
+                .Where(index => LightStatusLayout.IsActive(mode, index)));
+        }
+    }
+
+    [Fact]
+    public void Missing_frame_leaves_every_indicator_off()
     {
         Assert.All(Enumerable.Range(0, 4), index => Assert.False(LightStatusLayout.IsActive(null, index)));
-        Assert.All(Enumerable.Range(0, 4), index => Assert.False(LightStatusLayout.IsActive((FlashMode)10, index)));
     }
 
     [Theory]

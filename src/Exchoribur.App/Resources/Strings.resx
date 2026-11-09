@@ -219,6 +219,30 @@
   <data name="MainActionDeleteFrames" xml:space="preserve">
     <value>删除帧</value>
   </data>
+  <data name="MainActionCopyFrames" xml:space="preserve">
+    <value>复制帧</value>
+  </data>
+  <data name="MainActionCutFrames" xml:space="preserve">
+    <value>剪切帧</value>
+  </data>
+  <data name="MainActionPasteFrames" xml:space="preserve">
+    <value>粘贴帧</value>
+  </data>
+  <data name="MainStatusFramesCopiedFormat" xml:space="preserve">
+    <value>已复制 {0} 帧</value>
+  </data>
+  <data name="MainStatusFramesCutFormat" xml:space="preserve">
+    <value>已剪切 {0} 帧</value>
+  </data>
+  <data name="MainStatusFramesPastedFormat" xml:space="preserve">
+    <value>已粘贴 {0} 帧</value>
+  </data>
+  <data name="MainHintFrameClipboardEmpty" xml:space="preserve">
+    <value>请先复制或剪切帧</value>
+  </data>
+  <data name="MainHintPastedFramesOutsideBlock" xml:space="preserve">
+    <value>粘贴帧超出当前块范围，请调整播放头位置</value>
+  </data>
   <data name="MainStatusBlockCreatedFormat" xml:space="preserve">
     <value>已在 CH{0} 的 {1} 新建一个块</value>
   </data>

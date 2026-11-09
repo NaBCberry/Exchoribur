@@ -177,6 +177,25 @@ public partial class MainWindow : Window
                     return;
             }
         }
+        else if (FocusManager?.GetFocusedElement() is BlockEditorControl
+            && (e.KeyModifiers == KeyModifiers.Control
+                || (OperatingSystem.IsMacOS() && e.KeyModifiers == KeyModifiers.Meta)))
+        {
+            switch (e.Key)
+            {
+                case Key.C:
+                    viewModel.Editing.BlockEditor.CopySelectedFramesCommand.Execute(null);
+                    break;
+                case Key.X:
+                    viewModel.Editing.BlockEditor.CutSelectedFramesCommand.Execute(null);
+                    break;
+                case Key.V:
+                    viewModel.Editing.BlockEditor.PasteFramesCommand.Execute(null);
+                    break;
+                default:
+                    return;
+            }
+        }
         else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.Shift)
         {
             // 保留旧的删帧组合键,同样避开输入框。

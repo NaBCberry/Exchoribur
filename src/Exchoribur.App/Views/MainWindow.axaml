@@ -119,6 +119,13 @@
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
+                <MenuItem Header="{x:Static res:Strings.MainActionCopyFrames}"
+                          Command="{Binding Editing.BlockEditor.CopySelectedFramesCommand}" InputGesture="Ctrl+C" />
+                <MenuItem Header="{x:Static res:Strings.MainActionCutFrames}"
+                          Command="{Binding Editing.BlockEditor.CutSelectedFramesCommand}" InputGesture="Ctrl+X" />
+                <MenuItem Header="{x:Static res:Strings.MainActionPasteFrames}"
+                          Command="{Binding Editing.BlockEditor.PasteFramesCommand}" InputGesture="Ctrl+V" />
+                <Separator />
                 <MenuItem Header="{x:Static res:Strings.MainMenuUsePlayheadColor}" Command="{Binding Editing.BlockEditor.SetSelectionColorCommand}">
                     <MenuItem.Icon>
                         <Path Classes="icon title" Data="{x:Static controls:Icons.SetColor}" />

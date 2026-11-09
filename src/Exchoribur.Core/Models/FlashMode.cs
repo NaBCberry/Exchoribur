@@ -7,12 +7,6 @@ public enum FlashMode : byte
     Blink1Hz = 1,
     Blink2Hz = 2,
     Blink4Hz = 3,
-    //还有fade in 和 fade out
-
-    /// <summary>忘记啥了，确认之后记得改</summary>
-    Wangle = 10,
-    /// <summary>忘记啥了，确认之后记得改</summary>
-    Wangle2 = 11
 }
 
 /// <summary> FlashMode 的取值集合与转换工具。 </summary>
@@ -26,10 +20,10 @@ public static class FlashModes
         FlashMode.Blink4Hz
     ]);
 
+    /// <summary>导入时将4位功能码转换为四种标准行为,越界值仍拒绝读取。</summary>
     public static bool TryFromRawValue(byte raw, out FlashMode mode)
     {
-        mode = (FlashMode)raw;
-        //return All.Contains(mode);
-        return Enum.IsDefined(mode);
+        mode = (FlashMode)(raw <= 15 ? raw % 4 : raw);
+        return raw <= 15;
     }
 }
